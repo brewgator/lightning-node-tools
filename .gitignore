@@ -1,0 +1,6 @@
+# Environment variables
+.env
+
+# State files
+last_state.json
+last_uptime.txt
