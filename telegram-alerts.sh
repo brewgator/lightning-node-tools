@@ -15,7 +15,8 @@ if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
 fi
 
 # File to store last known state
-STATE_FILE=~/lightning-monitor/last_state.json
+SCRIPT_DIR="$(dirname "$0")"
+STATE_FILE="$SCRIPT_DIR/data/last_state.json"
 
 # Function to send Telegram message
 send_telegram() {
@@ -45,7 +46,7 @@ format_sats() {
 
 # Check for server reboot by looking at uptime
 CURRENT_UPTIME=$(cat /proc/uptime | cut -d' ' -f1 | cut -d'.' -f1)
-UPTIME_FILE=~/lightning-monitor/last_uptime.txt
+UPTIME_FILE="$SCRIPT_DIR/data/last_uptime.txt"
 
 if [ -f "$UPTIME_FILE" ]; then
     PREV_UPTIME=$(cat "$UPTIME_FILE")
@@ -87,6 +88,9 @@ RECENT_TIME=$(date -d '10 minutes ago' +%s)
 FORWARDING_EVENTS=$(lncli fwdinghistory --start_time $RECENT_TIME | jq '.forwarding_events // []')
 RECENT_FORWARDS=$(echo "$FORWARDING_EVENTS" | jq 'length')
 RECENT_FEES=$(echo "$FORWARDING_EVENTS" | jq '[.[].fee_msat | tonumber] | add // 0')
+
+# Create data directory if it doesn't exist
+mkdir -p "$SCRIPT_DIR/data"
 
 # Initialize state file if it doesn't exist
 if [ ! -f "$STATE_FILE" ]; then

@@ -42,9 +42,9 @@ Real-time Lightning node monitoring with Telegram notifications.
    chmod +x telegram-alerts.sh
    ```
 
-5. **Create the monitor directory**:
+5. **Create the data directory**:
    ```bash
-   mkdir -p ~/lightning-monitor
+   mkdir -p data
    ```
 
 ## Usage
@@ -108,12 +108,12 @@ The script includes several configurable thresholds:
 - `telegram-alerts.sh`: Main monitoring script
 - `.env`: Your private configuration (not tracked by git)
 - `.env.example`: Template configuration file
-- `~/lightning-monitor/last_state.json`: Stores previous state for comparison
-- `~/lightning-monitor/last_uptime.txt`: Tracks server uptime for reboot detection
+- `data/last_state.json`: Stores previous state for comparison
+- `data/last_uptime.txt`: Tracks server uptime for reboot detection
 
 ## Troubleshooting
 
 - Ensure your Lightning node is running and `lncli` commands work
 - Verify your `.env` file has correct bot token and chat ID
-- Check that the `~/lightning-monitor` directory exists
+- Check that the `data` directory exists
 - Test the Telegram bot by sending a manual message first
