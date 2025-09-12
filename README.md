@@ -49,35 +49,41 @@ Real-time Lightning node monitoring with Telegram notifications.
 
 ## Usage
 
-### Manual Execution
+### Go Program (Recommended)
 
-Run the script manually to test:
-```bash
-./telegram-alerts.sh
-```
+1. **Build the Go program**:
+   ```bash
+   go build -o bin/telegram-monitor ./cmd/telegram-monitor
+   ```
 
-### Automated Monitoring with Cron
+2. **Run manually to test**:
+   ```bash
+   ./bin/telegram-monitor
+   ```
 
-To set up automated monitoring that runs every 2 minutes:
-
-1. **Edit your crontab**:
+3. **Set up automated monitoring with cron** (runs every 2 minutes):
    ```bash
    crontab -e
    ```
-
-2. **Add the following line** (replace `/path/to/lightning-node-tools` with the actual path):
+   
+   Add this line (replace `/path/to/lightning-node-tools` with the actual path):
    ```
+   */2 * * * * /path/to/lightning-node-tools/bin/telegram-monitor >/dev/null 2>&1
+   ```
+
+### Bash Script (Legacy)
+
+You can still use the original bash script:
+
+1. **Run manually to test**:
+   ```bash
+   ./telegram-alerts.sh
+   ```
+
+2. **Set up with cron**:
+   ```bash
    */2 * * * * /path/to/lightning-node-tools/telegram-alerts.sh >/dev/null 2>&1
    ```
-
-3. **Save and exit**. The monitoring will now run automatically every 2 minutes.
-
-### Example Crontab Entry
-
-```bash
-# Lightning Node Monitoring - runs every 2 minutes
-*/2 * * * * /home/bitcoin/lightning-node-tools/telegram-alerts.sh >/dev/null 2>&1
-```
 
 ## What Gets Monitored
 
@@ -97,15 +103,20 @@ The script includes several configurable thresholds:
 ## Requirements
 
 - Lightning Network node with `lncli` installed and configured
+- Go 1.19+ (for the Go program)
+- Telegram bot token and chat ID
+
+### Legacy Bash Script Requirements
 - `jq` for JSON parsing
 - `bc` for mathematical calculations
 - `curl` for Telegram API calls
-- Telegram bot token and chat ID
 
 ## File Structure
 
 ### Telegram Monitoring Tool
-- `telegram-alerts.sh`: Main monitoring script
+- `cmd/telegram-monitor/main.go`: Go program source code
+- `bin/telegram-monitor`: Compiled Go binary (after building)
+- `telegram-alerts.sh`: Legacy bash monitoring script
 - `.env`: Your private configuration (not tracked by git)
 - `.env.example`: Template configuration file
 - `data/last_state.json`: Stores previous state for comparison

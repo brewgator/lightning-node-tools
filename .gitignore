@@ -1,6 +1,32 @@
 # Environment variables
 .env
 
-# State files
+# Data directory
+data/
+
+# Go binary
+bin/
+
+# Go build cache
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace files
+go.work
+go.work.sum
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Legacy state files (if still using bash script)
 last_state.json
 last_uptime.txt
