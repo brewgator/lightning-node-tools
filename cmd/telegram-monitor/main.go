@@ -23,15 +23,15 @@ type Config struct {
 }
 
 type LightningState struct {
-	Channels         int   `json:"channels"`
-	PendingOpen      int   `json:"pending_open"`
-	PendingClose     int   `json:"pending_close"`
-	Invoices         int   `json:"invoices"`
-	Forwards         int   `json:"forwards"`
-	OnchainBalance   int64 `json:"onchain_balance"`
-	LocalBalance     int64 `json:"local_balance"`
-	RemoteBalance    int64 `json:"remote_balance"`
-	TotalBalance     int64 `json:"total_balance"`
+	Channels       int   `json:"channels"`
+	PendingOpen    int   `json:"pending_open"`
+	PendingClose   int   `json:"pending_close"`
+	Invoices       int   `json:"invoices"`
+	Forwards       int   `json:"forwards"`
+	OnchainBalance int64 `json:"onchain_balance"`
+	LocalBalance   int64 `json:"local_balance"`
+	RemoteBalance  int64 `json:"remote_balance"`
+	TotalBalance   int64 `json:"total_balance"`
 }
 
 type TelegramMessage struct {
@@ -41,14 +41,14 @@ type TelegramMessage struct {
 }
 
 const (
-	BalanceThreshold     = 10000    // 10k sats
-	SignificantThreshold = 1000000  // 1M sats
+	BalanceThreshold     = 10000   // 10k sats
+	SignificantThreshold = 1000000 // 1M sats
 )
 
 var (
-	config    Config
-	dataDir   string
-	stateFile string
+	config     Config
+	dataDir    string
+	stateFile  string
 	uptimeFile string
 )
 
@@ -59,12 +59,12 @@ func main() {
 		log.Fatal("Failed to get executable path:", err)
 	}
 	exeDir := filepath.Dir(exePath)
-	
+
 	// Try current directory first (for development)
 	if _, err := os.Stat(".env"); err == nil {
 		exeDir = "."
 	}
-	
+
 	dataDir = filepath.Join(exeDir, "data")
 	stateFile = filepath.Join(dataDir, "last_state.json")
 	uptimeFile = filepath.Join(dataDir, "last_uptime.txt")
@@ -96,7 +96,7 @@ func main() {
 		if err := saveState(currentState); err != nil {
 			log.Fatal("Failed to save initial state:", err)
 		}
-		
+
 		msg := fmt.Sprintf("Lightning Monitor Started\nActive channels: %d\nPending opens: %d\nPending closes: %d\nTotal invoices: %d\n\n<b>Balance Summary:</b>\nOn-chain: %s\nLightning local: %s\nLightning remote: %s\nTotal balance: %s",
 			currentState.Channels,
 			currentState.PendingOpen,
@@ -106,7 +106,7 @@ func main() {
 			formatSats(currentState.LocalBalance),
 			formatSats(currentState.RemoteBalance),
 			formatSats(currentState.TotalBalance))
-		
+
 		sendTelegram(msg)
 		return
 	}
@@ -142,15 +142,15 @@ func loadConfig(envFile string) error {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		
+
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		
+
 		key := strings.TrimSpace(parts[0])
 		value := strings.Trim(strings.TrimSpace(parts[1]), "\"")
-		
+
 		switch key {
 		case "BOT_TOKEN":
 			config.BotToken = value
@@ -177,7 +177,7 @@ func checkServerReboot() error {
 		return ioutil.WriteFile(uptimeFile, []byte(strconv.Itoa(uptime)), 0644)
 	}
 
-	prevUptimeBytes, err := ioutil.ReadFile(uptimeFile)
+	prevUptimeBytes, err := os.ReadFile(uptimeFile)
 	if err != nil {
 		return err
 	}
@@ -196,7 +196,7 @@ func checkServerReboot() error {
 }
 
 func getSystemUptime() (int, error) {
-	uptimeBytes, err := ioutil.ReadFile("/proc/uptime")
+	uptimeBytes, err := os.ReadFile("/proc/uptime")
 	if err != nil {
 		return 0, err
 	}
@@ -218,13 +218,13 @@ func getCurrentLightningState() (*LightningState, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	var channelData map[string]interface{}
+
+	var channelData map[string]any
 	if err := json.Unmarshal(channels, &channelData); err != nil {
 		return nil, err
 	}
-	
-	if channelList, ok := channelData["channels"].([]interface{}); ok {
+
+	if channelList, ok := channelData["channels"].([]any); ok {
 		state.Channels = len(channelList)
 	}
 
@@ -233,25 +233,25 @@ func getCurrentLightningState() (*LightningState, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	var pendingData map[string]interface{}
+
+	var pendingData map[string]any
 	if err := json.Unmarshal(pendingChannels, &pendingData); err != nil {
 		return nil, err
 	}
-	
-	if pendingOpen, ok := pendingData["pending_open_channels"].([]interface{}); ok {
+
+	if pendingOpen, ok := pendingData["pending_open_channels"].([]any); ok {
 		state.PendingOpen = len(pendingOpen)
 	}
-	
+
 	// Count all types of pending closes
 	pendingCloses := 0
-	if pendingClosing, ok := pendingData["pending_closing_channels"].([]interface{}); ok {
+	if pendingClosing, ok := pendingData["pending_closing_channels"].([]any); ok {
 		pendingCloses += len(pendingClosing)
 	}
-	if pendingForceClosing, ok := pendingData["pending_force_closing_channels"].([]interface{}); ok {
+	if pendingForceClosing, ok := pendingData["pending_force_closing_channels"].([]any); ok {
 		pendingCloses += len(pendingForceClosing)
 	}
-	if waitingClose, ok := pendingData["waiting_close_channels"].([]interface{}); ok {
+	if waitingClose, ok := pendingData["waiting_close_channels"].([]any); ok {
 		pendingCloses += len(waitingClose)
 	}
 	state.PendingClose = pendingCloses
@@ -261,13 +261,13 @@ func getCurrentLightningState() (*LightningState, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	var invoiceData map[string]interface{}
+
+	var invoiceData map[string]any
 	if err := json.Unmarshal(invoices, &invoiceData); err != nil {
 		return nil, err
 	}
-	
-	if invoiceList, ok := invoiceData["invoices"].([]interface{}); ok {
+
+	if invoiceList, ok := invoiceData["invoices"].([]any); ok {
 		state.Invoices = len(invoiceList)
 	}
 
@@ -276,12 +276,12 @@ func getCurrentLightningState() (*LightningState, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	var walletData map[string]interface{}
+
+	var walletData map[string]any
 	if err := json.Unmarshal(walletBalance, &walletData); err != nil {
 		return nil, err
 	}
-	
+
 	if totalBalance, ok := walletData["total_balance"].(string); ok {
 		if balance, err := strconv.ParseInt(totalBalance, 10, 64); err == nil {
 			state.OnchainBalance = balance
@@ -293,21 +293,21 @@ func getCurrentLightningState() (*LightningState, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	var balanceData map[string]interface{}
+
+	var balanceData map[string]any
 	if err := json.Unmarshal(channelBalance, &balanceData); err != nil {
 		return nil, err
 	}
-	
-	if localBal, ok := balanceData["local_balance"].(map[string]interface{}); ok {
+
+	if localBal, ok := balanceData["local_balance"].(map[string]any); ok {
 		if sat, ok := localBal["sat"].(string); ok {
 			if balance, err := strconv.ParseInt(sat, 10, 64); err == nil {
 				state.LocalBalance = balance
 			}
 		}
 	}
-	
-	if remoteBal, ok := balanceData["remote_balance"].(map[string]interface{}); ok {
+
+	if remoteBal, ok := balanceData["remote_balance"].(map[string]any); ok {
 		if sat, ok := remoteBal["sat"].(string); ok {
 			if balance, err := strconv.ParseInt(sat, 10, 64); err == nil {
 				state.RemoteBalance = balance
@@ -316,15 +316,15 @@ func getCurrentLightningState() (*LightningState, error) {
 	}
 
 	// Add pending balances
-	if pendingLocalBal, ok := balanceData["pending_open_local_balance"].(map[string]interface{}); ok {
+	if pendingLocalBal, ok := balanceData["pending_open_local_balance"].(map[string]any); ok {
 		if sat, ok := pendingLocalBal["sat"].(string); ok {
 			if balance, err := strconv.ParseInt(sat, 10, 64); err == nil {
 				state.LocalBalance += balance
 			}
 		}
 	}
-	
-	if pendingRemoteBal, ok := balanceData["pending_open_remote_balance"].(map[string]interface{}); ok {
+
+	if pendingRemoteBal, ok := balanceData["pending_open_remote_balance"].(map[string]any); ok {
 		if sat, ok := pendingRemoteBal["sat"].(string); ok {
 			if balance, err := strconv.ParseInt(sat, 10, 64); err == nil {
 				state.RemoteBalance += balance
@@ -341,13 +341,13 @@ func getCurrentLightningState() (*LightningState, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	var fwdData map[string]interface{}
+
+	var fwdData map[string]any
 	if err := json.Unmarshal(fwdHistory, &fwdData); err != nil {
 		return nil, err
 	}
-	
-	if fwdEvents, ok := fwdData["forwarding_events"].([]interface{}); ok {
+
+	if fwdEvents, ok := fwdData["forwarding_events"].([]any); ok {
 		state.Forwards = len(fwdEvents)
 	}
 
@@ -372,7 +372,7 @@ func loadState() (*LightningState, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var state LightningState
 	err = json.Unmarshal(data, &state)
 	return &state, err
@@ -384,13 +384,13 @@ func sendTelegram(message string) {
 		Text:      message,
 		ParseMode: "HTML",
 	}
-	
+
 	jsonData, err := json.Marshal(telegramMsg)
 	if err != nil {
 		log.Printf("Failed to marshal telegram message: %v", err)
 		return
 	}
-	
+
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", config.BotToken)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -420,19 +420,19 @@ func checkChannelChanges(current, prev *LightningState) {
 		msg := fmt.Sprintf("Channel Opened\nNew active channels: %d\nTotal active channels: %d", newChannels, current.Channels)
 		sendTelegram(msg)
 	}
-	
+
 	if current.PendingOpen > prev.PendingOpen {
 		newPending := current.PendingOpen - prev.PendingOpen
 		msg := fmt.Sprintf("New Channel Opening\nNew pending opens: %d\nTotal pending: %d", newPending, current.PendingOpen)
 		sendTelegram(msg)
 	}
-	
+
 	if current.Channels < prev.Channels {
 		closedChannels := prev.Channels - current.Channels
 		msg := fmt.Sprintf("Channel Closed\nChannels closed: %d\nRemaining active: %d", closedChannels, current.Channels)
 		sendTelegram(msg)
 	}
-	
+
 	if current.PendingClose > prev.PendingClose {
 		newClosing := current.PendingClose - prev.PendingClose
 		msg := fmt.Sprintf("Channel Closing Initiated\nNew pending closes: %d\nTotal pending closes: %d", newClosing, current.PendingClose)
@@ -449,17 +449,17 @@ func checkForwardingActivity(current *LightningState) {
 			log.Printf("Failed to get forwarding history: %v", err)
 			return
 		}
-		
-		var fwdData map[string]interface{}
+
+		var fwdData map[string]any
 		if err := json.Unmarshal(fwdHistory, &fwdData); err != nil {
 			log.Printf("Failed to parse forwarding history: %v", err)
 			return
 		}
-		
+
 		totalFees := int64(0)
-		if fwdEvents, ok := fwdData["forwarding_events"].([]interface{}); ok {
+		if fwdEvents, ok := fwdData["forwarding_events"].([]any); ok {
 			for _, event := range fwdEvents {
-				if eventMap, ok := event.(map[string]interface{}); ok {
+				if eventMap, ok := event.(map[string]any); ok {
 					if feeMsat, ok := eventMap["fee_msat"].(string); ok {
 						if fee, err := strconv.ParseInt(feeMsat, 10, 64); err == nil {
 							totalFees += fee
@@ -468,7 +468,7 @@ func checkForwardingActivity(current *LightningState) {
 				}
 			}
 		}
-		
+
 		msg := fmt.Sprintf("Lightning Forwards\nRecent forwards: %d\nFees earned: %d sats", current.Forwards, totalFees/1000)
 		sendTelegram(msg)
 	}
@@ -505,9 +505,9 @@ func checkBalanceChanges(current, prev *LightningState) {
 
 	if totalChange != 0 && int64(math.Abs(float64(totalChange))) >= SignificantThreshold {
 		msg := createBalanceMessage("Total Portfolio", totalChange, current.TotalBalance)
-		msg += fmt.Sprintf("\n\n<b>Breakdown:</b>\nOn-chain: %s (%+d)\nLightning: %s (%+d)", 
+		msg += fmt.Sprintf("\n\n<b>Breakdown:</b>\nOn-chain: %s (%+d)\nLightning: %s (%+d)",
 			formatSats(current.OnchainBalance), onchainChange,
-			formatSats(current.LocalBalance + current.RemoteBalance), localChange + remoteChange)
+			formatSats(current.LocalBalance+current.RemoteBalance), localChange+remoteChange)
 		sendTelegram(msg)
 	}
 }
@@ -529,6 +529,6 @@ func createBalanceMessage(changeType string, amount int64, current int64) string
 		emoji = "⚠️ " + emoji
 	}
 
-	return fmt.Sprintf("%s <b>%s Balance %s</b>\nChange: %s\nCurrent: %s", 
+	return fmt.Sprintf("%s <b>%s Balance %s</b>\nChange: %s\nCurrent: %s",
 		emoji, changeType, direction, formatSats(amount), formatSats(current))
 }
