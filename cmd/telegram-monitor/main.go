@@ -60,17 +60,15 @@ func main() {
 	}
 	exeDir := filepath.Dir(exePath)
 
-	// Try current directory first (for development)
-	if _, err := os.Stat(".env"); err == nil {
-		exeDir = "."
-	}
+	// Go up two directories from bin/ to get to project root
+	projectRoot := filepath.Dir(exeDir)
 
-	dataDir = filepath.Join(exeDir, "data")
+	dataDir = filepath.Join(projectRoot, "data")
 	stateFile = filepath.Join(dataDir, "last_state.json")
 	uptimeFile = filepath.Join(dataDir, "last_uptime.txt")
 
-	// Load configuration
-	if err := loadConfig(filepath.Join(exeDir, ".env")); err != nil {
+	// Load configuration from project root
+	if err := loadConfig(filepath.Join(projectRoot, ".env")); err != nil {
 		log.Fatal("Failed to load config:", err)
 	}
 
