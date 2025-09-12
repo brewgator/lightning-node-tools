@@ -17,12 +17,14 @@ Real-time Lightning node monitoring with Telegram notifications.
 ## Setup
 
 1. **Clone the repository**:
+
    ```bash
    git clone <your-repo-url>
    cd lightning-node-tools
    ```
 
 2. **Create your environment file**:
+
    ```bash
    cp .env.example .env
    ```
@@ -32,17 +34,20 @@ Real-time Lightning node monitoring with Telegram notifications.
    - Copy the bot token to your `.env` file
    - Get your chat ID by messaging your bot and visiting: `https://api.telegram.org/bot<YourBOTToken>/getUpdates`
    - Update the `.env` file with your actual values:
+
      ```
      BOT_TOKEN="your-actual-bot-token"
      CHAT_ID="your-actual-chat-id"
      ```
 
 4. **Make the script executable**:
+
    ```bash
    chmod +x telegram-alerts.sh
    ```
 
 5. **Create the data directory**:
+
    ```bash
    mkdir -p data
    ```
@@ -52,22 +57,26 @@ Real-time Lightning node monitoring with Telegram notifications.
 ### Go Program (Recommended)
 
 1. **Build the Go program**:
+
    ```bash
    go build -o bin/telegram-monitor ./cmd/telegram-monitor
    ```
 
 2. **Run manually to test**:
+
    ```bash
    ./bin/telegram-monitor
    ```
 
 3. **Set up automated monitoring with cron** (runs every 2 minutes):
+
    ```bash
    crontab -e
    ```
-   
+
    Add this line (replace `/path/to/lightning-node-tools` with the actual path):
-   ```
+
+   ```crontab
    */2 * * * * /path/to/lightning-node-tools/bin/telegram-monitor >/dev/null 2>&1
    ```
 
@@ -76,11 +85,13 @@ Real-time Lightning node monitoring with Telegram notifications.
 You can still use the original bash script:
 
 1. **Run manually to test**:
+
    ```bash
    ./telegram-alerts.sh
    ```
 
 2. **Set up with cron**:
+
    ```bash
    */2 * * * * /path/to/lightning-node-tools/telegram-alerts.sh >/dev/null 2>&1
    ```
@@ -107,6 +118,7 @@ The script includes several configurable thresholds:
 - Telegram bot token and chat ID
 
 ### Legacy Bash Script Requirements
+
 - `jq` for JSON parsing
 - `bc` for mathematical calculations
 - `curl` for Telegram API calls
@@ -114,6 +126,7 @@ The script includes several configurable thresholds:
 ## File Structure
 
 ### Telegram Monitoring Tool
+
 - `cmd/telegram-monitor/main.go`: Go program source code
 - `bin/telegram-monitor`: Compiled Go binary (after building)
 - `telegram-alerts.sh`: Legacy bash monitoring script
