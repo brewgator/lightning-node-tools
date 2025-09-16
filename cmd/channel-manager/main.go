@@ -93,7 +93,7 @@ func showChannelBalances() {
 		totalCapacity += capacity
 		totalLocal += local
 		totalRemote += remote
-		
+
 		if channel.Active {
 			activeChannels++
 		}
@@ -130,32 +130,47 @@ func displayChannel(channel Channel) {
 		localPercent = (float64(local) / float64(capacity)) * 100
 	}
 
-	// Create the visual representation like: 10000 -------- Remote Peer Name ---- 90000
+	// Create progress bar visualization: |#####------------------------|
+	barWidth := 30
+	localWidth := 0
+	if capacity > 0 {
+		localWidth = int((float64(local) / float64(capacity)) * float64(barWidth))
+		if localWidth > barWidth {
+			localWidth = barWidth
+		}
+	}
+	remoteWidth := barWidth - localWidth
+
+	// Create the progress bar with # for local balance and - for remote
+	localBar := strings.Repeat("#", localWidth)
+	remoteBar := strings.Repeat("-", remoteWidth)
+
+	// Format the balances
 	localStr := formatSats(local)
 	remoteStr := formatSats(remote)
-	
-	// Calculate dash lengths to center the peer name
-	totalDashes := 50 - len(localStr) - len(remoteStr) - len(alias) - 2 // -2 for spaces
-	if totalDashes < 6 {
-		totalDashes = 6
-	}
-	leftDashes := totalDashes / 2
-	rightDashes := totalDashes - leftDashes
 
-	fmt.Printf("%s %s %s %s %s %s\n",
+	// Pad alias name for consistent alignment
+	const maxNameWidth = 25
+	if len(alias) > maxNameWidth {
+		alias = alias[:maxNameWidth-3] + "..."
+	}
+
+	// Display: "Remote Name: |#####-----------| 1000/90000"
+	fmt.Printf("%s %-*s |%s%s| %s/%s\n",
 		status,
+		maxNameWidth, alias+":",
+		localBar,
+		remoteBar,
 		localStr,
-		strings.Repeat("─", leftDashes),
-		alias,
-		strings.Repeat("─", rightDashes),
 		remoteStr)
 
 	// Show capacity and percentage info on second line
-	fmt.Printf("   Capacity: %s │ Local: %.1f%% │ %s\n",
+	fmt.Printf("   %*s  Capacity: %s │ Local: %.1f%% │ %s\n",
+		maxNameWidth, "",
 		formatSats(capacity),
 		localPercent,
 		getChannelStatus(channel))
-	
+
 	fmt.Println()
 }
 
@@ -166,11 +181,11 @@ func getChannelStatus(channel Channel) string {
 	} else {
 		status += "Public"
 	}
-	
+
 	if !channel.Active {
 		status += " (Inactive)"
 	}
-	
+
 	return status
 }
 
