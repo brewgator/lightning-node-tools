@@ -52,9 +52,24 @@ Real-time Lightning node monitoring with Telegram notifications.
    mkdir -p data
    ```
 
+## Available Tools
+
+### 1. Telegram Monitor
+Real-time Lightning node monitoring with Telegram notifications.
+
+### 2. Channel Manager
+Visual channel liquidity management and analysis tool.
+
 ## Usage
 
-### Go Program (Recommended)
+### Build All Tools
+
+```bash
+go build -o bin/telegram-monitor ./cmd/telegram-monitor
+go build -o bin/channel-manager ./cmd/channel-manager
+```
+
+### Telegram Monitor
 
 1. **Build the Go program**:
 
@@ -79,6 +94,31 @@ Real-time Lightning node monitoring with Telegram notifications.
    ```crontab
    */2 * * * * /path/to/lightning-node-tools/bin/telegram-monitor >/dev/null 2>&1
    ```
+
+### Channel Manager
+
+**Show visual channel balances:**
+```bash
+./bin/channel-manager balance
+# or short alias:
+./bin/channel-manager bal
+```
+
+**Example Output:**
+```
+🔋 Channel Liquidity Overview
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🟢 ACINQ:                     |#######-----------------------| 250K/750K
+                               Capacity: 1.0M │ Local: 25.0% │ Public
+
+🟢 Bitrefill:                 |##----------------------------| 50K/950K
+                               Capacity: 1.0M │ Local: 5.0% │ Public
+
+🔴 Offline Node:              |------------------------------| 0/500K
+                               Capacity: 500K │ Local: 0.0% │ Private (Inactive)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Summary: 2/3 active channels | Total: 2.5M | Local: 300K | Remote: 2.2M
+```
 
 ### Bash Script (Legacy)
 
