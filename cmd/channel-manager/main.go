@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Channel struct {
@@ -33,11 +34,11 @@ type ChannelResponse struct {
 }
 
 type ChannelFeeReport struct {
-	ChanID         string  `json:"chan_id"`
-	ChannelPoint   string  `json:"channel_point"`
-	BaseFeeMsat    string  `json:"base_fee_msat"`
-	FeePerMil      string  `json:"fee_per_mil"`
-	FeeRate        float64 `json:"fee_rate"`
+	ChanID       string  `json:"chan_id"`
+	ChannelPoint string  `json:"channel_point"`
+	BaseFeeMsat  string  `json:"base_fee_msat"`
+	FeePerMil    string  `json:"fee_per_mil"`
+	FeeRate      float64 `json:"fee_rate"`
 }
 
 type FeeReportResponse struct {
@@ -45,6 +46,20 @@ type FeeReportResponse struct {
 	DayFeeSum   string             `json:"day_fee_sum"`
 	WeekFeeSum  string             `json:"week_fee_sum"`
 	MonthFeeSum string             `json:"month_fee_sum"`
+}
+
+type ForwardingHistory struct {
+	ForwardingEvents []ForwardingEvent `json:"forwarding_events"`
+}
+
+type ForwardingEvent struct {
+	ChanIdIn  string `json:"chan_id_in"`
+	ChanIdOut string `json:"chan_id_out"`
+	AmtIn     string `json:"amt_in"`
+	AmtOut    string `json:"amt_out"`
+	Fee       string `json:"fee"`
+	FeeMsat   string `json:"fee_msat"`
+	Timestamp string `json:"timestamp"`
 }
 
 func main() {
@@ -60,6 +75,12 @@ func main() {
 		showChannelBalances()
 	case "fees":
 		showChannelFees()
+	case "earnings":
+		detailed := false
+		if len(os.Args) > 2 && (os.Args[2] == "--detailed" || os.Args[2] == "-d") {
+			detailed = true
+		}
+		showFeeEarnings(detailed)
 	case "help", "-h", "--help":
 		showHelp()
 	default:
@@ -72,10 +93,13 @@ func showHelp() {
 	fmt.Println("Channel Manager - Lightning Network Channel Liquidity Tool")
 	fmt.Println("")
 	fmt.Println("Usage:")
-	fmt.Println("  channel-manager balance    Show visual channel balances")
-	fmt.Println("  channel-manager bal        Short alias for balance")
-	fmt.Println("  channel-manager fees       Show channel fees information")
-	fmt.Println("  channel-manager help       Show this help message")
+	fmt.Println("  channel-manager balance              Show visual channel balances")
+	fmt.Println("  channel-manager bal                  Short alias for balance")
+	fmt.Println("  channel-manager fees                 Show channel fees information")
+	fmt.Println("  channel-manager earnings             Show fee earnings summary")
+	fmt.Println("  channel-manager earnings --detailed  Show earnings with per-channel breakdown")
+	fmt.Println("  channel-manager earnings -d          Short alias for --detailed")
+	fmt.Println("  channel-manager help                 Show this help message")
 	fmt.Println("")
 }
 
@@ -142,7 +166,7 @@ func showChannelFees() {
 	}
 
 	fmt.Println("\n💰 Channel Fees Overview")
-	fmt.Println(strings.Repeat("━", 80))
+	fmt.Println(strings.Repeat("━", 70))
 
 	// Create a map for quick fee lookup by channel ID
 	feeMap := make(map[string]ChannelFeeReport)
@@ -150,15 +174,15 @@ func showChannelFees() {
 		feeMap[fee.ChanID] = fee
 	}
 
-	fmt.Printf("%-25s %-12s %-12s %-12s %s\n", "Channel", "Base Fee", "Fee Rate", "PPM", "Status")
-	fmt.Println(strings.Repeat("─", 80))
+	fmt.Printf("%-30s %-12s %-12s %s\n", "Channel", "Base Fee", "Fee Rate", "Status")
+	fmt.Println(strings.Repeat("─", 70))
 
 	for _, channel := range channels {
 		displayChannelFees(channel, feeMap)
 	}
 
 	// Summary
-	fmt.Println(strings.Repeat("━", 80))
+	fmt.Println(strings.Repeat("━", 70))
 	if feeReport.DayFeeSum != "" || feeReport.WeekFeeSum != "" || feeReport.MonthFeeSum != "" {
 		fmt.Printf("📊 Fee Summary:\n")
 		if feeReport.DayFeeSum != "" {
@@ -178,12 +202,136 @@ func showChannelFees() {
 	fmt.Println()
 }
 
+func showFeeEarnings(detailed bool) {
+	feeReport, err := getFeeReport()
+	if err != nil {
+		log.Fatal("Failed to get fee report:", err)
+	}
+
+	fmt.Println("\n💸 Fee Earnings Summary")
+	fmt.Println(strings.Repeat("━", 50))
+
+	// Parse and display earnings
+	dayFee := int64(0)
+	weekFee := int64(0)
+	monthFee := int64(0)
+
+	if feeReport.DayFeeSum != "" {
+		dayFee, _ = strconv.ParseInt(feeReport.DayFeeSum, 10, 64)
+	}
+	if feeReport.WeekFeeSum != "" {
+		weekFee, _ = strconv.ParseInt(feeReport.WeekFeeSum, 10, 64)
+	}
+	if feeReport.MonthFeeSum != "" {
+		monthFee, _ = strconv.ParseInt(feeReport.MonthFeeSum, 10, 64)
+	}
+
+	// Display earnings with nice formatting
+	fmt.Printf("📅 Today:    %15s\n", formatSats(dayFee))
+	fmt.Printf("📊 Week:     %15s\n", formatSats(weekFee))
+	fmt.Printf("📈 Month:    %15s\n", formatSats(monthFee))
+
+	fmt.Println(strings.Repeat("─", 50))
+
+	// Calculate daily and weekly averages
+	if weekFee > 0 {
+		avgDaily := weekFee / 7
+		fmt.Printf("📉 Daily Avg:%15s (7-day)\n", formatSats(avgDaily))
+	}
+	if monthFee > 0 {
+		avgDaily := monthFee / 30
+		fmt.Printf("📉 Daily Avg:%15s (30-day)\n", formatSats(avgDaily))
+	}
+
+	// Show total channel count for context
+	channels, err := getChannels()
+	if err == nil {
+		activeChannels := 0
+		for _, channel := range channels {
+			if channel.Active {
+				activeChannels++
+			}
+		}
+		fmt.Printf("⚡ Channels: %15d active\n", activeChannels)
+	}
+
+	// Show detailed per-channel breakdown if requested
+	if detailed {
+		fmt.Println()
+		showDetailedChannelEarnings()
+	}
+
+	fmt.Println()
+}
+
+func showDetailedChannelEarnings() {
+	channels, err := getChannels()
+	if err != nil {
+		log.Printf("Failed to get channels for detailed view: %v", err)
+		return
+	}
+
+	// Get forwarding history for the last month
+	now := time.Now()
+	monthAgo := now.AddDate(0, -1, 0)
+
+	history, err := getForwardingHistory(
+		fmt.Sprintf("%d", monthAgo.Unix()),
+		fmt.Sprintf("%d", now.Unix()),
+	)
+	if err != nil {
+		log.Printf("Failed to get forwarding history: %v", err)
+		return
+	}
+
+	fmt.Println("📋 Detailed Channel Earnings (30 days)")
+	fmt.Println(strings.Repeat("━", 70))
+
+	// Calculate fees per channel
+	channelFees := make(map[string]int64)
+
+	for _, event := range history.ForwardingEvents {
+		if event.FeeMsat != "" {
+			feeMsat, _ := strconv.ParseInt(event.FeeMsat, 10, 64)
+			channelFees[event.ChanIdOut] += feeMsat / 1000 // Convert to sats
+		}
+	}
+
+	fmt.Printf("%-30s %-15s %s\n", "Channel", "Earnings", "Status")
+	fmt.Println(strings.Repeat("─", 70))
+
+	totalEarnings := int64(0)
+	for _, channel := range channels {
+		alias := getNodeAlias(channel.RemotePubkey)
+		if len(alias) > 27 {
+			alias = alias[:24] + "..."
+		}
+
+		earnings := channelFees[channel.ChanID]
+		totalEarnings += earnings
+
+		status := "🟢"
+		if !channel.Active {
+			status = "🔴"
+		}
+
+		fmt.Printf("%s %-27s %-15s %s\n",
+			status,
+			alias+":",
+			formatSats(earnings),
+			getChannelStatus(channel))
+	}
+
+	fmt.Println(strings.Repeat("─", 70))
+	fmt.Printf("%-30s %-15s\n", "Total:", formatSats(totalEarnings))
+}
+
 func displayChannelFees(channel Channel, feeMap map[string]ChannelFeeReport) {
 	alias := getNodeAlias(channel.RemotePubkey)
-	
+
 	// Truncate alias if too long
-	if len(alias) > 22 {
-		alias = alias[:19] + "..."
+	if len(alias) > 27 {
+		alias = alias[:24] + "..."
 	}
 
 	// Status indicator
@@ -194,34 +342,29 @@ func displayChannelFees(channel Channel, feeMap map[string]ChannelFeeReport) {
 
 	// Get fee information
 	baseFee := "N/A"
-	feeRate := "N/A"
-	ppm := "N/A"
+	feeRatePPM := "N/A"
 
 	if feeInfo, exists := feeMap[channel.ChanID]; exists {
 		if feeInfo.BaseFeeMsat != "" {
 			baseFeeMsat, _ := strconv.ParseInt(feeInfo.BaseFeeMsat, 10, 64)
 			baseFee = fmt.Sprintf("%d msat", baseFeeMsat)
 		}
+
+		// Use FeePerMil if available, otherwise convert FeeRate to PPM
 		if feeInfo.FeePerMil != "" {
-			feeRate = feeInfo.FeePerMil
-			ppm = feeInfo.FeePerMil + " ppm"
-		}
-		if feeInfo.FeeRate > 0 {
+			feeRatePPM = feeInfo.FeePerMil + " ppm"
+		} else if feeInfo.FeeRate > 0 {
 			// Convert fee rate to PPM (parts per million)
 			ppmValue := feeInfo.FeeRate * 1000000
-			feeRate = fmt.Sprintf("%.6f", feeInfo.FeeRate)
-			if feeInfo.FeePerMil == "" {
-				ppm = fmt.Sprintf("%.0f ppm", ppmValue)
-			}
+			feeRatePPM = fmt.Sprintf("%.0f ppm", ppmValue)
 		}
 	}
 
-	fmt.Printf("%s %-22s %-12s %-12s %-12s %s\n",
+	fmt.Printf("%s %-27s %-12s %-12s %s\n",
 		status,
 		alias+":",
 		baseFee,
-		feeRate,
-		ppm,
+		feeRatePPM,
 		getChannelStatus(channel))
 }
 
@@ -328,6 +471,20 @@ func getFeeReport() (*FeeReportResponse, error) {
 	}
 
 	var response FeeReportResponse
+	if err := json.Unmarshal(output, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func getForwardingHistory(startTime, endTime string) (*ForwardingHistory, error) {
+	output, err := runLNCLI("fwdinghistory", "--start_time", startTime, "--end_time", endTime)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ForwardingHistory
 	if err := json.Unmarshal(output, &response); err != nil {
 		return nil, err
 	}
