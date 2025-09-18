@@ -97,14 +97,37 @@ go build -o bin/channel-manager ./cmd/channel-manager
 
 ### Channel Manager
 
-**Show visual channel balances:**
+The Channel Manager provides comprehensive Lightning Network channel analysis and monitoring capabilities.
+
+#### Available Commands
+
+**1. Show visual channel balances:**
 ```bash
 ./bin/channel-manager balance
 # or short alias:
 ./bin/channel-manager bal
 ```
 
-**Example Output:**
+**2. Show channel fees information:**
+```bash
+./bin/channel-manager fees
+```
+
+**3. Show fee earnings summary:**
+```bash
+./bin/channel-manager earnings
+```
+
+**4. Show detailed earnings breakdown:**
+```bash
+./bin/channel-manager earnings --detailed
+# or short alias:
+./bin/channel-manager earnings -d
+```
+
+#### Example Outputs
+
+**Balance Overview:**
 ```
 🔋 Channel Liquidity Overview
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -118,6 +141,57 @@ go build -o bin/channel-manager ./cmd/channel-manager
                                Capacity: 500K │ Local: 0.0% │ Private (Inactive)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 Summary: 2/3 active channels | Total: 2.5M | Local: 300K | Remote: 2.2M
+```
+
+**Fees Overview:**
+```
+💰 Channel Fees Overview
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Channel                          Base Fee     Fee Rate     Status
+───────────────────────────────────────────────────────────────────────────
+🟢 ACINQ:                        1000 msat    1 ppm        Public
+🟢 LN Big:                       1000 msat    1 ppm        Public
+🟢 Bitrefill:                    1000 msat    1 ppm        Public
+🟢 WalletOfSatoshi.com:          1000 msat    1 ppm        Public
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Fee Summary:
+   Today: 0 │ Week: 27 │ Month: 27
+```
+
+**Earnings Summary:**
+```
+💸 Fee Earnings Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 Today:                  0
+📊 Week:                  27
+📈 Month:                 27
+──────────────────────────────────────────────────
+📉 Daily Avg:              3 (7-day)
+📉 Daily Avg:              0 (30-day)
+⚡ Channels:               6 active
+```
+
+**Detailed Earnings Breakdown:**
+```
+💸 Fee Earnings Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 Today:                  0
+📊 Week:                  27
+📈 Month:                 27
+──────────────────────────────────────────────────
+📉 Daily Avg:              3 (7-day)
+⚡ Channels:               6 active
+
+📋 Detailed Channel Earnings (30 days)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Channel                          Earnings        Status
+───────────────────────────────────────────────────────────────────────────
+🟢 LN Big:                       21              Public
+🟢 ACINQ:                        1               Public
+🟢 Bitrefill:                    0               Public
+🟢 WalletOfSatoshi.com:          0               Public
+───────────────────────────────────────────────────────────────────────────
+Total:                           22
 ```
 
 ### Bash Script (Legacy)

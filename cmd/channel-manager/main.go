@@ -166,7 +166,7 @@ func showChannelFees() {
 	}
 
 	fmt.Println("\n💰 Channel Fees Overview")
-	fmt.Println(strings.Repeat("━", 70))
+	fmt.Println(strings.Repeat("━", 75))
 
 	// Create a map for quick fee lookup by channel ID
 	feeMap := make(map[string]ChannelFeeReport)
@@ -174,15 +174,15 @@ func showChannelFees() {
 		feeMap[fee.ChanID] = fee
 	}
 
-	fmt.Printf("%-30s %-12s %-12s %s\n", "Channel", "Base Fee", "Fee Rate", "Status")
-	fmt.Println(strings.Repeat("─", 70))
+	fmt.Printf("%-32s %-12s %-12s %s\n", "Channel", "Base Fee", "Fee Rate", "Status")
+	fmt.Println(strings.Repeat("─", 75))
 
 	for _, channel := range channels {
 		displayChannelFees(channel, feeMap)
 	}
 
 	// Summary
-	fmt.Println(strings.Repeat("━", 70))
+	fmt.Println(strings.Repeat("━", 75))
 	if feeReport.DayFeeSum != "" || feeReport.WeekFeeSum != "" || feeReport.MonthFeeSum != "" {
 		fmt.Printf("📊 Fee Summary:\n")
 		if feeReport.DayFeeSum != "" {
@@ -285,7 +285,7 @@ func showDetailedChannelEarnings() {
 	}
 
 	fmt.Println("📋 Detailed Channel Earnings (30 days)")
-	fmt.Println(strings.Repeat("━", 70))
+	fmt.Println(strings.Repeat("━", 75))
 
 	// Calculate fees per channel
 	channelFees := make(map[string]int64)
@@ -297,14 +297,14 @@ func showDetailedChannelEarnings() {
 		}
 	}
 
-	fmt.Printf("%-30s %-15s %s\n", "Channel", "Earnings", "Status")
-	fmt.Println(strings.Repeat("─", 70))
+	fmt.Printf("%-32s %-15s %s\n", "Channel", "Earnings", "Status")
+	fmt.Println(strings.Repeat("─", 75))
 
 	totalEarnings := int64(0)
 	for _, channel := range channels {
 		alias := getNodeAlias(channel.RemotePubkey)
-		if len(alias) > 27 {
-			alias = alias[:24] + "..."
+		if len(alias) > 29 {
+			alias = alias[:26] + "..."
 		}
 
 		earnings := channelFees[channel.ChanID]
@@ -315,23 +315,23 @@ func showDetailedChannelEarnings() {
 			status = "🔴"
 		}
 
-		fmt.Printf("%s %-27s %-15s %s\n",
+		fmt.Printf("%s %-29s %-15s %s\n",
 			status,
 			alias+":",
 			formatSats(earnings),
 			getChannelStatus(channel))
 	}
 
-	fmt.Println(strings.Repeat("─", 70))
-	fmt.Printf("%-30s %-15s\n", "Total:", formatSats(totalEarnings))
+	fmt.Println(strings.Repeat("─", 75))
+	fmt.Printf("%-32s %-15s\n", "Total:", formatSats(totalEarnings))
 }
 
 func displayChannelFees(channel Channel, feeMap map[string]ChannelFeeReport) {
 	alias := getNodeAlias(channel.RemotePubkey)
 
 	// Truncate alias if too long
-	if len(alias) > 27 {
-		alias = alias[:24] + "..."
+	if len(alias) > 29 {
+		alias = alias[:26] + "..."
 	}
 
 	// Status indicator
@@ -360,7 +360,7 @@ func displayChannelFees(channel Channel, feeMap map[string]ChannelFeeReport) {
 		}
 	}
 
-	fmt.Printf("%s %-27s %-12s %-12s %s\n",
+	fmt.Printf("%s %-29s %-12s %-12s %s\n",
 		status,
 		alias+":",
 		baseFee,
