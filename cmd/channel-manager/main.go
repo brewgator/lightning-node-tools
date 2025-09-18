@@ -32,6 +32,21 @@ type ChannelResponse struct {
 	Channels []Channel `json:"channels"`
 }
 
+type ChannelFeeReport struct {
+	ChanID         string `json:"chan_id"`
+	ChannelPoint   string `json:"channel_point"`
+	BaseFeeMsat    string `json:"base_fee_msat"`
+	FeePerMil      string `json:"fee_per_mil"`
+	FeeRate        string `json:"fee_rate"`
+}
+
+type FeeReportResponse struct {
+	ChannelFees []ChannelFeeReport `json:"channel_fees"`
+	DayFeeSum   string             `json:"day_fee_sum"`
+	WeekFeeSum  string             `json:"week_fee_sum"`
+	MonthFeeSum string             `json:"month_fee_sum"`
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		showHelp()
@@ -43,6 +58,8 @@ func main() {
 	switch command {
 	case "balance", "bal":
 		showChannelBalances()
+	case "fees":
+		showChannelFees()
 	case "help", "-h", "--help":
 		showHelp()
 	default:
@@ -57,6 +74,7 @@ func showHelp() {
 	fmt.Println("Usage:")
 	fmt.Println("  channel-manager balance    Show visual channel balances")
 	fmt.Println("  channel-manager bal        Short alias for balance")
+	fmt.Println("  channel-manager fees       Show channel fees information")
 	fmt.Println("  channel-manager help       Show this help message")
 	fmt.Println("")
 }
@@ -105,6 +123,101 @@ func showChannelBalances() {
 		formatSats(totalCapacity),
 		formatSats(totalLocal),
 		formatSats(totalRemote))
+}
+
+func showChannelFees() {
+	channels, err := getChannels()
+	if err != nil {
+		log.Fatal("Failed to get channels:", err)
+	}
+
+	feeReport, err := getFeeReport()
+	if err != nil {
+		log.Fatal("Failed to get fee report:", err)
+	}
+
+	if len(channels) == 0 {
+		fmt.Println("No channels found")
+		return
+	}
+
+	fmt.Println("\n💰 Channel Fees Overview")
+	fmt.Println(strings.Repeat("━", 80))
+
+	// Create a map for quick fee lookup by channel ID
+	feeMap := make(map[string]ChannelFeeReport)
+	for _, fee := range feeReport.ChannelFees {
+		feeMap[fee.ChanID] = fee
+	}
+
+	fmt.Printf("%-25s %-12s %-12s %-12s %s\n", "Channel", "Base Fee", "Fee Rate", "PPM", "Status")
+	fmt.Println(strings.Repeat("─", 80))
+
+	for _, channel := range channels {
+		displayChannelFees(channel, feeMap)
+	}
+
+	// Summary
+	fmt.Println(strings.Repeat("━", 80))
+	if feeReport.DayFeeSum != "" || feeReport.WeekFeeSum != "" || feeReport.MonthFeeSum != "" {
+		fmt.Printf("📊 Fee Summary:\n")
+		if feeReport.DayFeeSum != "" {
+			dayFee, _ := strconv.ParseInt(feeReport.DayFeeSum, 10, 64)
+			fmt.Printf("   Today: %s", formatSats(dayFee))
+		}
+		if feeReport.WeekFeeSum != "" {
+			weekFee, _ := strconv.ParseInt(feeReport.WeekFeeSum, 10, 64)
+			fmt.Printf(" │ Week: %s", formatSats(weekFee))
+		}
+		if feeReport.MonthFeeSum != "" {
+			monthFee, _ := strconv.ParseInt(feeReport.MonthFeeSum, 10, 64)
+			fmt.Printf(" │ Month: %s", formatSats(monthFee))
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+}
+
+func displayChannelFees(channel Channel, feeMap map[string]ChannelFeeReport) {
+	alias := getNodeAlias(channel.RemotePubkey)
+	
+	// Truncate alias if too long
+	if len(alias) > 22 {
+		alias = alias[:19] + "..."
+	}
+
+	// Status indicator
+	status := "🟢"
+	if !channel.Active {
+		status = "🔴"
+	}
+
+	// Get fee information
+	baseFee := "N/A"
+	feeRate := "N/A"
+	ppm := "N/A"
+
+	if feeInfo, exists := feeMap[channel.ChanID]; exists {
+		if feeInfo.BaseFeeMsat != "" {
+			baseFeeMsat, _ := strconv.ParseInt(feeInfo.BaseFeeMsat, 10, 64)
+			baseFee = fmt.Sprintf("%d msat", baseFeeMsat)
+		}
+		if feeInfo.FeePerMil != "" {
+			feeRate = feeInfo.FeePerMil
+			ppm = feeInfo.FeePerMil + " ppm"
+		}
+		if feeInfo.FeeRate != "" && feeInfo.FeeRate != feeInfo.FeePerMil {
+			feeRate = feeInfo.FeeRate
+		}
+	}
+
+	fmt.Printf("%s %-22s %-12s %-12s %-12s %s\n",
+		status,
+		alias+":",
+		baseFee,
+		feeRate,
+		ppm,
+		getChannelStatus(channel))
 }
 
 func displayChannel(channel Channel) {
@@ -201,6 +314,20 @@ func getChannels() ([]Channel, error) {
 	}
 
 	return response.Channels, nil
+}
+
+func getFeeReport() (*FeeReportResponse, error) {
+	output, err := runLNCLI("feereport")
+	if err != nil {
+		return nil, err
+	}
+
+	var response FeeReportResponse
+	if err := json.Unmarshal(output, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
 }
 
 func getNodeAlias(pubkey string) string {
