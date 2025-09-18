@@ -33,11 +33,11 @@ type ChannelResponse struct {
 }
 
 type ChannelFeeReport struct {
-	ChanID         string `json:"chan_id"`
-	ChannelPoint   string `json:"channel_point"`
-	BaseFeeMsat    string `json:"base_fee_msat"`
-	FeePerMil      string `json:"fee_per_mil"`
-	FeeRate        int64  `json:"fee_rate"`
+	ChanID         string  `json:"chan_id"`
+	ChannelPoint   string  `json:"channel_point"`
+	BaseFeeMsat    string  `json:"base_fee_msat"`
+	FeePerMil      string  `json:"fee_per_mil"`
+	FeeRate        float64 `json:"fee_rate"`
 }
 
 type FeeReportResponse struct {
@@ -207,9 +207,11 @@ func displayChannelFees(channel Channel, feeMap map[string]ChannelFeeReport) {
 			ppm = feeInfo.FeePerMil + " ppm"
 		}
 		if feeInfo.FeeRate > 0 {
-			feeRate = fmt.Sprintf("%d", feeInfo.FeeRate)
+			// Convert fee rate to PPM (parts per million)
+			ppmValue := feeInfo.FeeRate * 1000000
+			feeRate = fmt.Sprintf("%.6f", feeInfo.FeeRate)
 			if feeInfo.FeePerMil == "" {
-				ppm = fmt.Sprintf("%d ppm", feeInfo.FeeRate)
+				ppm = fmt.Sprintf("%.0f ppm", ppmValue)
 			}
 		}
 	}
