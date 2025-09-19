@@ -84,6 +84,26 @@ func formatSats(amount int64) string {
 	return utils.FormatSats(amount)
 }
 
+// formatSatsChange formats balance changes with better precision for small amounts
+func formatSatsChange(amount int64) string {
+	if amount == 0 {
+		return "0 sats"
+	}
+
+	absAmount := amount
+	if absAmount < 0 {
+		absAmount = -absAmount
+	}
+
+	// For very small amounts, always show exact sats
+	if absAmount < 1000 {
+		return fmt.Sprintf("%d sats", amount)
+	}
+
+	// For larger amounts, use the standard formatting
+	return utils.FormatSats(amount)
+}
+
 // checkServerReboot checks if the server has rebooted and sends notification
 func checkServerReboot() error {
 	uptime, err := getSystemUptime()

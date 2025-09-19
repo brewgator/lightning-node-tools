@@ -23,7 +23,8 @@ Real-time Lightning node monitoring with Telegram notifications for critical eve
 
 - **Real-time Lightning Node Monitoring**: Track channel opens/closes, pending operations, and balance changes
 - **Telegram Notifications**: Get instant alerts about your Lightning node activity
-- **Balance Tracking**: Monitor on-chain and Lightning channel balances with configurable thresholds
+- **Smart Balance Tracking**: Adaptive thresholds based on account size with precise change detection
+- **Portfolio Focus**: Total balance excludes remote Lightning balances (only counts your actual funds)
 - **Forward Monitoring**: Track routing fees and forward activity
 - **Server Reboot Detection**: Get notified when your Lightning node server restarts
 
@@ -242,7 +243,7 @@ Total:                           22
 
 The Channel Manager is under active development with the following features planned:
 
-**Phase 2: Channel Rebalancing (Coming Soon)**
+##### Phase 2: Channel Rebalancing (Coming Soon)
 
 - Automated liquidity rebalancing between channels
 - Intelligent rebalancing suggestions based on channel performance
@@ -256,7 +257,7 @@ Planned commands:
 ./bin/channel-manager auto-rebalance     # Automated rebalancing based on policies
 ```
 
-**Phase 3: Advanced Analytics & Intelligence (Future)**
+##### Phase 3: Advanced Analytics & Intelligence (Future)
 
 - Deep channel performance analysis and health scoring
 - Peer recommendations based on network flow analysis
@@ -292,17 +293,26 @@ You can still use the original bash script:
 ## What Gets Monitored
 
 - **Channel Events**: Opens, closes, pending operations
-- **Balance Changes**: On-chain and Lightning balances (configurable thresholds)
+- **Balance Changes**: On-chain and Lightning balances with adaptive thresholds based on account size
 - **Payment Activity**: New invoices and forwards
 - **Server Status**: Reboot detection
 - **Routing Fees**: Recent forwarding activity and fees earned
 
 ## Configuration
 
-The script includes several configurable thresholds:
+The telegram monitor uses adaptive balance change thresholds based on account size:
 
-- `BALANCE_THRESHOLD=10000`: Minimum balance change to trigger notification (10k sats)
-- `SIGNIFICANT_THRESHOLD=1000000`: Threshold for highlighting significant changes (1M sats)
+- **Very small accounts** (<100k sats): 1 sat minimum change detection
+- **Small accounts** (<1M sats): 100 sats threshold
+- **Medium accounts** (<10M sats): 1k sats threshold
+- **Large accounts** (10M+ sats): 5k sats threshold
+- **Portfolio changes**: Uses higher thresholds (2x individual thresholds or 1M sats minimum)
+
+**Key improvements:**
+
+- Total portfolio only includes on-chain and local Lightning balances (excludes remote balances)
+- Precise balance change formatting shows exact satoshis for small amounts
+- Eliminates false "identical balance" notifications for small accounts
 
 ## Requirements
 
@@ -318,7 +328,7 @@ The script includes several configurable thresholds:
 
 ## Project Structure
 
-```
+```text
 lightning-node-tools/
 ├── cmd/
 │   ├── channel-manager/          # Channel management tool
