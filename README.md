@@ -147,9 +147,13 @@ The Channel Manager provides comprehensive Lightning Network channel analysis an
 
 ```bash
 ./bin/channel-manager set-fees --channel-id 12345 --ppm 1 --base-fee 1000
-# or just set PPM:
+# or just set PPM (preserves existing base fee and time lock delta):
 ./bin/channel-manager set-fees --channel-id 12345 --ppm 2
+# or just set base fee (preserves existing PPM and time lock delta):
+./bin/channel-manager set-fees --channel-id 12345 --base-fee 1500
 ```
+
+*Note: The tool intelligently preserves existing channel policy values for any parameters not explicitly specified.*
 
 **6. Set fees for all channels:**
 
@@ -158,6 +162,8 @@ The Channel Manager provides comprehensive Lightning Network channel analysis an
 # or with base fee:
 ./bin/channel-manager bulk-set-fees --ppm 2 --base-fee 1000
 ```
+
+*Note: Like set-fees, bulk operations preserve existing values for unspecified parameters on each channel.*
 
 #### Example Outputs
 
@@ -182,14 +188,14 @@ The Channel Manager provides comprehensive Lightning Network channel analysis an
 
 ```text
 💰 Channel Fees Overview
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Channel                          Base Fee     Fee Rate     Status
-───────────────────────────────────────────────────────────────────────────
-🟢 ACINQ:                        1000 msat    1 ppm        Public
-🟢 LN Big:                       1000 msat    1 ppm        Public
-🟢 Bitrefill:                    1000 msat    1 ppm        Public
-🟢 WalletOfSatoshi.com:          1000 msat    1 ppm        Public
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Channel                          Channel ID           Base Fee     Fee Rate     Status
+───────────────────────────────────────────────────────────────────────────────────────────────────
+🟢 ACINQ:                        123456789012345678   1000 msat    1 ppm        Public
+🟢 LN Big:                       234567890123456789   1000 msat    1 ppm        Public
+🟢 Bitrefill:                    345678901234567890   1000 msat    1 ppm        Public
+🟢 WalletOfSatoshi.com:          456789012345678901   1000 msat    1 ppm        Public
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 Fee Summary:
    Today: 0 │ Week: 27 │ Month: 27
 ```

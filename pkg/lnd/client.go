@@ -81,3 +81,35 @@ func GetNodeAlias(pubkey string) string {
 
 	return response.Node.Alias
 }
+
+// GetNodePubkey retrieves our node's public key
+func GetNodePubkey() (string, error) {
+	output, err := RunLNCLI("getinfo")
+	if err != nil {
+		return "", err
+	}
+
+	var response struct {
+		IdentityPubkey string `json:"identity_pubkey"`
+	}
+	if err := json.Unmarshal(output, &response); err != nil {
+		return "", err
+	}
+
+	return response.IdentityPubkey, nil
+}
+
+// GetChannelInfo retrieves detailed channel information
+func GetChannelInfo(chanID string) (*ChannelEdge, error) {
+	output, err := RunLNCLI("getchaninfo", chanID)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ChannelEdge
+	if err := json.Unmarshal(output, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}

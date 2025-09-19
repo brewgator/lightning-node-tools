@@ -38,49 +38,81 @@ func getNodeAlias(pubkey string) string {
 	return lnd.GetNodeAlias(pubkey)
 }
 
-// setChannelFees updates the fee policy for a specific channel
-func setChannelFees(channelID, baseFee, ppm string) error {
-	// First get the channel info to find the channel point
-	channels, err := getChannels()
+// getCurrentChannelPolicy gets the current policy for a channel including time lock delta
+func getCurrentChannelPolicy(channelID string) (baseFee, feeRatePpm, timeLockDelta string, err error) {
+	// Get our node's public key to determine which policy is ours
+	ourPubkey, err := lnd.GetNodePubkey()
 	if err != nil {
-		return fmt.Errorf("failed to get channels: %v", err)
+		// Fall back to defaults if we can't get our pubkey
+		return "1000", "1", "40", nil
 	}
 
-	var channelPoint string
-	for _, channel := range channels {
-		if channel.ChanID == channelID {
-			// Get channel point from fee report which has the channel point info
-			feeReport, err := getFeeReport()
-			if err != nil {
-				return fmt.Errorf("failed to get fee report: %v", err)
-			}
-			
-			for _, feeInfo := range feeReport.ChannelFees {
-				if feeInfo.ChanID == channelID {
-					channelPoint = feeInfo.ChannelPoint
-					break
-				}
-			}
+	// Get detailed channel information
+	channelInfo, err := lnd.GetChannelInfo(channelID)
+	if err != nil {
+		// Fall back to defaults if we can't get channel info
+		return "1000", "1", "40", nil
+	}
+
+	// Determine which policy is ours based on our pubkey
+	var ourPolicy lnd.RoutingPolicy
+	if channelInfo.Node1Pub == ourPubkey {
+		ourPolicy = channelInfo.Node1Policy
+	} else if channelInfo.Node2Pub == ourPubkey {
+		ourPolicy = channelInfo.Node2Policy
+	} else {
+		// Fall back to defaults if we're not found in the channel
+		return "1000", "1", "40", nil
+	}
+
+	// Convert fee rate from milli-msat to PPM
+	// fee_rate_milli_msat is in millionths, so we need to convert to PPM
+	feeRateMilliMsat, _ := strconv.ParseInt(ourPolicy.FeeRateMilliMsat, 10, 64)
+	feeRatePpmValue := feeRateMilliMsat / 1000 // Convert from millionths to PPM
+
+	return ourPolicy.FeeBaseMsat, strconv.FormatInt(feeRatePpmValue, 10), strconv.FormatUint(uint64(ourPolicy.TimeLockDelta), 10), nil
+}
+
+// setChannelFees updates the fee policy for a specific channel
+func setChannelFees(channelID, baseFee, ppm string) error {
+	// Get current channel policy to preserve unspecified values
+	feeReport, err := getFeeReport()
+	if err != nil {
+		return fmt.Errorf("failed to get fee report: %v", err)
+	}
+
+	var currentFeeInfo *lnd.ChannelFeeReport
+	for _, feeInfo := range feeReport.ChannelFees {
+		if feeInfo.ChanID == channelID {
+			currentFeeInfo = &feeInfo
 			break
 		}
 	}
 
-	if channelPoint == "" {
-		return fmt.Errorf("channel not found or no channel point available for channel ID: %s", channelID)
+	if currentFeeInfo == nil {
+		return fmt.Errorf("channel not found for channel ID: %s", channelID)
 	}
 
 	args := []string{"updatechanpolicy"}
-	
+
+	// Use provided base fee or preserve current value
 	if baseFee != "" {
 		args = append(args, "--base_fee_msat", baseFee)
+	} else {
+		args = append(args, "--base_fee_msat", currentFeeInfo.BaseFeeMsat)
 	}
-	
-	// Convert PPM to fee rate (PPM = parts per million, so 1 ppm = 0.000001)
-	ppmInt, _ := strconv.ParseInt(ppm, 10, 64)
-	feeRate := float64(ppmInt) / 1000000.0
-	args = append(args, "--fee_rate", fmt.Sprintf("%.6f", feeRate))
-	args = append(args, "--time_lock_delta", "40")  // Standard time lock delta
-	args = append(args, "--chan_point", channelPoint)
+
+	// Use provided PPM or preserve current value
+	if ppm != "" {
+		args = append(args, "--fee_rate_ppm", ppm)
+	} else {
+		args = append(args, "--fee_rate_ppm", currentFeeInfo.FeePerMil)
+	}
+
+	// Get current time lock delta or use default
+	_, _, timeLockDelta, _ := getCurrentChannelPolicy(channelID)
+	args = append(args, "--time_lock_delta", timeLockDelta)
+	args = append(args, "--chan_point", currentFeeInfo.ChannelPoint)
 
 	_, err = lnd.RunLNCLI(args...)
 	return err

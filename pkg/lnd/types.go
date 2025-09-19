@@ -58,3 +58,23 @@ type ForwardingEvent struct {
 	FeeMsat   string `json:"fee_msat"`
 	Timestamp string `json:"timestamp"`
 }
+
+// RoutingPolicy represents the routing policy for a channel
+type RoutingPolicy struct {
+	TimeLockDelta    uint32 `json:"time_lock_delta"`
+	MinHtlc          string `json:"min_htlc"`
+	FeeBaseMsat      string `json:"fee_base_msat"`
+	FeeRateMilliMsat string `json:"fee_rate_milli_msat"`
+	Disabled         bool   `json:"disabled"`
+	MaxHtlcMsat      string `json:"max_htlc_msat"`
+}
+
+// ChannelEdge represents a channel edge from getchaninfo
+type ChannelEdge struct {
+	ChannelId   string        `json:"channel_id"`
+	ChanPoint   string        `json:"chan_point"`
+	Node1Pub    string        `json:"node1_pub"`
+	Node2Pub    string        `json:"node2_pub"`
+	Node1Policy RoutingPolicy `json:"node1_policy"`
+	Node2Policy RoutingPolicy `json:"node2_policy"`
+}
