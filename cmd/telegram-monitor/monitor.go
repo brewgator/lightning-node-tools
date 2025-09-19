@@ -89,28 +89,45 @@ func checkBalanceChanges(current, prev *LightningState) {
 	remoteChange := current.RemoteBalance - prev.RemoteBalance
 	totalChange := current.TotalBalance - prev.TotalBalance
 
-	if onchainChange != 0 && int64(math.Abs(float64(onchainChange))) >= BalanceThreshold {
+	// Use adaptive thresholds based on account size
+	threshold := getAdaptiveThreshold(current.TotalBalance)
+
+	if onchainChange != 0 && int64(math.Abs(float64(onchainChange))) >= threshold {
 		msg := createBalanceMessage("On-chain", onchainChange, current.OnchainBalance)
 		sendTelegram(msg)
 	}
 
-	if localChange != 0 && int64(math.Abs(float64(localChange))) >= BalanceThreshold {
+	if localChange != 0 && int64(math.Abs(float64(localChange))) >= threshold {
 		msg := createBalanceMessage("Lightning Local", localChange, current.LocalBalance)
 		sendTelegram(msg)
 	}
 
-	if remoteChange != 0 && int64(math.Abs(float64(remoteChange))) >= BalanceThreshold {
+	if remoteChange != 0 && int64(math.Abs(float64(remoteChange))) >= threshold {
 		msg := createBalanceMessage("Lightning Remote", remoteChange, current.RemoteBalance)
 		sendTelegram(msg)
 	}
 
-	if totalChange != 0 && int64(math.Abs(float64(totalChange))) >= SignificantThreshold {
+	// For total portfolio changes, use a higher threshold or significant threshold
+	portfolioThreshold := int64(math.Max(float64(threshold*2), float64(SignificantThreshold)))
+	if totalChange != 0 && int64(math.Abs(float64(totalChange))) >= portfolioThreshold {
 		msg := createBalanceMessage("Total Portfolio", totalChange, current.TotalBalance)
-		msg += fmt.Sprintf("\n\n<b>Breakdown:</b>\nOn-chain: %s (%+d)\nLightning: %s (%+d)",
-			formatSats(current.OnchainBalance), onchainChange,
-			formatSats(current.LocalBalance+current.RemoteBalance), localChange+remoteChange)
+		msg += fmt.Sprintf("\n\n<b>Breakdown:</b>\nOn-chain: %s (%s)\nLightning local: %s (%s)",
+			formatSats(current.OnchainBalance), formatSatsChange(onchainChange),
+			formatSats(current.LocalBalance), formatSatsChange(localChange))
 		sendTelegram(msg)
 	}
+}
+
+// getAdaptiveThreshold returns an appropriate threshold based on account size
+func getAdaptiveThreshold(totalBalance int64) int64 {
+	if totalBalance < 100000 { // Less than 100k sats
+		return MinimalBalanceThreshold // 1 sat
+	} else if totalBalance < 1000000 { // Less than 1M sats
+		return 100 // 100 sats
+	} else if totalBalance < 10000000 { // Less than 10M sats
+		return BalanceThreshold // 1k sats
+	}
+	return BalanceThreshold * 5 // 5k sats for large accounts
 }
 
 // createBalanceMessage creates a formatted message for balance changes
@@ -132,5 +149,5 @@ func createBalanceMessage(changeType string, amount int64, current int64) string
 	}
 
 	return fmt.Sprintf("%s <b>%s Balance %s</b>\nChange: %s\nCurrent: %s",
-		emoji, changeType, direction, formatSats(amount), formatSats(current))
+		emoji, changeType, direction, formatSatsChange(amount), formatSats(current))
 }

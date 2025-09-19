@@ -123,8 +123,8 @@ func getCurrentLightningState() (*LightningState, error) {
 		}
 	}
 
-	// Calculate total
-	state.TotalBalance = state.OnchainBalance + state.LocalBalance + state.RemoteBalance
+	// Calculate total (only on-chain and local Lightning balances - remote balances aren't "mine")
+	state.TotalBalance = state.OnchainBalance + state.LocalBalance
 
 	// Get recent forwarding events (last 10 minutes)
 	recentTime := time.Now().Add(-10 * time.Minute).Unix()

@@ -28,6 +28,7 @@ type TelegramMessage struct {
 
 // Constants for monitoring thresholds
 const (
-	BalanceThreshold     = 10000   // 10k sats
-	SignificantThreshold = 1000000 // 1M sats
+	MinimalBalanceThreshold = 1       // 1 sat - minimum change to report
+	BalanceThreshold        = 1000    // 1k sats - reduced from 10k for small accounts
+	SignificantThreshold    = 1000000 // 1M sats
 )
