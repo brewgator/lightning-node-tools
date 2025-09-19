@@ -125,6 +125,20 @@ The Channel Manager provides comprehensive Lightning Network channel analysis an
 ./bin/channel-manager earnings -d
 ```
 
+**5. Set fees for a specific channel:**
+```bash
+./bin/channel-manager set-fees --channel-id 12345 --ppm 1 --base-fee 1000
+# or just set PPM:
+./bin/channel-manager set-fees --channel-id 12345 --ppm 2
+```
+
+**6. Set fees for all channels:**
+```bash
+./bin/channel-manager bulk-set-fees --ppm 1
+# or with base fee:
+./bin/channel-manager bulk-set-fees --ppm 2 --base-fee 1000
+```
+
 #### Example Outputs
 
 **Balance Overview:**
@@ -193,6 +207,37 @@ Channel                          Earnings        Status
 ───────────────────────────────────────────────────────────────────────────
 Total:                           22
 ```
+
+#### Planned Improvements
+
+The Channel Manager is under active development with the following features planned:
+
+**Phase 2: Channel Rebalancing (Coming Soon)**
+- Automated liquidity rebalancing between channels
+- Intelligent rebalancing suggestions based on channel performance
+- Cost-aware rebalancing with fee optimization
+
+Planned commands:
+```bash
+./bin/channel-manager rebalance --from-channel X --to-channel Y --amount Z
+./bin/channel-manager suggest-rebalance  # Analyze and suggest optimal moves
+./bin/channel-manager auto-rebalance     # Automated rebalancing based on policies
+```
+
+**Phase 3: Advanced Analytics & Intelligence (Future)**
+- Deep channel performance analysis and health scoring
+- Peer recommendations based on network flow analysis
+- Historical trend analysis and predictive insights
+
+Planned commands:
+```bash
+./bin/channel-manager analyze --channel X     # Performance metrics and insights
+./bin/channel-manager health-check           # Identify problematic channels
+./bin/channel-manager recommend-peers        # Suggest profitable channel partners
+./bin/channel-manager forecast              # Predict future routing performance
+```
+
+These features will build upon the existing foundation to provide a comprehensive Lightning Network management solution comparable to tools like rebalance-lnd, charge-lnd, and lndmanage, while maintaining the clean, intuitive interface and Go-based performance advantages.
 
 ### Bash Script (Legacy)
 
