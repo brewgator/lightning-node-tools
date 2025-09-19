@@ -79,6 +79,7 @@ func setChannelFees(channelID, baseFee, ppm string) error {
 	ppmInt, _ := strconv.ParseInt(ppm, 10, 64)
 	feeRate := float64(ppmInt) / 1000000.0
 	args = append(args, "--fee_rate", fmt.Sprintf("%.6f", feeRate))
+	args = append(args, "--time_lock_delta", "40")  // Standard time lock delta
 	args = append(args, "--chan_point", channelPoint)
 
 	_, err = lnd.RunLNCLI(args...)
