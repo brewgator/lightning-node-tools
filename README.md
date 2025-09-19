@@ -1,18 +1,40 @@
 # Lightning Node Tools
 
-A toolkit for Lightning Network node management and monitoring. This repository contains the first tool with more utilities planned.
+A comprehensive toolkit for Lightning Network node management and monitoring. This repository contains multiple tools designed to help Lightning node operators manage their channels, monitor activity, and optimize performance.
 
-## Current Tool: Telegram Monitoring
+## Tools Overview
 
-Real-time Lightning node monitoring with Telegram notifications.
+### Channel Manager
 
-## Features
+Advanced Lightning Network channel management and fee optimization tool with comprehensive analytics.
+
+**Features:**
+
+- **Visual Channel Balances**: Interactive display of channel liquidity with progress bars
+- **Fee Management**: Set and optimize routing fees for individual channels or bulk operations
+- **Earnings Analytics**: Track fee earnings with detailed per-channel breakdowns
+- **Performance Monitoring**: Monitor channel activity and routing performance
+
+### Telegram Monitor
+
+Real-time Lightning node monitoring with Telegram notifications for critical events.
+
+**Features:**
 
 - **Real-time Lightning Node Monitoring**: Track channel opens/closes, pending operations, and balance changes
 - **Telegram Notifications**: Get instant alerts about your Lightning node activity
 - **Balance Tracking**: Monitor on-chain and Lightning channel balances with configurable thresholds
 - **Forward Monitoring**: Track routing fees and forward activity
 - **Server Reboot Detection**: Get notified when your Lightning node server restarts
+
+## Architecture
+
+The project uses a modular architecture with shared packages for common functionality:
+
+- **`pkg/lnd/`**: Shared Lightning Network API client and data structures
+- **`pkg/utils/`**: Common utility functions for formatting and calculations
+- **`cmd/channel-manager/`**: Channel management tool implementation
+- **`cmd/telegram-monitor/`**: Telegram monitoring tool implementation
 
 ## Setup
 
@@ -52,14 +74,6 @@ Real-time Lightning node monitoring with Telegram notifications.
    mkdir -p data
    ```
 
-## Available Tools
-
-### 1. Telegram Monitor
-Real-time Lightning node monitoring with Telegram notifications.
-
-### 2. Channel Manager
-Visual channel liquidity management and analysis tool.
-
 ## Usage
 
 ### Build All Tools
@@ -97,15 +111,65 @@ go build -o bin/channel-manager ./cmd/channel-manager
 
 ### Channel Manager
 
-**Show visual channel balances:**
+The Channel Manager provides comprehensive Lightning Network channel analysis and monitoring capabilities.
+
+#### Available Commands
+
+**1. Show visual channel balances:**
+
 ```bash
 ./bin/channel-manager balance
 # or short alias:
 ./bin/channel-manager bal
 ```
 
-**Example Output:**
+**2. Show channel fees information:**
+
+```bash
+./bin/channel-manager fees
 ```
+
+**3. Show fee earnings summary:**
+
+```bash
+./bin/channel-manager earnings
+```
+
+**4. Show detailed earnings breakdown:**
+
+```bash
+./bin/channel-manager earnings --detailed
+# or short alias:
+./bin/channel-manager earnings -d
+```
+
+**5. Set fees for a specific channel:**
+
+```bash
+./bin/channel-manager set-fees --channel-id 12345 --ppm 1 --base-fee 1000
+# or just set PPM (preserves existing base fee and time lock delta):
+./bin/channel-manager set-fees --channel-id 12345 --ppm 2
+# or just set base fee (preserves existing PPM and time lock delta):
+./bin/channel-manager set-fees --channel-id 12345 --base-fee 1500
+```
+
+*Note: The tool intelligently preserves existing channel policy values for any parameters not explicitly specified.*
+
+**6. Set fees for all channels:**
+
+```bash
+./bin/channel-manager bulk-set-fees --ppm 1
+# or with base fee:
+./bin/channel-manager bulk-set-fees --ppm 2 --base-fee 1000
+```
+
+*Note: Like set-fees, bulk operations preserve existing values for unspecified parameters on each channel.*
+
+#### Example Outputs
+
+**Balance Overview:**
+
+```text
 🔋 Channel Liquidity Overview
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🟢 ACINQ:                     |#######-----------------------| 250K/750K
@@ -119,6 +183,95 @@ go build -o bin/channel-manager ./cmd/channel-manager
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 Summary: 2/3 active channels | Total: 2.5M | Local: 300K | Remote: 2.2M
 ```
+
+**Fees Overview:**
+
+```text
+💰 Channel Fees Overview
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Channel                          Channel ID           Base Fee     Fee Rate     Status
+───────────────────────────────────────────────────────────────────────────────────────────────────
+🟢 ACINQ:                        123456789012345678   1000 msat    1 ppm        Public
+🟢 LN Big:                       234567890123456789   1000 msat    1 ppm        Public
+🟢 Bitrefill:                    345678901234567890   1000 msat    1 ppm        Public
+🟢 WalletOfSatoshi.com:          456789012345678901   1000 msat    1 ppm        Public
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Fee Summary:
+   Today: 0 │ Week: 27 │ Month: 27
+```
+
+**Earnings Summary:**
+
+```text
+💸 Fee Earnings Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 Today:                  0
+📊 Week:                  27
+📈 Month:                 27
+──────────────────────────────────────────────────
+📉 Daily Avg:              3 (7-day)
+📉 Daily Avg:              0 (30-day)
+⚡ Channels:               6 active
+```
+
+**Detailed Earnings Breakdown:**
+
+```text
+💸 Fee Earnings Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📅 Today:                  0
+📊 Week:                  27
+📈 Month:                 27
+──────────────────────────────────────────────────
+📉 Daily Avg:              3 (7-day)
+⚡ Channels:               6 active
+
+📋 Detailed Channel Earnings (30 days)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Channel                          Earnings        Status
+───────────────────────────────────────────────────────────────────────────
+🟢 LN Big:                       21              Public
+🟢 ACINQ:                        1               Public
+🟢 Bitrefill:                    0               Public
+🟢 WalletOfSatoshi.com:          0               Public
+───────────────────────────────────────────────────────────────────────────
+Total:                           22
+```
+
+#### Planned Improvements
+
+The Channel Manager is under active development with the following features planned:
+
+**Phase 2: Channel Rebalancing (Coming Soon)**
+
+- Automated liquidity rebalancing between channels
+- Intelligent rebalancing suggestions based on channel performance
+- Cost-aware rebalancing with fee optimization
+
+Planned commands:
+
+```bash
+./bin/channel-manager rebalance --from-channel X --to-channel Y --amount Z
+./bin/channel-manager suggest-rebalance  # Analyze and suggest optimal moves
+./bin/channel-manager auto-rebalance     # Automated rebalancing based on policies
+```
+
+**Phase 3: Advanced Analytics & Intelligence (Future)**
+
+- Deep channel performance analysis and health scoring
+- Peer recommendations based on network flow analysis
+- Historical trend analysis and predictive insights
+
+Planned commands:
+
+```bash
+./bin/channel-manager analyze --channel X     # Performance metrics and insights
+./bin/channel-manager health-check           # Identify problematic channels
+./bin/channel-manager recommend-peers        # Suggest profitable channel partners
+./bin/channel-manager forecast              # Predict future routing performance
+```
+
+These features will build upon the existing foundation to provide a comprehensive Lightning Network management solution comparable to tools like rebalance-lnd, charge-lnd, and lndmanage, while maintaining the clean, intuitive interface and Go-based performance advantages.
 
 ### Bash Script (Legacy)
 
@@ -154,8 +307,8 @@ The script includes several configurable thresholds:
 ## Requirements
 
 - Lightning Network node with `lncli` installed and configured
-- Go 1.19+ (for the Go program)
-- Telegram bot token and chat ID
+- Go 1.19+ for building the tools
+- Telegram bot token and chat ID (for telegram-monitor)
 
 ### Legacy Bash Script Requirements
 
@@ -163,17 +316,42 @@ The script includes several configurable thresholds:
 - `bc` for mathematical calculations
 - `curl` for Telegram API calls
 
-## File Structure
+## Project Structure
 
-### Telegram Monitoring Tool
-
-- `cmd/telegram-monitor/main.go`: Go program source code
-- `bin/telegram-monitor`: Compiled Go binary (after building)
-- `telegram-alerts.sh`: Legacy bash monitoring script
-- `.env`: Your private configuration (not tracked by git)
-- `.env.example`: Template configuration file
-- `data/last_state.json`: Stores previous state for comparison
-- `data/last_uptime.txt`: Tracks server uptime for reboot detection
+```
+lightning-node-tools/
+├── cmd/
+│   ├── channel-manager/          # Channel management tool
+│   │   ├── main.go              # Main entry point and command routing
+│   │   ├── types.go             # Tool-specific data structures
+│   │   ├── client.go            # LND client wrapper
+│   │   ├── fees.go              # Fee management functionality
+│   │   ├── earnings.go          # Earnings analysis
+│   │   ├── balance.go           # Balance display
+│   │   └── utils.go             # Tool-specific utilities
+│   └── telegram-monitor/         # Telegram monitoring tool
+│       ├── main.go              # Main entry point
+│       ├── types.go             # Tool-specific data structures
+│       ├── client.go            # LND client wrapper
+│       ├── monitor.go           # Monitoring logic
+│       ├── telegram.go          # Telegram API integration
+│       └── utils.go             # Tool-specific utilities
+├── pkg/
+│   ├── lnd/                     # Shared Lightning Network functionality
+│   │   ├── client.go            # LND API client functions
+│   │   └── types.go             # Common LND data structures
+│   └── utils/                   # Shared utility functions
+│       └── format.go            # Satoshi formatting utilities
+├── bin/                         # Compiled binaries (after building)
+│   ├── channel-manager
+│   └── telegram-monitor
+├── data/                        # Runtime data storage
+│   ├── last_state.json          # Previous state for comparison
+│   └── last_uptime.txt          # Server uptime tracking
+├── .env                         # Configuration (not tracked by git)
+├── .env.example                 # Configuration template
+└── telegram-alerts.sh           # Legacy bash monitoring script
+```
 
 ## Troubleshooting
 
