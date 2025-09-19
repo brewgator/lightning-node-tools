@@ -79,17 +79,32 @@ The project uses a modular architecture with shared packages for common function
 
 ### Build All Tools
 
+**Simple one-command build:**
+```bash
+make
+```
+
+**Or use the traditional Go commands:**
 ```bash
 go build -o bin/telegram-monitor ./cmd/telegram-monitor
 go build -o bin/channel-manager ./cmd/channel-manager
 ```
+
+**Available make targets:**
+- `make` or `make build` - Build all tools
+- `make clean` - Remove build artifacts
+- `make channel-manager` - Build only channel-manager
+- `make telegram-monitor` - Build only telegram-monitor
+- `make install` - Install tools to GOPATH/bin
+- `make help` - Show all available targets
 
 ### Telegram Monitor
 
 1. **Build the Go program**:
 
    ```bash
-   go build -o bin/telegram-monitor ./cmd/telegram-monitor
+   make telegram-monitor
+   # or: go build -o bin/telegram-monitor ./cmd/telegram-monitor
    ```
 
 2. **Run manually to test**:
