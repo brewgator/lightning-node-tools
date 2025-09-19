@@ -26,7 +26,7 @@ func showChannelFees() {
 	}
 
 	fmt.Println("\n💰 Channel Fees Overview")
-	fmt.Println(strings.Repeat("━", 75))
+	fmt.Println(strings.Repeat("━", 95))
 
 	// Create a map for quick fee lookup by channel ID
 	feeMap := make(map[string]ChannelFeeReport)
@@ -34,15 +34,15 @@ func showChannelFees() {
 		feeMap[fee.ChanID] = fee
 	}
 
-	fmt.Printf("%-32s %-12s %-12s %s\n", "Channel", "Base Fee", "Fee Rate", "Status")
-	fmt.Println(strings.Repeat("─", 75))
+	fmt.Printf("%-32s %-20s %-12s %-12s %s\n", "Channel", "Channel ID", "Base Fee", "Fee Rate", "Status")
+	fmt.Println(strings.Repeat("─", 95))
 
 	for _, channel := range channels {
 		displayChannelFees(channel, feeMap)
 	}
 
 	// Summary
-	fmt.Println(strings.Repeat("━", 75))
+	fmt.Println(strings.Repeat("━", 95))
 	if feeReport.DayFeeSum != "" || feeReport.WeekFeeSum != "" || feeReport.MonthFeeSum != "" {
 		fmt.Printf("📊 Fee Summary:\n")
 		if feeReport.DayFeeSum != "" {
@@ -97,9 +97,10 @@ func displayChannelFees(channel Channel, feeMap map[string]ChannelFeeReport) {
 		}
 	}
 
-	fmt.Printf("%s %-29s %-12s %-12s %s\n",
+	fmt.Printf("%s %-29s %-20s %-12s %-12s %s\n",
 		status,
 		alias+":",
+		channel.ChanID,
 		baseFee,
 		feeRatePPM,
 		getChannelStatus(channel))
@@ -118,14 +119,14 @@ func handleSetFees() {
 	}
 
 	var channelID, baseFee, ppm string
-	
+
 	// Parse arguments
 	for i := 2; i < len(os.Args); i += 2 {
 		if i+1 >= len(os.Args) {
 			fmt.Printf("Error: Missing value for %s\n", os.Args[i])
 			return
 		}
-		
+
 		switch os.Args[i] {
 		case "--channel-id":
 			channelID = os.Args[i+1]
@@ -149,7 +150,7 @@ func handleSetFees() {
 		fmt.Printf("Error: Invalid channel ID: %s\n", channelID)
 		return
 	}
-	
+
 	if _, err := strconv.ParseInt(ppm, 10, 64); err != nil {
 		fmt.Printf("Error: Invalid PPM rate: %s\n", ppm)
 		return
@@ -187,14 +188,14 @@ func handleBulkSetFees() {
 	}
 
 	var baseFee, ppm string
-	
+
 	// Parse arguments
 	for i := 2; i < len(os.Args); i += 2 {
 		if i+1 >= len(os.Args) {
 			fmt.Printf("Error: Missing value for %s\n", os.Args[i])
 			return
 		}
-		
+
 		switch os.Args[i] {
 		case "--base-fee":
 			baseFee = os.Args[i+1]
@@ -237,7 +238,7 @@ func handleBulkSetFees() {
 	}
 
 	fmt.Printf("🔄 Setting fees for %d channels...\n", len(channels))
-	
+
 	successCount := 0
 	for _, channel := range channels {
 		if !channel.Active {
@@ -250,7 +251,7 @@ func handleBulkSetFees() {
 			fmt.Printf("❌ Failed to set fees for %s: %v\n", getNodeAlias(channel.RemotePubkey), err)
 			continue
 		}
-		
+
 		fmt.Printf("✅ %s\n", getNodeAlias(channel.RemotePubkey))
 		successCount++
 	}
