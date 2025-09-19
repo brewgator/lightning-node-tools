@@ -2,13 +2,23 @@ package lnd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os/exec"
 )
 
 // RunLNCLI executes lncli commands and returns the output
 func RunLNCLI(args ...string) ([]byte, error) {
 	cmd := exec.Command("lncli", args...)
-	return cmd.Output()
+	output, err := cmd.Output()
+	if err != nil {
+		// If there's an error, try to get stderr for more details
+		if exitError, ok := err.(*exec.ExitError); ok {
+			// Include stderr in the error message
+			return nil, fmt.Errorf("lncli command failed: %v, stderr: %s", err, string(exitError.Stderr))
+		}
+		return nil, fmt.Errorf("lncli command failed: %v", err)
+	}
+	return output, nil
 }
 
 // GetChannels retrieves all channels from LND
