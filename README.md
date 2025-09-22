@@ -181,6 +181,24 @@ The Channel Manager provides comprehensive Lightning Network channel analysis an
 
 *Note: Like set-fees, bulk operations preserve existing values for unspecified parameters on each channel.*
 
+**7. Analyze rebalancing opportunities:**
+
+```bash
+./bin/channel-manager suggest-rebalance
+```
+
+**8. Execute automatic rebalancing:**
+
+```bash
+./bin/channel-manager auto-rebalance
+```
+
+**9. Manual rebalancing between specific channels:**
+
+```bash
+./bin/channel-manager rebalance --from-channel 12345 --to-channel 67890 --amount 100000
+```
+
 #### Example Outputs
 
 **Balance Overview:**
@@ -258,18 +276,44 @@ Total:                           22
 
 The Channel Manager is under active development with the following features planned:
 
-##### Phase 2: Channel Rebalancing (Coming Soon)
+##### Phase 2: Channel Rebalancing ✅ **IMPLEMENTED**
 
-- Automated liquidity rebalancing between channels
-- Intelligent rebalancing suggestions based on channel performance
-- Cost-aware rebalancing with fee optimization
+- ✅ **Automated liquidity rebalancing between channels**
+- ✅ **Intelligent rebalancing suggestions based on channel performance**
+- ✅ **Cost-aware rebalancing with fee optimization**
 
-Planned commands:
+**Features:**
+- **Smart Channel Analysis**: Scores channels based on imbalance, activity, and capacity
+- **Adaptive Thresholds**: Configurable target ratios and tolerance levels
+- **Cost Optimization**: Estimates and limits rebalancing fees
+- **Priority-Based Suggestions**: High/medium/low priority recommendations
+- **Automated Execution**: Auto-rebalance executes only high-priority operations
+
+**Available commands:**
 
 ```bash
-./bin/channel-manager rebalance --from-channel X --to-channel Y --amount Z
 ./bin/channel-manager suggest-rebalance  # Analyze and suggest optimal moves
-./bin/channel-manager auto-rebalance     # Automated rebalancing based on policies
+./bin/channel-manager auto-rebalance     # Execute high-priority rebalancing automatically
+./bin/channel-manager rebalance --from-channel X --to-channel Y --amount Z  # Manual rebalance
+```
+
+**Example suggest-rebalance output:**
+```text
+🔍 Analyzing channels for rebalancing opportunities...
+
+💡 Found 3 rebalancing opportunities:
+────────────────────────────────────────────────────────────────────────────────────────────────
+🔴 1. ACINQ → Bitrefill
+   Amount: 250.0K sats | Estimated fee: 25 sats (0.010%)
+   Reason: Move liquidity from over-liquid ACINQ (85.2% local) to under-liquid Bitrefill (15.3% local)
+   Command: ./bin/channel-manager rebalance --from-channel 12345 --to-channel 67890 --amount 250000
+
+🟡 2. WalletOfSatoshi → LNBig
+   Amount: 150.0K sats | Estimated fee: 18 sats (0.012%)
+   Reason: Move liquidity from over-liquid WalletOfSatoshi (78.9% local) to under-liquid LNBig (22.1% local)
+   Command: ./bin/channel-manager rebalance --from-channel 23456 --to-channel 78901 --amount 150000
+────────────────────────────────────────────────────────────────────────────────────────────────
+💡 To execute all high-priority rebalances: ./bin/channel-manager auto-rebalance
 ```
 
 ##### Phase 3: Advanced Analytics & Intelligence (Future)
