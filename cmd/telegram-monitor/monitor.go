@@ -172,7 +172,7 @@ func getSuperDetailedEarningsForTelegram() string {
 	// Get recent forwarding history (last 24 hours)
 	now := time.Now()
 	dayAgo := now.AddDate(0, 0, -1)
-	
+
 	output, err := lnd.RunLNCLI("fwdinghistory", "--start_time", strconv.FormatInt(dayAgo.Unix(), 10), "--end_time", strconv.FormatInt(now.Unix(), 10))
 	if err != nil {
 		return "📊 No forwarding activity in the last 24 hours"
@@ -191,7 +191,7 @@ func getSuperDetailedEarningsForTelegram() string {
 	channelEarnings := make(map[string]int64)
 	channelForwards := make(map[string]int)
 	totalEarnings := int64(0)
-	
+
 	for _, event := range history.ForwardingEvents {
 		feeMsat, _ := strconv.ParseInt(event.FeeMsat, 10, 64)
 		feeSats := feeMsat / 1000
@@ -209,14 +209,14 @@ func getSuperDetailedEarningsForTelegram() string {
 	message.WriteString("💰 <b>24h Routing Summary</b>\n")
 	message.WriteString("━━━━━━━━━━━━━━━━━━━━\n")
 	message.WriteString(fmt.Sprintf("Total: %s (%d forwards)\n", formatSats(totalEarnings), len(history.ForwardingEvents)))
-	
+
 	// Show top earning channels
 	type channelSummary struct {
 		alias    string
 		earnings int64
 		forwards int
 	}
-	
+
 	var topChannels []channelSummary
 	for _, channel := range channels {
 		if earnings := channelEarnings[channel.ChanID]; earnings > 0 {
@@ -231,24 +231,24 @@ func getSuperDetailedEarningsForTelegram() string {
 			})
 		}
 	}
-	
+
 	// Sort by earnings
 	sort.Slice(topChannels, func(i, j int) bool {
 		return topChannels[i].earnings > topChannels[j].earnings
 	})
-	
+
 	// Show top 5 channels
 	maxShow := 5
 	if len(topChannels) < maxShow {
 		maxShow = len(topChannels)
 	}
-	
+
 	for i := 0; i < maxShow; i++ {
 		ch := topChannels[i]
-		message.WriteString(fmt.Sprintf("• <b>%s</b>: %s (%d)\n", 
+		message.WriteString(fmt.Sprintf("• <b>%s</b>: %s (%d)\n",
 			ch.alias, formatSats(ch.earnings), ch.forwards))
 	}
-	
+
 	// Show most recent forward details
 	if len(history.ForwardingEvents) > 0 {
 		recent := history.ForwardingEvents[len(history.ForwardingEvents)-1]
@@ -256,7 +256,7 @@ func getSuperDetailedEarningsForTelegram() string {
 		recentTime := time.Unix(timestamp, 0)
 		amtSats, _ := strconv.ParseInt(recent.AmtOut, 10, 64)
 		feeMsat, _ := strconv.ParseInt(recent.FeeMsat, 10, 64)
-		
+
 		message.WriteString(fmt.Sprintf("\n🔄 <b>Latest</b>: %s for %s (fee: %s)\n",
 			recentTime.Format("15:04"),
 			formatSats(amtSats),

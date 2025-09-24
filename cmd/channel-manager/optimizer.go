@@ -1,3 +1,7 @@
+// Minimum viable fee per million (PPM)
+const MinViablePPM int64 = 10
+// Maximum reasonable fee per million (PPM)
+const MaxReasonablePPM int64 = 1000
 package main
 
 import (
@@ -10,6 +14,9 @@ import (
 	"strings"
 	"time"
 )
+
+// Minimum viable fee per million (PPM)
+const MinViablePPM int64 = 10
 
 // ChannelAnalysis contains analysis data for fee optimization
 type ChannelAnalysis struct {
@@ -32,10 +39,10 @@ type ChannelAnalysis struct {
 
 // ChannelCategory constants
 const (
-	CategoryHighCapOutbound = "high-cap-outbound"  // >500K local, good for sending large payments
-	CategoryHighCapInbound  = "high-cap-inbound"   // >500K remote, liquidity sink
-	CategoryBalanced        = "balanced"           // 30-70% local ratio
-	CategoryLowLiquidity    = "low-liquidity"      // <500K total capacity
+	CategoryHighCapOutbound = "high-cap-outbound" // >500K local, good for sending large payments
+	CategoryHighCapInbound  = "high-cap-inbound"  // >500K remote, liquidity sink
+	CategoryBalanced        = "balanced"          // 30-70% local ratio
+	CategoryLowLiquidity    = "low-liquidity"     // <500K total capacity
 )
 
 // handleSuggestFees analyzes channels and suggests optimal fees without applying changes
@@ -113,22 +120,22 @@ func handleFeeOptimizer() {
 	successCount := 0
 	for _, analysis := range toUpdate {
 		alias := getNodeAlias(analysis.Channel.RemotePubkey)
-		
+
 		if dryRun {
-			fmt.Printf("🔧 Would update %s: %d → %d ppm (%s priority)\n", 
+			fmt.Printf("🔧 Would update %s: %d → %d ppm (%s priority)\n",
 				alias, analysis.CurrentPPM, analysis.RecommendedPPM, analysis.Priority)
 			successCount++
 		} else {
 			err := setChannelFees(
-				analysis.Channel.ChanID, 
+				analysis.Channel.ChanID,
 				strconv.FormatInt(analysis.RecommendedBase, 10),
 				strconv.FormatInt(analysis.RecommendedPPM, 10),
 			)
-			
+
 			if err != nil {
 				fmt.Printf("❌ Failed to update %s: %v\n", alias, err)
 			} else {
-				fmt.Printf("✅ Updated %s: %d → %d ppm (%s priority)\n", 
+				fmt.Printf("✅ Updated %s: %d → %d ppm (%s priority)\n",
 					alias, analysis.CurrentPPM, analysis.RecommendedPPM, analysis.Priority)
 				successCount++
 			}
@@ -177,7 +184,7 @@ func analyzeChannelsForFeeOptimization() ([]ChannelAnalysis, error) {
 	// Create forwarding lookup maps
 	outgoingForwards := make(map[string][]ForwardingEvent)
 	incomingForwards := make(map[string][]ForwardingEvent)
-	
+
 	for _, event := range forwardingHistory.ForwardingEvents {
 		outgoingForwards[event.ChanIdOut] = append(outgoingForwards[event.ChanIdOut], event)
 		incomingForwards[event.ChanIdIn] = append(incomingForwards[event.ChanIdIn], event)
@@ -201,13 +208,13 @@ func analyzeChannel(channel Channel, feeMap map[string]ChannelFeeReport, outgoin
 	localBalance, _ := strconv.ParseInt(channel.LocalBalance, 10, 64)
 	remoteBalance, _ := strconv.ParseInt(channel.RemoteBalance, 10, 64)
 	capacity, _ := strconv.ParseInt(channel.Capacity, 10, 64)
-	
+
 	localRatio := float64(localBalance) / float64(capacity)
 
 	// Get current fees
 	currentBase := int64(1000) // default
 	currentPPM := int64(1)     // default
-	
+
 	if feeInfo, exists := feeMap[channel.ChanID]; exists {
 		if baseFee, err := strconv.ParseInt(feeInfo.BaseFeeMsat, 10, 64); err == nil {
 			currentBase = baseFee
@@ -225,7 +232,7 @@ func analyzeChannel(channel Channel, feeMap map[string]ChannelFeeReport, outgoin
 	for _, forward := range outgoingForwards[channel.ChanID] {
 		fee, _ := strconv.ParseInt(forward.FeeMsat, 10, 64)
 		earningsLast30d += fee / 1000 // Convert msat to sat
-		
+
 		timestamp, _ := strconv.ParseInt(forward.Timestamp, 10, 64)
 		forwardTime := time.Unix(timestamp, 0)
 		if forwardTime.After(lastForwardTime) {
@@ -243,7 +250,7 @@ func analyzeChannel(channel Channel, feeMap map[string]ChannelFeeReport, outgoin
 
 	// Calculate recommended fees
 	recommendedPPM, recommendedBase, reasoning, priority := calculateOptimalFees(
-		category, localBalance, remoteBalance, capacity, localRatio, 
+		category, localBalance, remoteBalance, capacity, localRatio,
 		forwardingCount, earningsLast30d, daysSinceForward,
 	)
 
@@ -271,19 +278,19 @@ func categorizeChannel(localBalance, remoteBalance, capacity int64, localRatio f
 	if capacity < 500000 {
 		return CategoryLowLiquidity
 	}
-	
+
 	if localBalance > 500000 && localRatio > 0.6 {
 		return CategoryHighCapOutbound
 	}
-	
+
 	if remoteBalance > 500000 && localRatio < 0.4 {
 		return CategoryHighCapInbound
 	}
-	
+
 	if localRatio >= 0.3 && localRatio <= 0.7 {
 		return CategoryBalanced
 	}
-	
+
 	// Default fallback
 	if localBalance > remoteBalance {
 		return CategoryHighCapOutbound
@@ -292,11 +299,11 @@ func categorizeChannel(localBalance, remoteBalance, capacity int64, localRatio f
 }
 
 // calculateOptimalFees calculates the optimal fee structure for a channel
-func calculateOptimalFees(category string, localBalance, remoteBalance, capacity int64, localRatio float64, 
+func calculateOptimalFees(category string, localBalance, remoteBalance, capacity int64, localRatio float64,
 	forwardingCount int, earningsLast30d int64, daysSinceForward int) (ppm, baseFee int64, reasoning, priority string) {
-	
+
 	baseFee = 1000 // Standard base fee
-	
+
 	// Base PPM by category
 	var basePPM int64
 	switch category {
@@ -316,10 +323,10 @@ func calculateOptimalFees(category string, localBalance, remoteBalance, capacity
 		basePPM = 100
 		reasoning = "Standard channel - moderate fees"
 	}
-	
+
 	// Performance adjustments
 	priority = "medium"
-	
+
 	// Recent forwarding activity (last 7 days)
 	if daysSinceForward <= 7 && forwardingCount > 0 {
 		basePPM = int64(float64(basePPM) * 0.8) // 20% discount for active channels
@@ -330,7 +337,7 @@ func calculateOptimalFees(category string, localBalance, remoteBalance, capacity
 		reasoning += " (increased for inactivity)"
 		priority = "low"
 	}
-	
+
 	// High-earning channels get moderate increase
 	avgDailyEarnings := earningsLast30d / 30
 	if avgDailyEarnings > 10 { // More than 10 sats per day average
@@ -338,17 +345,17 @@ func calculateOptimalFees(category string, localBalance, remoteBalance, capacity
 		reasoning += " (premium for high earnings)"
 		priority = "high"
 	}
-	
+
 	// Ensure minimum viable fees
-	if basePPM < 10 {
-		basePPM = 10
+	if basePPM < MinViablePPM {
+		basePPM = MinViablePPM
 	}
-	
+
 	// Cap maximum fees to reasonable levels
-	if basePPM > 1000 {
-		basePPM = 1000
+	if basePPM > MaxReasonablePPM {
+		basePPM = MaxReasonablePPM
 	}
-	
+
 	return basePPM, baseFee, reasoning, priority
 }
 
@@ -356,16 +363,16 @@ func calculateOptimalFees(category string, localBalance, remoteBalance, capacity
 func displayFeeOptimizationSuggestions(analyses []ChannelAnalysis) {
 	fmt.Println("\n💡 Fee Optimization Suggestions:")
 	fmt.Println(strings.Repeat("─", 120))
-	
+
 	highPriorityCount := 0
 	mediumPriorityCount := 0
-	
+
 	for _, analysis := range analyses {
 		alias := getNodeAlias(analysis.Channel.RemotePubkey)
 		if len(alias) > 25 {
 			alias = alias[:22] + "..."
 		}
-		
+
 		// Priority indicator
 		priorityIcon := "🟢"
 		switch analysis.Priority {
@@ -378,7 +385,7 @@ func displayFeeOptimizationSuggestions(analyses []ChannelAnalysis) {
 		case "low":
 			priorityIcon = "🟢"
 		}
-		
+
 		// Fee change indicator
 		feeChangeIcon := "→"
 		feeChange := analysis.RecommendedPPM - analysis.CurrentPPM
@@ -387,7 +394,7 @@ func displayFeeOptimizationSuggestions(analyses []ChannelAnalysis) {
 		} else if feeChange < 0 {
 			feeChangeIcon = "↘"
 		}
-		
+
 		fmt.Printf("%s %-25s │ %s %3d %s %3d ppm │ %s │ %7s │ %2dd │ %s\n",
 			priorityIcon,
 			alias,
@@ -400,26 +407,26 @@ func displayFeeOptimizationSuggestions(analyses []ChannelAnalysis) {
 			analysis.DaysSinceForward,
 			analysis.Category,
 		)
-		
+
 		// Show reasoning for high priority items
 		if analysis.Priority == "high" {
 			fmt.Printf("   └─ %s\n", analysis.Reasoning)
 		}
 	}
-	
+
 	fmt.Println(strings.Repeat("─", 120))
-	fmt.Printf("📊 Summary: %d high priority, %d medium priority changes suggested\n", 
+	fmt.Printf("📊 Summary: %d high priority, %d medium priority changes suggested\n",
 		highPriorityCount, mediumPriorityCount)
-	
+
 	if highPriorityCount > 0 || mediumPriorityCount > 0 {
 		fmt.Println("\n💡 Commands:")
 		fmt.Println("   ./bin/channel-manager fee-optimizer --dry-run    # Preview changes")
 		fmt.Println("   ./bin/channel-manager fee-optimizer             # Apply optimizations")
 	}
-	
+
 	fmt.Println("\n🔑 Legend:")
 	fmt.Println("   🔴 High priority  🟡 Medium priority  🟢 Low priority")
 	fmt.Println("   ↗ Increase fees  ↘ Decrease fees  → No change")
-	fmt.Printf("   Categories: %s, %s, %s, %s\n", 
+	fmt.Printf("   Categories: %s, %s, %s, %s\n",
 		CategoryHighCapOutbound, CategoryBalanced, CategoryHighCapInbound, CategoryLowLiquidity)
 }

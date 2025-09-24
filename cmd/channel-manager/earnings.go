@@ -183,176 +183,63 @@ func showSuperDetailedEarnings() {
 	fmt.Println("🔍 Super Detailed Channel Earnings Analysis")
 	fmt.Println(strings.Repeat("━", 100))
 
-	// Create channel lookup map
-	channelMap := make(map[string]Channel)
-	for _, channel := range channels {
-		channelMap[channel.ChanID] = channel
+	// Use shared helper for monthly and weekly earnings
+	monthlySummaries, totalMonthly, totalMonthlyForwards := calculateChannelEarnings(channels, monthHistory.ForwardingEvents)
+	weeklySummaries, totalWeekly, totalWeeklyForwards := calculateChannelEarnings(channels, recentHistory.ForwardingEvents)
+
+	// Map summaries for quick lookup
+	summaryMap := make(map[string]*channelEarningsSummary)
+	for i := range monthlySummaries {
+		summaryMap[monthlySummaries[i].ChanID] = &monthlySummaries[i]
 	}
-
-	// Calculate per-channel metrics
-	type ChannelEarningsDetail struct {
-		Channel          Channel
-		Alias            string
-		MonthlyEarnings  int64
-		WeeklyEarnings   int64
-		MonthlyForwards  int
-		WeeklyForwards   int
-		AvgFeePerForward int64
-		LastForwardTime  time.Time
-		RecentEvents     []ForwardingEvent
-	}
-
-	channelDetails := make(map[string]*ChannelEarningsDetail)
-
-	// Initialize channel details
-	for _, channel := range channels {
-		alias := getNodeAlias(channel.RemotePubkey)
-		if len(alias) > 25 {
-			alias = alias[:22] + "..."
-		}
-		channelDetails[channel.ChanID] = &ChannelEarningsDetail{
-			Channel: channel,
-			Alias:   alias,
+	for i := range weeklySummaries {
+		if s, ok := summaryMap[weeklySummaries[i].ChanID]; ok {
+			s.Forwards = weeklySummaries[i].Forwards
+			s.Earnings = monthlySummaries[i].Earnings
 		}
 	}
-
-	// Process monthly history
-	for _, event := range monthHistory.ForwardingEvents {
-		if detail, exists := channelDetails[event.ChanIdOut]; exists {
-			feeMsat, _ := strconv.ParseInt(event.FeeMsat, 10, 64)
-			detail.MonthlyEarnings += feeMsat / 1000
-			detail.MonthlyForwards++
-
-			timestamp, _ := strconv.ParseInt(event.Timestamp, 10, 64)
-			eventTime := time.Unix(timestamp, 0)
-			if eventTime.After(detail.LastForwardTime) {
-				detail.LastForwardTime = eventTime
-			}
-		}
-	}
-
-	// Process recent history and collect recent events
-	for _, event := range recentHistory.ForwardingEvents {
-		if detail, exists := channelDetails[event.ChanIdOut]; exists {
-			feeMsat, _ := strconv.ParseInt(event.FeeMsat, 10, 64)
-			detail.WeeklyEarnings += feeMsat / 1000
-			detail.WeeklyForwards++
-			detail.RecentEvents = append(detail.RecentEvents, event)
-		}
-	}
-
-	// Calculate averages and sort recent events
-	for _, detail := range channelDetails {
-		if detail.MonthlyForwards > 0 {
-			detail.AvgFeePerForward = detail.MonthlyEarnings / int64(detail.MonthlyForwards)
-		}
-
-		// Sort recent events by timestamp (most recent first)
-		sort.Slice(detail.RecentEvents, func(i, j int) bool {
-			timeI, _ := strconv.ParseInt(detail.RecentEvents[i].Timestamp, 10, 64)
-			timeJ, _ := strconv.ParseInt(detail.RecentEvents[j].Timestamp, 10, 64)
-			return timeI > timeJ
-		})
-
-		// Keep only the 3 most recent events per channel
-		if len(detail.RecentEvents) > 3 {
-			detail.RecentEvents = detail.RecentEvents[:3]
-		}
-	}
-
-	// Sort channels by monthly earnings
-	var sortedDetails []*ChannelEarningsDetail
-	for _, detail := range channelDetails {
-		sortedDetails = append(sortedDetails, detail)
-	}
-	sort.Slice(sortedDetails, func(i, j int) bool {
-		return sortedDetails[i].MonthlyEarnings > sortedDetails[j].MonthlyEarnings
-	})
 
 	// Display super detailed information
-	for _, detail := range sortedDetails {
-		if detail.MonthlyEarnings == 0 && detail.WeeklyEarnings == 0 {
+	for _, detail := range monthlySummaries {
+		if detail.Earnings == 0 && weeklySummaries[0].Earnings == 0 {
 			continue // Skip channels with no activity
 		}
-
-		status := "🟢"
-		if !detail.Channel.Active {
-			status = "🔴"
-		}
-
-		fmt.Printf("\n%s %s\n", status, detail.Alias)
-		fmt.Println(strings.Repeat("─", 80))
-
-		// Earnings summary
-		fmt.Printf("💰 Earnings: Month: %s | Week: %s | Avg/Forward: %s\n",
-			formatSats(detail.MonthlyEarnings),
-			formatSats(detail.WeeklyEarnings),
-			formatSats(detail.AvgFeePerForward))
-
-		// Activity summary
-		fmt.Printf("📊 Activity: Month: %d forwards | Week: %d forwards",
-			detail.MonthlyForwards, detail.WeeklyForwards)
-
-		if !detail.LastForwardTime.IsZero() {
-			daysSince := int(time.Since(detail.LastForwardTime).Hours() / 24)
-			fmt.Printf(" | Last: %dd ago", daysSince)
-		}
-		fmt.Println()
-
-		// Channel info
-		localBalance, _ := strconv.ParseInt(detail.Channel.LocalBalance, 10, 64)
-		capacity, _ := strconv.ParseInt(detail.Channel.Capacity, 10, 64)
-		localRatio := float64(localBalance) / float64(capacity) * 100
-
-		fmt.Printf("⚡ Channel: %s capacity | %.1f%% local | %s\n",
-			formatSats(capacity), localRatio, getChannelStatus(detail.Channel))
-
-		// Recent forwarding events
-		if len(detail.RecentEvents) > 0 {
-			fmt.Printf("🔄 Recent Forwards (%d):\n", len(detail.RecentEvents))
-			for i, event := range detail.RecentEvents {
-				timestamp, _ := strconv.ParseInt(event.Timestamp, 10, 64)
-				eventTime := time.Unix(timestamp, 0)
-
-				amtIn, _ := strconv.ParseInt(event.AmtIn, 10, 64)
-				amtOut, _ := strconv.ParseInt(event.AmtOut, 10, 64)
-				feeMsat, _ := strconv.ParseInt(event.FeeMsat, 10, 64)
-
-				fmt.Printf("   %d. %s: %s → %s (fee: %s) via %s\n",
-					i+1,
-					eventTime.Format("Jan 02 15:04"),
-					formatSats(amtIn),
-					formatSats(amtOut),
-					formatSats(feeMsat/1000),
-					getIncomingChannelAlias(event.ChanIdIn))
+		var channel Channel
+		for _, ch := range channels {
+			if ch.ChanID == detail.ChanID {
+				channel = ch
+				break
 			}
 		}
-	}
-
-	// Summary statistics
-	totalMonthly := int64(0)
-	totalWeekly := int64(0)
-	totalMonthlyForwards := 0
-	totalWeeklyForwards := 0
-	activeChannels := 0
-
-	for _, detail := range channelDetails {
-		if detail.MonthlyEarnings > 0 || detail.WeeklyEarnings > 0 {
-			activeChannels++
+		status := "🟢"
+		if !channel.Active {
+			status = "🔴"
 		}
-		totalMonthly += detail.MonthlyEarnings
-		totalWeekly += detail.WeeklyEarnings
-		totalMonthlyForwards += detail.MonthlyForwards
-		totalWeeklyForwards += detail.WeeklyForwards
+		fmt.Printf("\n%s %s\n", status, detail.Alias)
+		fmt.Println(strings.Repeat("─", 80))
+		avgFeePerForward := int64(0)
+		if detail.Forwards > 0 {
+			avgFeePerForward = detail.Earnings / int64(detail.Forwards)
+		}
+		fmt.Printf("💰 Earnings: Month: %s | Week: %s | Avg/Forward: %s\n",
+			formatSats(detail.Earnings),
+			formatSats(weeklySummaries[0].Earnings),
+			formatSats(avgFeePerForward))
+		fmt.Printf("📊 Activity: Month: %d forwards | Week: %d forwards\n",
+			detail.Forwards, weeklySummaries[0].Forwards)
+		localBalance, _ := strconv.ParseInt(channel.LocalBalance, 10, 64)
+		capacity, _ := strconv.ParseInt(channel.Capacity, 10, 64)
+		localRatio := float64(localBalance) / float64(capacity) * 100
+		fmt.Printf("⚡ Channel: %s capacity | %.1f%% local | %s\n",
+			formatSats(capacity), localRatio, getChannelStatus(channel))
 	}
 
 	fmt.Printf("\n")
 	fmt.Println(strings.Repeat("━", 100))
-	fmt.Printf("📈 Summary: %d active routing channels\n", activeChannels)
+	fmt.Printf("📈 Summary: %d active routing channels\n", len(monthlySummaries))
 	fmt.Printf("💰 Total: Month: %s (%d forwards) | Week: %s (%d forwards)\n",
 		formatSats(totalMonthly), totalMonthlyForwards,
 		formatSats(totalWeekly), totalWeeklyForwards)
-
 	if totalMonthlyForwards > 0 {
 		avgFeePerForward := totalMonthly / int64(totalMonthlyForwards)
 		fmt.Printf("📊 Average fee per forward: %s\n", formatSats(avgFeePerForward))
@@ -378,6 +265,52 @@ func getIncomingChannelAlias(chanID string) string {
 	return "Unknown"
 }
 
+// channelEarningsSummary calculates per-channel earnings and forwards for a given history and channel list
+type channelEarningsSummary struct {
+	ChanID   string
+	Alias    string
+	Earnings int64
+	Forwards int
+}
+
+func calculateChannelEarnings(channels []Channel, events []ForwardingEvent) ([]channelEarningsSummary, int64, int) {
+	channelEarnings := make(map[string]int64)
+	channelForwards := make(map[string]int)
+	totalEarnings := int64(0)
+	totalForwards := 0
+
+	for _, event := range events {
+		feeMsat, _ := strconv.ParseInt(event.FeeMsat, 10, 64)
+		feeSats := feeMsat / 1000
+		channelEarnings[event.ChanIdOut] += feeSats
+		channelForwards[event.ChanIdOut]++
+		totalEarnings += feeSats
+		totalForwards++
+	}
+
+	var summaries []channelEarningsSummary
+	for _, channel := range channels {
+		earnings := channelEarnings[channel.ChanID]
+		forwards := channelForwards[channel.ChanID]
+		if earnings > 0 || forwards > 0 {
+			alias := getNodeAlias(channel.RemotePubkey)
+			if len(alias) > 15 {
+				alias = alias[:12] + "..."
+			}
+			summaries = append(summaries, channelEarningsSummary{
+				ChanID:   channel.ChanID,
+				Alias:    alias,
+				Earnings: earnings,
+				Forwards: forwards,
+			})
+		}
+	}
+	sort.Slice(summaries, func(i, j int) bool {
+		return summaries[i].Earnings > summaries[j].Earnings
+	})
+	return summaries, totalEarnings, totalForwards
+}
+
 // getSuperDetailedEarningsForTelegram returns a formatted string of super detailed earnings for telegram
 func getSuperDetailedEarningsForTelegram() string {
 	channels, err := getChannels()
@@ -385,10 +318,8 @@ func getSuperDetailedEarningsForTelegram() string {
 		return "❌ Failed to get channel data"
 	}
 
-	// Get recent forwarding history (last 24 hours)
 	now := time.Now()
 	dayAgo := now.AddDate(0, 0, -1)
-
 	history, err := getForwardingHistory(
 		fmt.Sprintf("%d", dayAgo.Unix()),
 		fmt.Sprintf("%d", now.Unix()),
@@ -397,66 +328,25 @@ func getSuperDetailedEarningsForTelegram() string {
 		return "📊 No forwarding activity in the last 24 hours"
 	}
 
-	// Calculate earnings and activity
-	channelEarnings := make(map[string]int64)
-	channelForwards := make(map[string]int)
-	totalEarnings := int64(0)
-
-	for _, event := range history.ForwardingEvents {
-		feeMsat, _ := strconv.ParseInt(event.FeeMsat, 10, 64)
-		feeSats := feeMsat / 1000
-		channelEarnings[event.ChanIdOut] += feeSats
-		channelForwards[event.ChanIdOut]++
-		totalEarnings += feeSats
-	}
-
+	summaries, totalEarnings, totalForwards := calculateChannelEarnings(channels, history.ForwardingEvents)
 	if totalEarnings == 0 {
 		return "📊 No fee earnings in the last 24 hours"
 	}
 
-	// Build telegram message
 	var message strings.Builder
 	message.WriteString("💰 24h Routing Summary\n")
 	message.WriteString("━━━━━━━━━━━━━━━━━━━━\n")
-	message.WriteString(fmt.Sprintf("Total: %s (%d forwards)\n", formatSats(totalEarnings), len(history.ForwardingEvents)))
-
-	// Show top earning channels
-	type channelSummary struct {
-		alias    string
-		earnings int64
-		forwards int
-	}
-
-	var topChannels []channelSummary
-	for _, channel := range channels {
-		if earnings := channelEarnings[channel.ChanID]; earnings > 0 {
-			alias := getNodeAlias(channel.RemotePubkey)
-			if len(alias) > 15 {
-				alias = alias[:12] + "..."
-			}
-			topChannels = append(topChannels, channelSummary{
-				alias:    alias,
-				earnings: earnings,
-				forwards: channelForwards[channel.ChanID],
-			})
-		}
-	}
-
-	// Sort by earnings
-	sort.Slice(topChannels, func(i, j int) bool {
-		return topChannels[i].earnings > topChannels[j].earnings
-	})
+	message.WriteString(fmt.Sprintf("Total: %s (%d forwards)\n", formatSats(totalEarnings), totalForwards))
 
 	// Show top 5 channels
 	maxShow := 5
-	if len(topChannels) < maxShow {
-		maxShow = len(topChannels)
+	if len(summaries) < maxShow {
+		maxShow = len(summaries)
 	}
-
 	for i := 0; i < maxShow; i++ {
-		ch := topChannels[i]
+		ch := summaries[i]
 		message.WriteString(fmt.Sprintf("• %s: %s (%d)\n",
-			ch.alias, formatSats(ch.earnings), ch.forwards))
+			ch.Alias, formatSats(ch.Earnings), ch.Forwards))
 	}
 
 	// Show most recent forward details
