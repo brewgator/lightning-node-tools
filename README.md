@@ -25,7 +25,8 @@ Real-time Lightning node monitoring with Telegram notifications for critical eve
 - **Telegram Notifications**: Get instant alerts about your Lightning node activity
 - **Smart Balance Tracking**: Adaptive thresholds based on account size with precise change detection
 - **Portfolio Focus**: Total balance excludes remote Lightning balances (only counts your actual funds)
-- **Forward Monitoring**: Track routing fees and forward activity
+- **Forward Monitoring**: Track routing fees and forward activity with detailed 24h summaries
+- **Super Detailed Earnings**: Automated forwarding analysis with top earning channels and recent activity
 - **Server Reboot Detection**: Get notified when your Lightning node server restarts
 
 ## Architecture
@@ -159,7 +160,15 @@ The Channel Manager provides comprehensive Lightning Network channel analysis an
 ./bin/channel-manager earnings -d
 ```
 
-**5. Set fees for a specific channel:**
+**5. Show super detailed earnings with forwarding event analysis:**
+
+```bash
+./bin/channel-manager earnings --super-detailed
+# or short alias:
+./bin/channel-manager earnings --super
+```
+
+**6. Set fees for a specific channel:**
 
 ```bash
 ./bin/channel-manager set-fees --channel-id 12345 --ppm 1 --base-fee 1000
@@ -180,6 +189,43 @@ The Channel Manager provides comprehensive Lightning Network channel analysis an
 ```
 
 *Note: Like set-fees, bulk operations preserve existing values for unspecified parameters on each channel.*
+
+**7. Analyze and suggest optimal fee adjustments:**
+
+```bash
+./bin/channel-manager suggest-fees
+```
+
+**8. Automatically optimize fees based on channel performance:**
+
+```bash
+# Preview changes without applying them
+./bin/channel-manager fee-optimizer --dry-run
+
+# Apply optimizations automatically
+./bin/channel-manager fee-optimizer
+```
+
+#### Smart Fee Optimization
+
+The Channel Manager includes intelligent fee optimization that analyzes your channels and suggests optimal fees based on:
+
+**Analysis Factors:**
+- **Liquidity Distribution**: Channels are categorized as high-capacity outbound (>500K local), high-capacity inbound (>500K remote), balanced (30-70% local), or low-liquidity (<500K total)
+- **Recent Activity**: Channels with recent forwarding get competitive fees, inactive channels get higher fees
+- **Earning Performance**: High-earning channels receive moderate fee increases
+- **Payment Routing Capability**: Ensures multiple channels can handle large payments (500K+ sats)
+
+**Fee Strategy:**
+- **High-capacity outbound**: 10-50 ppm (competitive for large payments)
+- **Balanced channels**: 50-150 ppm (moderate for optimal routing)
+- **High-capacity inbound**: 150-500 ppm (protective to prevent draining)
+- **Low-liquidity channels**: 200-1000 ppm (premium for limited capacity)
+
+**Performance Adjustments:**
+- Recent activity (last 7 days): -20% fee reduction
+- High earnings (>10 sats/day avg): +25% fee increase
+- Inactive channels (>30 days): +50% fee increase
 
 #### Example Outputs
 
@@ -254,11 +300,72 @@ Channel                          Earnings        Status
 Total:                           22
 ```
 
+**Smart Fee Optimization Output:**
+
+```text
+🔍 Analyzing channels for fee optimization opportunities...
+
+💡 Fee Optimization Suggestions:
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+🔴 ACINQ                      │ ↗  50 ↗ 120 ppm │ 1.0M   │  85.2% │  2d │ high-cap-outbound
+   └─ High-capacity outbound channel - competitive fees to attract large payments (reduced for recent activity)
+🟡 Bitrefill                  │ ↘ 200 ↘  80 ppm │ 1.0M   │  15.3% │  5d │ high-cap-inbound
+🟡 WalletOfSatoshi            │ → 100 → 100 ppm │ 500K   │  45.0% │ 12d │ balanced
+🟢 LowCap Node                │ ↗ 150 ↗ 500 ppm │ 200K   │  60.0% │ 45d │ low-liquidity
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+📊 Summary: 1 high priority, 2 medium priority changes suggested
+
+💡 Commands:
+   ./bin/channel-manager fee-optimizer --dry-run    # Preview changes
+   ./bin/channel-manager fee-optimizer             # Apply optimizations
+
+🔑 Legend:
+   🔴 High priority  🟡 Medium priority  🟢 Low priority
+   ↗ Increase fees  ↘ Decrease fees  → No change
+   Categories: high-cap-outbound, balanced, high-cap-inbound, low-liquidity
+```
+
+**Fee Optimizer Dry Run:**
+
+```text
+🧪 Running fee optimizer in dry-run mode (no changes will be applied)...
+
+📊 Found 3 channels that would benefit from fee optimization:
+
+🔧 Would update ACINQ: 50 → 120 ppm (high priority)
+🔧 Would update Bitrefill: 200 → 80 ppm (medium priority)
+🔧 Would update LowCap Node: 150 → 500 ppm (medium priority)
+
+🧪 Dry run complete: 3 channels would be updated
+💡 Run without --dry-run to apply changes
+```
+
 #### Planned Improvements
 
 The Channel Manager is under active development with the following features planned:
 
-##### Phase 2: Channel Rebalancing (Coming Soon)
+##### Phase 2: Smart Fee Optimization ✅ **IMPLEMENTED**
+
+- ✅ **Intelligent fee analysis based on channel performance and liquidity distribution**
+- ✅ **Automated fee optimization with dry-run capability**
+- ✅ **Multi-path routing optimization for large payments (500K+ sats)**
+- ✅ **Performance-based fee adjustments using forwarding history**
+
+**Features:**
+- **Smart Channel Categorization**: Analyzes channels based on capacity, liquidity ratio, and activity
+- **Revenue Optimization**: Balances competitive fees with earnings maximization
+- **Large Payment Support**: Ensures multiple channels can route 500K+ sat payments
+- **Activity-Based Adjustments**: Rewards active channels with competitive fees
+
+**Available commands:**
+
+```bash
+./bin/channel-manager suggest-fees           # Analyze and suggest optimal fees
+./bin/channel-manager fee-optimizer --dry-run # Preview fee optimizations
+./bin/channel-manager fee-optimizer          # Apply automatic optimizations
+```
+
+##### Phase 3: Channel Rebalancing (Future)
 
 - Automated liquidity rebalancing between channels
 - Intelligent rebalancing suggestions based on channel performance
@@ -268,11 +375,11 @@ Planned commands:
 
 ```bash
 ./bin/channel-manager rebalance --from-channel X --to-channel Y --amount Z
-./bin/channel-manager suggest-rebalance  # Analyze and suggest optimal moves
-./bin/channel-manager auto-rebalance     # Automated rebalancing based on policies
+./bin/channel-manager suggest-rebalance      # Analyze and suggest optimal moves
+./bin/channel-manager auto-rebalance         # Automated rebalancing based on policies
 ```
 
-##### Phase 3: Advanced Analytics & Intelligence (Future)
+##### Phase 4: Advanced Analytics & Intelligence (Future)
 
 - Deep channel performance analysis and health scoring
 - Peer recommendations based on network flow analysis

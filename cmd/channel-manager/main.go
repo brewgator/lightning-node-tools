@@ -20,7 +20,7 @@ func main() {
 		showChannelFees()
 	case "earnings":
 		detailed := false
-		if len(os.Args) > 2 && (os.Args[2] == "--detailed" || os.Args[2] == "-d") {
+		if len(os.Args) > 2 && (os.Args[2] == "--detailed" || os.Args[2] == "-d" || os.Args[2] == "--super-detailed" || os.Args[2] == "--super") {
 			detailed = true
 		}
 		showFeeEarnings(detailed)
@@ -28,6 +28,10 @@ func main() {
 		handleSetFees()
 	case "bulk-set-fees":
 		handleBulkSetFees()
+	case "suggest-fees":
+		handleSuggestFees()
+	case "fee-optimizer":
+		handleFeeOptimizer()
 	case "help", "-h", "--help":
 		showHelp()
 	default:
@@ -47,6 +51,8 @@ func showHelp() {
 	fmt.Println("    channel-manager earnings             Show fee earnings summary")
 	fmt.Println("    channel-manager earnings --detailed  Show earnings with per-channel breakdown")
 	fmt.Println("    channel-manager earnings -d          Short alias for --detailed")
+	fmt.Println("    channel-manager earnings --super-detailed  Show comprehensive forwarding event details")
+	fmt.Println("    channel-manager earnings --super     Short alias for --super-detailed")
 	fmt.Println("")
 	fmt.Println("  Fee Management Commands:")
 	fmt.Println("    channel-manager set-fees --channel-id <ID> --ppm <rate> [--base-fee <msat>]")
@@ -54,9 +60,16 @@ func showHelp() {
 	fmt.Println("    channel-manager bulk-set-fees --ppm <rate> [--base-fee <msat>]")
 	fmt.Println("                                         Set fees for all active channels")
 	fmt.Println("")
+	fmt.Println("  Smart Fee Optimization Commands:")
+	fmt.Println("    channel-manager suggest-fees         Analyze and suggest optimal fee adjustments")
+	fmt.Println("    channel-manager fee-optimizer        Automatically apply optimal fee adjustments")
+	fmt.Println("    channel-manager fee-optimizer --dry-run  Preview fee changes without applying")
+	fmt.Println("")
 	fmt.Println("  Examples:")
 	fmt.Println("    channel-manager set-fees --channel-id 12345 --ppm 1 --base-fee 1000")
 	fmt.Println("    channel-manager bulk-set-fees --ppm 2")
+	fmt.Println("    channel-manager suggest-fees")
+	fmt.Println("    channel-manager fee-optimizer --dry-run")
 	fmt.Println("")
 	fmt.Println("  Help:")
 	fmt.Println("    channel-manager help                 Show this help message")
