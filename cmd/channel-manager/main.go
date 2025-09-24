@@ -20,7 +20,7 @@ func main() {
 		showChannelFees()
 	case "earnings":
 		detailed := false
-		if len(os.Args) > 2 && (os.Args[2] == "--detailed" || os.Args[2] == "-d") {
+		if len(os.Args) > 2 && (os.Args[2] == "--detailed" || os.Args[2] == "-d" || os.Args[2] == "--super-detailed" || os.Args[2] == "--super") {
 			detailed = true
 		}
 		showFeeEarnings(detailed)
@@ -51,6 +51,8 @@ func showHelp() {
 	fmt.Println("    channel-manager earnings             Show fee earnings summary")
 	fmt.Println("    channel-manager earnings --detailed  Show earnings with per-channel breakdown")
 	fmt.Println("    channel-manager earnings -d          Short alias for --detailed")
+	fmt.Println("    channel-manager earnings --super-detailed  Show comprehensive forwarding event details")
+	fmt.Println("    channel-manager earnings --super     Short alias for --super-detailed")
 	fmt.Println("")
 	fmt.Println("  Fee Management Commands:")
 	fmt.Println("    channel-manager set-fees --channel-id <ID> --ppm <rate> [--base-fee <msat>]")

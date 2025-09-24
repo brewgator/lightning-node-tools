@@ -25,7 +25,8 @@ Real-time Lightning node monitoring with Telegram notifications for critical eve
 - **Telegram Notifications**: Get instant alerts about your Lightning node activity
 - **Smart Balance Tracking**: Adaptive thresholds based on account size with precise change detection
 - **Portfolio Focus**: Total balance excludes remote Lightning balances (only counts your actual funds)
-- **Forward Monitoring**: Track routing fees and forward activity
+- **Forward Monitoring**: Track routing fees and forward activity with detailed 24h summaries
+- **Super Detailed Earnings**: Automated forwarding analysis with top earning channels and recent activity
 - **Server Reboot Detection**: Get notified when your Lightning node server restarts
 
 ## Architecture
@@ -159,7 +160,15 @@ The Channel Manager provides comprehensive Lightning Network channel analysis an
 ./bin/channel-manager earnings -d
 ```
 
-**5. Set fees for a specific channel:**
+**5. Show super detailed earnings with forwarding event analysis:**
+
+```bash
+./bin/channel-manager earnings --super-detailed
+# or short alias:
+./bin/channel-manager earnings --super
+```
+
+**6. Set fees for a specific channel:**
 
 ```bash
 ./bin/channel-manager set-fees --channel-id 12345 --ppm 1 --base-fee 1000
@@ -209,13 +218,13 @@ The Channel Manager includes intelligent fee optimization that analyzes your cha
 
 **Fee Strategy:**
 - **High-capacity outbound**: 10-50 ppm (competitive for large payments)
-- **Balanced channels**: 50-150 ppm (moderate for optimal routing)  
+- **Balanced channels**: 50-150 ppm (moderate for optimal routing)
 - **High-capacity inbound**: 150-500 ppm (protective to prevent draining)
 - **Low-liquidity channels**: 200-1000 ppm (premium for limited capacity)
 
 **Performance Adjustments:**
 - Recent activity (last 7 days): -20% fee reduction
-- High earnings (>10 sats/day avg): +25% fee increase  
+- High earnings (>10 sats/day avg): +25% fee increase
 - Inactive channels (>30 days): +50% fee increase
 
 #### Example Outputs
@@ -324,7 +333,7 @@ Total:                           22
 📊 Found 3 channels that would benefit from fee optimization:
 
 🔧 Would update ACINQ: 50 → 120 ppm (high priority)
-🔧 Would update Bitrefill: 200 → 80 ppm (medium priority)  
+🔧 Would update Bitrefill: 200 → 80 ppm (medium priority)
 🔧 Would update LowCap Node: 150 → 500 ppm (medium priority)
 
 🧪 Dry run complete: 3 channels would be updated
@@ -338,7 +347,7 @@ The Channel Manager is under active development with the following features plan
 ##### Phase 2: Smart Fee Optimization ✅ **IMPLEMENTED**
 
 - ✅ **Intelligent fee analysis based on channel performance and liquidity distribution**
-- ✅ **Automated fee optimization with dry-run capability**  
+- ✅ **Automated fee optimization with dry-run capability**
 - ✅ **Multi-path routing optimization for large payments (500K+ sats)**
 - ✅ **Performance-based fee adjustments using forwarding history**
 
@@ -359,7 +368,7 @@ The Channel Manager is under active development with the following features plan
 ##### Phase 3: Channel Rebalancing (Future)
 
 - Automated liquidity rebalancing between channels
-- Intelligent rebalancing suggestions based on channel performance  
+- Intelligent rebalancing suggestions based on channel performance
 - Cost-aware rebalancing with fee optimization
 
 Planned commands:
