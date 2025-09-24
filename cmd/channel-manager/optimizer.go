@@ -1,7 +1,3 @@
-// Minimum viable fee per million (PPM)
-const MinViablePPM int64 = 10
-// Maximum reasonable fee per million (PPM)
-const MaxReasonablePPM int64 = 1000
 package main
 
 import (
@@ -15,6 +11,8 @@ import (
 	"time"
 )
 
+// Maximum reasonable fee per million (PPM)
+const MaxReasonablePPM int64 = 1000
 // Minimum viable fee per million (PPM)
 const MinViablePPM int64 = 10
 
