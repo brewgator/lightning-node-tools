@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/luiscarbonell/lightning-node-tools/pkg/utils"
+	"github.com/brewgator/lightning-node-tools/pkg/utils"
 )
 
 // Global variables for configuration and file paths

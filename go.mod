@@ -1,3 +1,3 @@
-module github.com/luiscarbonell/lightning-node-tools
+module github.com/brewgator/lightning-node-tools
 
 go 1.25.0
