@@ -78,3 +78,23 @@ type ChannelEdge struct {
 	Node1Policy RoutingPolicy `json:"node1_policy"`
 	Node2Policy RoutingPolicy `json:"node2_policy"`
 }
+
+// Peer represents a connected peer
+type Peer struct {
+	PubKey    string `json:"pub_key"`
+	Address   string `json:"address"`
+	BytesSent string `json:"bytes_sent"`
+	BytesRecv string `json:"bytes_recv"`
+}
+
+// PeerResponse represents the response from listpeers
+type PeerResponse struct {
+	Peers []Peer `json:"peers"`
+}
+
+// OpenChannelResponse represents the response from openchannel
+type OpenChannelResponse struct {
+	FundingTxidBytes string `json:"funding_txid_bytes"`
+	FundingTxidStr   string `json:"funding_txid_str"`
+	OutputIndex      uint32 `json:"output_index"`
+}
