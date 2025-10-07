@@ -93,6 +93,7 @@ func checkInvoiceChanges(current, prev *LightningState) {
 }
 
 // checkBalanceChanges monitors and reports significant balance changes
+// Only reports changes that indicate actual payments sent/received, not routing activity
 func checkBalanceChanges(current, prev *LightningState) {
 	onchainChange := current.OnchainBalance - prev.OnchainBalance
 	localChange := current.LocalBalance - prev.LocalBalance
@@ -102,30 +103,72 @@ func checkBalanceChanges(current, prev *LightningState) {
 	// Use adaptive thresholds based on account size
 	threshold := getAdaptiveThreshold(current.TotalBalance)
 
+	// Only report on-chain changes (these are always real payments/receipts)
 	if onchainChange != 0 && int64(math.Abs(float64(onchainChange))) >= threshold {
 		msg := createBalanceMessage("On-chain", onchainChange, current.OnchainBalance)
 		sendTelegram(msg)
 	}
 
-	if localChange != 0 && int64(math.Abs(float64(localChange))) >= threshold {
-		msg := createBalanceMessage("Lightning Local", localChange, current.LocalBalance)
-		sendTelegram(msg)
+	// Only report Lightning balance changes when they indicate actual payments
+	// Check if this is likely a payment vs routing by looking at invoice/forward activity
+	isLikelyPayment := isBalanceChangeFromPayment(current, prev, localChange, remoteChange)
+
+	if isLikelyPayment {
+		if localChange != 0 && int64(math.Abs(float64(localChange))) >= threshold {
+			msg := createBalanceMessage("Lightning Local", localChange, current.LocalBalance)
+			sendTelegram(msg)
+		}
+
+		if remoteChange != 0 && int64(math.Abs(float64(remoteChange))) >= threshold {
+			msg := createBalanceMessage("Lightning Remote", remoteChange, current.RemoteBalance)
+			sendTelegram(msg)
+		}
+
+		// For total portfolio changes, use a higher threshold or significant threshold
+		portfolioThreshold := int64(math.Max(float64(threshold*2), float64(SignificantThreshold)))
+		if totalChange != 0 && int64(math.Abs(float64(totalChange))) >= portfolioThreshold {
+			msg := createBalanceMessage("Total Portfolio", totalChange, current.TotalBalance)
+			msg += fmt.Sprintf("\n\n<b>Breakdown:</b>\nOn-chain: %s (%s)\nLightning local: %s (%s)",
+				formatSats(current.OnchainBalance), formatSatsChange(onchainChange),
+				formatSats(current.LocalBalance), formatSatsChange(localChange))
+			sendTelegram(msg)
+		}
+	}
+}
+
+// isBalanceChangeFromPayment determines if a balance change is from an actual payment
+// rather than just routing activity. Returns true if it's likely a real payment.
+func isBalanceChangeFromPayment(current, prev *LightningState, localChange, remoteChange int64) bool {
+	// If invoices increased, it's likely a payment received
+	if current.Invoices > prev.Invoices {
+		return true
 	}
 
-	if remoteChange != 0 && int64(math.Abs(float64(remoteChange))) >= threshold {
-		msg := createBalanceMessage("Lightning Remote", remoteChange, current.RemoteBalance)
-		sendTelegram(msg)
+	// If no recent forwarding activity but balance changed, likely a payment
+	if current.Forwards == 0 && (localChange != 0 || remoteChange != 0) {
+		return true
 	}
 
-	// For total portfolio changes, use a higher threshold or significant threshold
-	portfolioThreshold := int64(math.Max(float64(threshold*2), float64(SignificantThreshold)))
-	if totalChange != 0 && int64(math.Abs(float64(totalChange))) >= portfolioThreshold {
-		msg := createBalanceMessage("Total Portfolio", totalChange, current.TotalBalance)
-		msg += fmt.Sprintf("\n\n<b>Breakdown:</b>\nOn-chain: %s (%s)\nLightning local: %s (%s)",
-			formatSats(current.OnchainBalance), formatSatsChange(onchainChange),
-			formatSats(current.LocalBalance), formatSatsChange(localChange))
-		sendTelegram(msg)
+	// If there's forwarding activity, we need to be more cautious
+	// Only report if the change is significant compared to typical routing amounts
+	if current.Forwards > 0 {
+		// For routing, changes are usually smaller and temporary
+		// If the change is very large, it's more likely a real payment
+		threshold := getAdaptiveThreshold(current.TotalBalance)
+		absLocalChange := int64(math.Abs(float64(localChange)))
+		absRemoteChange := int64(math.Abs(float64(remoteChange)))
+
+		// If the change is much larger than normal routing, treat as payment
+		routingThreshold := threshold * 10 // 10x normal threshold for routing situations
+		if absLocalChange >= routingThreshold || absRemoteChange >= routingThreshold {
+			return true
+		}
+
+		// Otherwise, assume it's routing activity
+		return false
 	}
+
+	return true
 }
 
 // getAdaptiveThreshold returns an appropriate threshold based on account size
@@ -264,4 +307,22 @@ func getSuperDetailedEarningsForTelegram() string {
 	}
 
 	return message.String()
+}
+
+// checkRoutingActivity monitors and reports routing success when balance changes are likely from routing
+func checkRoutingActivity(current, prev *LightningState) {
+	localChange := current.LocalBalance - prev.LocalBalance
+	remoteChange := current.RemoteBalance - prev.RemoteBalance
+
+	// Only report if there was forwarding activity and balance changes that we filtered out
+	if current.Forwards > 0 && (localChange != 0 || remoteChange != 0) {
+		// Check if this change was filtered out as routing activity
+		isLikelyPayment := isBalanceChangeFromPayment(current, prev, localChange, remoteChange)
+
+		if !isLikelyPayment {
+			// This was routing activity - send a brief routing success message
+			msg := fmt.Sprintf("🔄 <b>Routing Activity</b>\nForwards: %d\nTemp balance shifts during routing", current.Forwards)
+			sendTelegram(msg)
+		}
+	}
 }
