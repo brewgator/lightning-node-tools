@@ -32,6 +32,8 @@ func main() {
 		handleSuggestFees()
 	case "fee-optimizer":
 		handleFeeOptimizer()
+	case "open-channel":
+		handleOpenChannel()
 	case "help", "-h", "--help":
 		showHelp()
 	default:
@@ -65,11 +67,16 @@ func showHelp() {
 	fmt.Println("    channel-manager fee-optimizer        Automatically apply optimal fee adjustments")
 	fmt.Println("    channel-manager fee-optimizer --dry-run  Preview fee changes without applying")
 	fmt.Println("")
+	fmt.Println("  Channel Management Commands:")
+	fmt.Println("    channel-manager open-channel --peer <address> --size <sats> --fee-rate <sat/vB>")
+	fmt.Println("                                         Open a new channel to a peer")
+	fmt.Println("")
 	fmt.Println("  Examples:")
 	fmt.Println("    channel-manager set-fees --channel-id 12345 --ppm 1 --base-fee 1000")
 	fmt.Println("    channel-manager bulk-set-fees --ppm 2")
 	fmt.Println("    channel-manager suggest-fees")
 	fmt.Println("    channel-manager fee-optimizer --dry-run")
+	fmt.Println("    channel-manager open-channel --peer 02a1b2c3...@192.168.1.100:9735 --size 1000000 --fee-rate 10")
 	fmt.Println("")
 	fmt.Println("  Help:")
 	fmt.Println("    channel-manager help                 Show this help message")

@@ -113,3 +113,46 @@ func GetChannelInfo(chanID string) (*ChannelEdge, error) {
 
 	return &response, nil
 }
+
+// ConnectPeer connects to a Lightning Network peer
+func ConnectPeer(peerAddress string) error {
+	_, err := RunLNCLI("connect", peerAddress)
+	return err
+}
+
+// ListPeers retrieves all connected peers
+func ListPeers() ([]Peer, error) {
+	output, err := RunLNCLI("listpeers")
+	if err != nil {
+		return nil, err
+	}
+
+	var response PeerResponse
+	if err := json.Unmarshal(output, &response); err != nil {
+		return nil, err
+	}
+
+	return response.Peers, nil
+}
+
+// OpenChannel opens a channel to a peer
+func OpenChannel(peerPubkey string, localAmt int64, satPerVbyte int64) (*OpenChannelResponse, error) {
+	args := []string{
+		"openchannel",
+		"--node_key", peerPubkey,
+		"--local_amt", fmt.Sprintf("%d", localAmt),
+		"--sat_per_vbyte", fmt.Sprintf("%d", satPerVbyte),
+	}
+
+	output, err := RunLNCLI(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var response OpenChannelResponse
+	if err := json.Unmarshal(output, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
