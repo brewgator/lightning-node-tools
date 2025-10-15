@@ -134,8 +134,8 @@ func isBalanceChangeFromPayment(current, prev *LightningState, localChange, remo
 		return true
 	}
 
-	// If no recent forwarding activity but balance changed, likely a payment
-	if current.Forwards == 0 && (localChange != 0 || remoteChange != 0) {
+	// If no recent forwarding activity in both current and previous states but balance changed, likely a payment
+	if current.Forwards == 0 && prev.Forwards == 0 && (localChange != 0 || remoteChange != 0) {
 		return true
 	}
 
