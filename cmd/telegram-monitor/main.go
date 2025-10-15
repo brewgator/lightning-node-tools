@@ -75,6 +75,8 @@ func main() {
 	checkForwardingActivity(currentState)
 	checkInvoiceChanges(currentState, prevState)
 	checkBalanceChanges(currentState, prevState)
+	checkRoutingFees(currentState, prevState)
+	checkRoutingActivity(currentState, prevState)
 
 	// Save current state
 	if err := saveState(currentState); err != nil {

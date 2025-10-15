@@ -140,6 +140,22 @@ func getCurrentLightningState() (*LightningState, error) {
 
 	if fwdEvents, ok := fwdData["forwarding_events"].([]any); ok {
 		state.Forwards = len(fwdEvents)
+		
+		// Track the latest forward timestamp for routing fee detection
+		var latestTimestamp int64
+		for _, event := range fwdEvents {
+			if eventMap, ok := event.(map[string]any); ok {
+				if timestampStr, ok := eventMap["timestamp"].(string); ok {
+					if timestamp, err := strconv.ParseInt(timestampStr, 10, 64); err == nil {
+						if timestamp > latestTimestamp {
+							latestTimestamp = timestamp
+						}
+					}
+				}
+			}
+		}
+		// Do not update state.LastForwardTimestamp here; it should be updated after event processing.
+		// The latestTimestamp can be returned or used elsewhere if needed.
 	}
 
 	return state, nil

@@ -93,6 +93,7 @@ func checkInvoiceChanges(current, prev *LightningState) {
 }
 
 // checkBalanceChanges monitors and reports significant balance changes
+// Only reports changes that indicate actual payments sent/received, not routing activity
 func checkBalanceChanges(current, prev *LightningState) {
 	onchainChange := current.OnchainBalance - prev.OnchainBalance
 	localChange := current.LocalBalance - prev.LocalBalance
@@ -102,30 +103,62 @@ func checkBalanceChanges(current, prev *LightningState) {
 	// Use adaptive thresholds based on account size
 	threshold := getAdaptiveThreshold(current.TotalBalance)
 
+	// Only report on-chain changes (these are always real payments/receipts)
 	if onchainChange != 0 && int64(math.Abs(float64(onchainChange))) >= threshold {
 		msg := createBalanceMessage("On-chain", onchainChange, current.OnchainBalance)
 		sendTelegram(msg)
 	}
 
-	if localChange != 0 && int64(math.Abs(float64(localChange))) >= threshold {
-		msg := createBalanceMessage("Lightning Local", localChange, current.LocalBalance)
-		sendTelegram(msg)
+	// Only report Lightning balance changes when they indicate actual payments
+	// Check if this is likely a payment vs routing by looking at invoice/forward activity
+	isLikelyPayment := isBalanceChangeFromPayment(current, prev, localChange, remoteChange)
+
+	if isLikelyPayment {
+		// For total portfolio changes, use a higher threshold or significant threshold
+		portfolioThreshold := int64(math.Max(float64(threshold*2), float64(SignificantThreshold)))
+		if totalChange != 0 && int64(math.Abs(float64(totalChange))) >= portfolioThreshold {
+			msg := createBalanceMessage("Total Portfolio", totalChange, current.TotalBalance)
+			msg += fmt.Sprintf("\n\n<b>Breakdown:</b>\nOn-chain: %s (%s)\nLightning local: %s (%s)",
+				formatSats(current.OnchainBalance), formatSatsChange(onchainChange),
+				formatSats(current.LocalBalance), formatSatsChange(localChange))
+			sendTelegram(msg)
+		}
+	}
+}
+
+// isBalanceChangeFromPayment determines if a balance change is from an actual payment
+// rather than just routing activity. Returns true if it's likely a real payment.
+func isBalanceChangeFromPayment(current, prev *LightningState, localChange, remoteChange int64) bool {
+	// If invoices increased, it's likely a payment received
+	if current.Invoices > prev.Invoices {
+		return true
 	}
 
-	if remoteChange != 0 && int64(math.Abs(float64(remoteChange))) >= threshold {
-		msg := createBalanceMessage("Lightning Remote", remoteChange, current.RemoteBalance)
-		sendTelegram(msg)
+	// If no recent forwarding activity in both current and previous states but balance changed, likely a payment
+	if current.Forwards == 0 && prev.Forwards == 0 && (localChange != 0 || remoteChange != 0) {
+		return true
 	}
 
-	// For total portfolio changes, use a higher threshold or significant threshold
-	portfolioThreshold := int64(math.Max(float64(threshold*2), float64(SignificantThreshold)))
-	if totalChange != 0 && int64(math.Abs(float64(totalChange))) >= portfolioThreshold {
-		msg := createBalanceMessage("Total Portfolio", totalChange, current.TotalBalance)
-		msg += fmt.Sprintf("\n\n<b>Breakdown:</b>\nOn-chain: %s (%s)\nLightning local: %s (%s)",
-			formatSats(current.OnchainBalance), formatSatsChange(onchainChange),
-			formatSats(current.LocalBalance), formatSatsChange(localChange))
-		sendTelegram(msg)
+	// If there's forwarding activity, we need to be more cautious
+	// Only report if the change is significant compared to typical routing amounts
+	if current.Forwards > 0 {
+		// For routing, changes are usually smaller and temporary
+		// If the change is very large, it's more likely a real payment
+		threshold := getAdaptiveThreshold(current.TotalBalance)
+		absLocalChange := int64(math.Abs(float64(localChange)))
+		absRemoteChange := int64(math.Abs(float64(remoteChange)))
+
+		// If the change is much larger than normal routing, treat as payment
+		routingThreshold := threshold * 10 // 10x normal threshold for routing situations
+		if absLocalChange >= routingThreshold || absRemoteChange >= routingThreshold {
+			return true
+		}
+
+		// Otherwise, assume it's routing activity
+		return false
 	}
+
+	return true
 }
 
 // getAdaptiveThreshold returns an appropriate threshold based on account size
@@ -264,4 +297,151 @@ func getSuperDetailedEarningsForTelegram() string {
 	}
 
 	return message.String()
+}
+
+// checkRoutingFees detects and reports new routing fees earned since last check
+func checkRoutingFees(current, prev *LightningState) {
+	// Get forwarding history since the last check
+	startTime := prev.LastForwardTimestamp
+	if startTime == 0 {
+		// If this is the first run, only check the last 10 minutes to avoid spam
+		startTime = time.Now().Add(-10 * time.Minute).Unix()
+	}
+
+	fwdHistory, err := lnd.RunLNCLI("fwdinghistory", "--start_time", strconv.FormatInt(startTime, 10))
+	if err != nil {
+		log.Printf("Failed to get forwarding history for routing fees: %v", err)
+		return
+	}
+
+	var fwdData map[string]any
+	if err := json.Unmarshal(fwdHistory, &fwdData); err != nil {
+		log.Printf("Failed to parse forwarding history for routing fees: %v", err)
+		return
+	}
+
+	fwdEvents, ok := fwdData["forwarding_events"].([]any)
+	if !ok || len(fwdEvents) == 0 {
+		return
+	}
+
+	// Get channel information for aliases
+	channels, err := lnd.GetChannels()
+	if err != nil {
+		log.Printf("Failed to get channels for routing fees: %v", err)
+		return
+	}
+
+	// Create channel ID to alias mapping
+	channelAliases := make(map[string]string)
+	for _, channel := range channels {
+		alias := lnd.GetNodeAlias(channel.RemotePubkey)
+		if len(alias) > 15 {
+			alias = alias[:12] + "..."
+		}
+		channelAliases[channel.ChanID] = alias
+	}
+
+	// Process new forwarding events
+	var newForwards []map[string]any
+	var latestTimestamp int64
+
+	for _, event := range fwdEvents {
+		if eventMap, ok := event.(map[string]any); ok {
+			if timestampStr, ok := eventMap["timestamp"].(string); ok {
+				if timestamp, err := strconv.ParseInt(timestampStr, 10, 64); err == nil {
+					if timestamp > startTime {
+						newForwards = append(newForwards, eventMap)
+						if timestamp > latestTimestamp {
+							latestTimestamp = timestamp
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Update the latest timestamp in current state
+	current.LastForwardTimestamp = latestTimestamp
+
+	// Report each new forwarding event
+	for _, event := range newForwards {
+		reportRoutingFee(event, channelAliases)
+	}
+}
+
+// reportRoutingFee sends a telegram message for a single routing fee earned
+func reportRoutingFee(event map[string]any, channelAliases map[string]string) {
+	// Extract event details with error checking
+	feeMsatStr, ok := event["fee_msat"].(string)
+	if !ok {
+		log.Printf("reportRoutingFee: missing or invalid fee_msat field: %#v", event["fee_msat"])
+		return
+	}
+	amtOutStr, ok := event["amt_out"].(string)
+	if !ok {
+		log.Printf("reportRoutingFee: missing or invalid amt_out field: %#v", event["amt_out"])
+		return
+	}
+	chanIdIn, ok := event["chan_id_in"].(string)
+	if !ok {
+		log.Printf("reportRoutingFee: missing or invalid chan_id_in field: %#v", event["chan_id_in"])
+		return
+	}
+	chanIdOut, ok := event["chan_id_out"].(string)
+	if !ok {
+		log.Printf("reportRoutingFee: missing or invalid chan_id_out field: %#v", event["chan_id_out"])
+		return
+	}
+
+	feeMsat, err := strconv.ParseInt(feeMsatStr, 10, 64)
+	if err != nil {
+		log.Printf("reportRoutingFee: failed to parse fee_msat: %v", err)
+		return
+	}
+	amtOut, err := strconv.ParseInt(amtOutStr, 10, 64)
+	if err != nil {
+		log.Printf("reportRoutingFee: failed to parse amt_out: %v", err)
+		return
+	}
+	feeSats := feeMsat / 1000
+	amtSats := amtOut
+
+	// Get channel aliases
+	inAlias := channelAliases[chanIdIn]
+	outAlias := channelAliases[chanIdOut]
+	
+	if inAlias == "" {
+		inAlias = "Unknown"
+	}
+	if outAlias == "" {
+		outAlias = "Unknown"
+	}
+
+	// Create routing fee message
+	msg := fmt.Sprintf("💰 <b>Routing Fee Earned</b>\nEarned: %s\nRouted: %s\nFrom: %s\nTo: %s",
+		formatSats(feeSats),
+		formatSats(amtSats),
+		inAlias,
+		outAlias)
+
+	sendTelegram(msg)
+}
+
+// checkRoutingActivity monitors and reports routing success when balance changes are likely from routing
+func checkRoutingActivity(current, prev *LightningState) {
+	localChange := current.LocalBalance - prev.LocalBalance
+	remoteChange := current.RemoteBalance - prev.RemoteBalance
+
+	// Only report if there was forwarding activity and balance changes that we filtered out
+	if current.Forwards > 0 && (localChange != 0 || remoteChange != 0) {
+		// Check if this change was filtered out as routing activity
+		isLikelyPayment := isBalanceChangeFromPayment(current, prev, localChange, remoteChange)
+
+		if !isLikelyPayment {
+			// This was routing activity - send a brief routing success message
+			msg := fmt.Sprintf("🔄 <b>Routing Activity</b>\nForwards: %d\nTemp balance shifts during routing", current.Forwards)
+			sendTelegram(msg)
+		}
+	}
 }
