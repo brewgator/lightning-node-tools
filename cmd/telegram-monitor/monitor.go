@@ -372,12 +372,38 @@ func checkRoutingFees(current, prev *LightningState) {
 
 // reportRoutingFee sends a telegram message for a single routing fee earned
 func reportRoutingFee(event map[string]any, channelAliases map[string]string) {
-	// Extract event details
-	feeMsat, _ := strconv.ParseInt(event["fee_msat"].(string), 10, 64)
-	amtOut, _ := strconv.ParseInt(event["amt_out"].(string), 10, 64)
-	chanIdIn := event["chan_id_in"].(string)
-	chanIdOut := event["chan_id_out"].(string)
+	// Extract event details with error checking
+	feeMsatStr, ok := event["fee_msat"].(string)
+	if !ok {
+		log.Printf("reportRoutingFee: missing or invalid fee_msat field: %#v", event["fee_msat"])
+		return
+	}
+	amtOutStr, ok := event["amt_out"].(string)
+	if !ok {
+		log.Printf("reportRoutingFee: missing or invalid amt_out field: %#v", event["amt_out"])
+		return
+	}
+	chanIdIn, ok := event["chan_id_in"].(string)
+	if !ok {
+		log.Printf("reportRoutingFee: missing or invalid chan_id_in field: %#v", event["chan_id_in"])
+		return
+	}
+	chanIdOut, ok := event["chan_id_out"].(string)
+	if !ok {
+		log.Printf("reportRoutingFee: missing or invalid chan_id_out field: %#v", event["chan_id_out"])
+		return
+	}
 
+	feeMsat, err := strconv.ParseInt(feeMsatStr, 10, 64)
+	if err != nil {
+		log.Printf("reportRoutingFee: failed to parse fee_msat: %v", err)
+		return
+	}
+	amtOut, err := strconv.ParseInt(amtOutStr, 10, 64)
+	if err != nil {
+		log.Printf("reportRoutingFee: failed to parse amt_out: %v", err)
+		return
+	}
 	feeSats := feeMsat / 1000
 	amtSats := amtOut
 
