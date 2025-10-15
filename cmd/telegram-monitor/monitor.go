@@ -415,7 +415,7 @@ func reportRoutingFee(event map[string]any, channelAliases map[string]string) {
 		inAlias = "Unknown"
 	}
 	if outAlias == "" {
-		outAlias = "Unknown" 
+		outAlias = "Unknown"
 	}
 
 	// Create routing fee message
