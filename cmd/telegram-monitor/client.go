@@ -154,9 +154,8 @@ func getCurrentLightningState() (*LightningState, error) {
 				}
 			}
 		}
-		if latestTimestamp > state.LastForwardTimestamp {
-			state.LastForwardTimestamp = latestTimestamp
-		}
+		// Do not update state.LastForwardTimestamp here; it should be updated after event processing.
+		// The latestTimestamp can be returned or used elsewhere if needed.
 	}
 
 	return state, nil
