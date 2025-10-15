@@ -114,16 +114,6 @@ func checkBalanceChanges(current, prev *LightningState) {
 	isLikelyPayment := isBalanceChangeFromPayment(current, prev, localChange, remoteChange)
 
 	if isLikelyPayment {
-		if localChange != 0 && int64(math.Abs(float64(localChange))) >= threshold {
-			msg := createBalanceMessage("Lightning Local", localChange, current.LocalBalance)
-			sendTelegram(msg)
-		}
-
-		if remoteChange != 0 && int64(math.Abs(float64(remoteChange))) >= threshold {
-			msg := createBalanceMessage("Lightning Remote", remoteChange, current.RemoteBalance)
-			sendTelegram(msg)
-		}
-
 		// For total portfolio changes, use a higher threshold or significant threshold
 		portfolioThreshold := int64(math.Max(float64(threshold*2), float64(SignificantThreshold)))
 		if totalChange != 0 && int64(math.Abs(float64(totalChange))) >= portfolioThreshold {
@@ -307,6 +297,109 @@ func getSuperDetailedEarningsForTelegram() string {
 	}
 
 	return message.String()
+}
+
+// checkRoutingFees detects and reports new routing fees earned since last check
+func checkRoutingFees(current, prev *LightningState) {
+	// Get forwarding history since the last check
+	startTime := prev.LastForwardTimestamp
+	if startTime == 0 {
+		// If this is the first run, only check the last 10 minutes to avoid spam
+		startTime = time.Now().Add(-10 * time.Minute).Unix()
+	}
+
+	fwdHistory, err := lnd.RunLNCLI("fwdinghistory", "--start_time", strconv.FormatInt(startTime, 10))
+	if err != nil {
+		log.Printf("Failed to get forwarding history for routing fees: %v", err)
+		return
+	}
+
+	var fwdData map[string]any
+	if err := json.Unmarshal(fwdHistory, &fwdData); err != nil {
+		log.Printf("Failed to parse forwarding history for routing fees: %v", err)
+		return
+	}
+
+	fwdEvents, ok := fwdData["forwarding_events"].([]any)
+	if !ok || len(fwdEvents) == 0 {
+		return
+	}
+
+	// Get channel information for aliases
+	channels, err := lnd.GetChannels()
+	if err != nil {
+		log.Printf("Failed to get channels for routing fees: %v", err)
+		return
+	}
+
+	// Create channel ID to alias mapping
+	channelAliases := make(map[string]string)
+	for _, channel := range channels {
+		alias := lnd.GetNodeAlias(channel.RemotePubkey)
+		if len(alias) > 15 {
+			alias = alias[:12] + "..."
+		}
+		channelAliases[channel.ChanID] = alias
+	}
+
+	// Process new forwarding events
+	var newForwards []map[string]any
+	var latestTimestamp int64
+
+	for _, event := range fwdEvents {
+		if eventMap, ok := event.(map[string]any); ok {
+			if timestampStr, ok := eventMap["timestamp"].(string); ok {
+				if timestamp, err := strconv.ParseInt(timestampStr, 10, 64); err == nil {
+					if timestamp > startTime {
+						newForwards = append(newForwards, eventMap)
+						if timestamp > latestTimestamp {
+							latestTimestamp = timestamp
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Update the latest timestamp in current state
+	current.LastForwardTimestamp = latestTimestamp
+
+	// Report each new forwarding event
+	for _, event := range newForwards {
+		reportRoutingFee(event, channelAliases)
+	}
+}
+
+// reportRoutingFee sends a telegram message for a single routing fee earned
+func reportRoutingFee(event map[string]any, channelAliases map[string]string) {
+	// Extract event details
+	feeMsat, _ := strconv.ParseInt(event["fee_msat"].(string), 10, 64)
+	amtOut, _ := strconv.ParseInt(event["amt_out"].(string), 10, 64)
+	chanIdIn := event["chan_id_in"].(string)
+	chanIdOut := event["chan_id_out"].(string)
+
+	feeSats := feeMsat / 1000
+	amtSats := amtOut
+
+	// Get channel aliases
+	inAlias := channelAliases[chanIdIn]
+	outAlias := channelAliases[chanIdOut]
+	
+	if inAlias == "" {
+		inAlias = "Unknown"
+	}
+	if outAlias == "" {
+		outAlias = "Unknown" 
+	}
+
+	// Create routing fee message
+	msg := fmt.Sprintf("💰 <b>Routing Fee Earned</b>\nEarned: %s\nRouted: %s\nFrom: %s\nTo: %s",
+		formatSats(feeSats),
+		formatSats(amtSats),
+		inAlias,
+		outAlias)
+
+	sendTelegram(msg)
 }
 
 // checkRoutingActivity monitors and reports routing success when balance changes are likely from routing
