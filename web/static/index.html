@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Portfolio Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            color: #f0883e;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #8b949e;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .card h2 {
+            color: #f0883e;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .balance-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .balance-item:last-child {
+            border-bottom: none;
+        }
+
+        .balance-label {
+            color: #8b949e;
+        }
+
+        .balance-value {
+            color: #c9d1d9;
+            font-weight: 600;
+        }
+
+        .total {
+            font-size: 1.2em;
+            color: #f0883e !important;
+        }
+
+        .status {
+            text-align: center;
+            padding: 20px;
+            color: #8b949e;
+        }
+
+        .loading {
+            color: #f0883e;
+        }
+
+        .error {
+            color: #f85149;
+        }
+
+        .chart-container {
+            height: 300px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #8b949e;
+        }
+
+        .refresh-btn {
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 20px auto;
+            display: block;
+        }
+
+        .refresh-btn:hover {
+            background: #2ea043;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ Bitcoin Portfolio Dashboard</h1>
+            <p class="subtitle">Real-time Lightning & On-chain Balance Tracking</p>
+        </header>
+
+        <div id="status" class="status loading">Loading portfolio data...</div>
+
+        <div id="dashboard" style="display: none;">
+            <div class="grid">
+                <div class="card">
+                    <h2>💰 Current Portfolio</h2>
+                    <div id="current-balances">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>⚡ Lightning Network</h2>
+                    <div id="lightning-details">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>🔗 On-chain</h2>
+                    <div id="onchain-details">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📈 Portfolio History (30 days)</h2>
+                <div class="chart-container">
+                    Chart visualization coming soon...
+                    <br><small>Will show balance trends over time</small>
+                </div>
+            </div>
+        </div>
+
+        <button class="refresh-btn" onclick="loadPortfolioData()">🔄 Refresh Data</button>
+    </div>
+
+    <script>
+        function formatSats(sats) {
+            if (sats >= 100000000) {
+                return (sats / 100000000).toFixed(2) + ' BTC';
+            }
+            return sats.toLocaleString() + ' sats';
+        }
+
+        function formatTimestamp(timestamp) {
+            return new Date(timestamp).toLocaleString();
+        }
+
+        function showError(message) {
+            const status = document.getElementById('status');
+            status.className = 'status error';
+            status.textContent = `❌ Error: ${message}`;
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        function showLoading() {
+            const status = document.getElementById('status');
+            status.className = 'status loading';
+            status.textContent = '⏳ Loading portfolio data...';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        function updateCurrentBalances(data) {
+            const container = document.getElementById('current-balances');
+            container.innerHTML = `
+                <div class="balance-item">
+                    <span class="balance-label">Total Portfolio:</span>
+                    <span class="balance-value total">${formatSats(data.total_portfolio)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Total Liquid:</span>
+                    <span class="balance-value">${formatSats(data.total_liquid)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Cold Storage:</span>
+                    <span class="balance-value">${formatSats(data.cold_storage)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Last Updated:</span>
+                    <span class="balance-value">${formatTimestamp(data.timestamp)}</span>
+                </div>
+            `;
+        }
+
+        function updateLightningDetails(data) {
+            const container = document.getElementById('lightning-details');
+            const total = data.lightning_local + data.lightning_remote;
+            const localPercent = total > 0 ? ((data.lightning_local / total) * 100).toFixed(1) : 0;
+            
+            container.innerHTML = `
+                <div class="balance-item">
+                    <span class="balance-label">Total Capacity:</span>
+                    <span class="balance-value">${formatSats(total)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Local Balance:</span>
+                    <span class="balance-value">${formatSats(data.lightning_local)} (${localPercent}%)</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Remote Balance:</span>
+                    <span class="balance-value">${formatSats(data.lightning_remote)}</span>
+                </div>
+            `;
+        }
+
+        function updateOnchainDetails(data) {
+            const container = document.getElementById('onchain-details');
+            const total = data.onchain_confirmed + data.onchain_unconfirmed + data.tracked_addresses;
+            
+            container.innerHTML = `
+                <div class="balance-item">
+                    <span class="balance-label">Total On-chain:</span>
+                    <span class="balance-value">${formatSats(total)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Confirmed:</span>
+                    <span class="balance-value">${formatSats(data.onchain_confirmed)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Unconfirmed:</span>
+                    <span class="balance-value">${formatSats(data.onchain_unconfirmed)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Tracked Addresses:</span>
+                    <span class="balance-value">${formatSats(data.tracked_addresses)}</span>
+                </div>
+            `;
+        }
+
+        async function loadPortfolioData() {
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/portfolio/current');
+                const result = await response.json();
+                
+                if (!result.success) {
+                    showError(result.error || 'Failed to load portfolio data');
+                    return;
+                }
+                
+                const data = result.data;
+                
+                // Update all sections
+                updateCurrentBalances(data);
+                updateLightningDetails(data);
+                updateOnchainDetails(data);
+                
+                // Hide status and show dashboard
+                document.getElementById('status').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                
+            } catch (error) {
+                showError(`Network error: ${error.message}`);
+            }
+        }
+
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', loadPortfolioData);
+        
+        // Auto-refresh every 5 minutes
+        setInterval(loadPortfolioData, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
