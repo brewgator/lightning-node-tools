@@ -98,3 +98,22 @@ type OpenChannelResponse struct {
 	FundingTxidStr   string `json:"funding_txid_str"`
 	OutputIndex      uint32 `json:"output_index"`
 }
+
+// ChannelBalance represents channel balance information
+type ChannelBalance struct {
+	LocalBalance  int64 `json:"local_balance,string"`
+	RemoteBalance int64 `json:"remote_balance,string"`
+}
+
+// WalletBalance represents wallet balance information
+type WalletBalance struct {
+	ConfirmedBalance   int64 `json:"confirmed_balance,string"`
+	UnconfirmedBalance int64 `json:"unconfirmed_balance,string"`
+	TotalBalance       int64 `json:"total_balance,string"`
+}
+
+// Client represents an LND client
+type Client struct {
+	// This is a simple wrapper around lncli commands
+	// In a production setup, you might use gRPC instead
+}

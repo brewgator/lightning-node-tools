@@ -21,16 +21,17 @@ type Config struct {
 }
 
 type Collector struct {
-	config *Config
-	db     *db.Database
+	config   *Config
+	db       *db.Database
+	mockMode bool
 }
 
 func main() {
 	var (
-		configPath = flag.String("config", "configs/dashboard.yaml", "Path to configuration file")
-		dbPath     = flag.String("db", "data/portfolio.db", "Path to SQLite database")
-		interval   = flag.Duration("interval", 15*time.Minute, "Collection interval")
-		oneshot    = flag.Bool("oneshot", false, "Run once and exit (for testing)")
+		dbPath   = flag.String("db", "data/portfolio.db", "Path to SQLite database")
+		interval = flag.Duration("interval", 15*time.Minute, "Collection interval")
+		oneshot  = flag.Bool("oneshot", false, "Run once and exit (for testing)")
+		mockMode = flag.Bool("mock", false, "Use mock data for testing without LND")
 	)
 	flag.Parse()
 
@@ -47,9 +48,17 @@ func main() {
 	defer database.Close()
 
 	// Initialize LND client (reusing existing client)
-	lndClient, err := lnd.NewClient()
-	if err != nil {
-		log.Fatalf("Failed to initialize LND client: %v", err)
+	var lndClient *lnd.Client
+	
+	if *mockMode {
+		fmt.Println("⚠️  Running in mock mode - using test data")
+		lndClient = nil // We'll handle mock data in collection
+	} else {
+		var err error
+		lndClient, err = lnd.NewClient()
+		if err != nil {
+			log.Fatalf("Failed to initialize LND client: %v (try --mock for testing)", err)
+		}
 	}
 
 	config := &Config{
@@ -59,8 +68,9 @@ func main() {
 	}
 
 	collector := &Collector{
-		config: config,
-		db:     database,
+		config:   config,
+		db:       database,
+		mockMode: *mockMode,
 	}
 
 	if *oneshot {
@@ -153,6 +163,11 @@ func (c *Collector) collectData() error {
 }
 
 func (c *Collector) collectLightningData() (local, remote int64, err error) {
+	if c.mockMode {
+		// Return mock Lightning data
+		return 5000000, 3000000, nil // 5M local, 3M remote
+	}
+	
 	// Get channel balances using existing LND client
 	balances, err := c.config.LNDClient.GetChannelBalances()
 	if err != nil {
@@ -163,6 +178,11 @@ func (c *Collector) collectLightningData() (local, remote int64, err error) {
 }
 
 func (c *Collector) collectOnchainData() (confirmed, unconfirmed int64, err error) {
+	if c.mockMode {
+		// Return mock on-chain data
+		return 2000000, 100000, nil // 2M confirmed, 100K unconfirmed
+	}
+	
 	// Get on-chain balances using existing LND client
 	balance, err := c.config.LNDClient.GetWalletBalance()
 	if err != nil {

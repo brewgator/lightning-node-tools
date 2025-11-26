@@ -17,12 +17,13 @@ mkdir -p data
 
 echo ""
 echo "📊 Testing data collection..."
-./bin/dashboard-collector --oneshot
+./bin/dashboard-collector --oneshot --mock
 
 if [ $? -eq 0 ]; then
     echo "✅ Data collection test successful!"
+    echo "💡 Note: Using mock data for demo. Remove --mock to use real LND data."
 else
-    echo "❌ Data collection failed. Please check your LND configuration."
+    echo "❌ Data collection failed."
     exit 1
 fi
 

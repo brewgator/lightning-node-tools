@@ -21,6 +21,16 @@ func RunLNCLI(args ...string) ([]byte, error) {
 	return output, nil
 }
 
+// NewClient creates a new LND client
+func NewClient() (*Client, error) {
+	// Test LND connectivity
+	_, err := RunLNCLI("getinfo")
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to LND: %w", err)
+	}
+	return &Client{}, nil
+}
+
 // GetChannels retrieves all channels from LND
 func GetChannels() ([]Channel, error) {
 	output, err := RunLNCLI("listchannels")
@@ -34,6 +44,36 @@ func GetChannels() ([]Channel, error) {
 	}
 
 	return response.Channels, nil
+}
+
+// GetChannelBalances retrieves the total channel balances
+func (c *Client) GetChannelBalances() (*ChannelBalance, error) {
+	output, err := RunLNCLI("channelbalance")
+	if err != nil {
+		return nil, err
+	}
+
+	var balance ChannelBalance
+	if err := json.Unmarshal(output, &balance); err != nil {
+		return nil, err
+	}
+
+	return &balance, nil
+}
+
+// GetWalletBalance retrieves the wallet balance
+func (c *Client) GetWalletBalance() (*WalletBalance, error) {
+	output, err := RunLNCLI("walletbalance")
+	if err != nil {
+		return nil, err
+	}
+
+	var balance WalletBalance
+	if err := json.Unmarshal(output, &balance); err != nil {
+		return nil, err
+	}
+
+	return &balance, nil
 }
 
 // GetFeeReport retrieves the fee report from LND

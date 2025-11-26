@@ -24,14 +24,27 @@ Real-time Lightning node monitoring with Telegram notifications for critical eve
 - Forward monitoring with detailed 24h summaries
 - Server reboot detection and notifications
 
+### Portfolio Dashboard
+
+Web-based Bitcoin portfolio tracking dashboard with historical data visualization.
+
+**Features:**
+- Real-time portfolio balance display aggregating all sources
+- Historical balance snapshots with SQLite storage
+- Lightning Network and on-chain balance tracking
+- Responsive web interface optimized for continuous monitoring
+
 ## Architecture
 
 The project uses a modular architecture with shared packages:
 
 - **`pkg/lnd/`**: Shared Lightning Network API client and data structures
 - **`pkg/utils/`**: Common utility functions for formatting and calculations
+- **`pkg/db/`**: Database operations and historical data management
 - **`cmd/channel-manager/`**: Channel management tool implementation
 - **`cmd/telegram-monitor/`**: Telegram monitoring tool implementation
+- **`cmd/dashboard-collector/`**: Portfolio data collection service
+- **`web/api/`**: Web API server and dashboard interface
 
 ## Quick Start
 
@@ -60,6 +73,12 @@ The project uses a modular architecture with shared packages:
    ./bin/telegram-monitor          # Test manually
    # Add to cron for automated monitoring:
    # */2 * * * * /path/to/lightning-node-tools/bin/telegram-monitor >/dev/null 2>&1
+   ```
+
+5. **Start portfolio dashboard**:
+   ```bash
+   ./start-dashboard.sh            # Launch web dashboard
+   # Open http://localhost:8080 in your browser
    ```
 
 ## Channel Manager Commands
@@ -143,6 +162,11 @@ lightning-node-tools/
 - Verify your `.env` file has correct bot token and chat ID
 - Check that the `data` directory exists
 - Test the Telegram bot by sending a manual message first
+
+## Documentation
+
+- **[ROADMAP.md](ROADMAP.md)** - Planned features and future development
+- **[DASHBOARD.md](DASHBOARD.md)** - Portfolio Dashboard setup and usage guide
 
 ## Future Development
 
