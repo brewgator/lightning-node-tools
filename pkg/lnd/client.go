@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strconv"
 )
 
 // RunLNCLI executes lncli commands and returns the output
@@ -46,8 +47,20 @@ func GetChannels() ([]Channel, error) {
 	return response.Channels, nil
 }
 
+// ParsedChannelBalance represents parsed channel balances as int64
+type ParsedChannelBalance struct {
+	LocalBalance  int64
+	RemoteBalance int64
+}
+
+// ParsedWalletBalance represents parsed wallet balance as int64
+type ParsedWalletBalance struct {
+	ConfirmedBalance   int64
+	UnconfirmedBalance int64
+}
+
 // GetChannelBalances retrieves the total channel balances
-func (c *Client) GetChannelBalances() (*ChannelBalance, error) {
+func (c *Client) GetChannelBalances() (*ParsedChannelBalance, error) {
 	output, err := RunLNCLI("channelbalance")
 	if err != nil {
 		return nil, err
@@ -58,11 +71,25 @@ func (c *Client) GetChannelBalances() (*ChannelBalance, error) {
 		return nil, err
 	}
 
-	return &balance, nil
+	// Parse string values to int64
+	localBalance, err := strconv.ParseInt(balance.LocalBalance.Sat, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse local balance: %w", err)
+	}
+	
+	remoteBalance, err := strconv.ParseInt(balance.RemoteBalance.Sat, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse remote balance: %w", err)
+	}
+
+	return &ParsedChannelBalance{
+		LocalBalance:  localBalance,
+		RemoteBalance: remoteBalance,
+	}, nil
 }
 
 // GetWalletBalance retrieves the wallet balance
-func (c *Client) GetWalletBalance() (*WalletBalance, error) {
+func (c *Client) GetWalletBalance() (*ParsedWalletBalance, error) {
 	output, err := RunLNCLI("walletbalance")
 	if err != nil {
 		return nil, err
@@ -73,7 +100,21 @@ func (c *Client) GetWalletBalance() (*WalletBalance, error) {
 		return nil, err
 	}
 
-	return &balance, nil
+	// Parse string values to int64
+	confirmedBalance, err := strconv.ParseInt(balance.ConfirmedBalance, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse confirmed balance: %w", err)
+	}
+	
+	unconfirmedBalance, err := strconv.ParseInt(balance.UnconfirmedBalance, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse unconfirmed balance: %w", err)
+	}
+
+	return &ParsedWalletBalance{
+		ConfirmedBalance:   confirmedBalance,
+		UnconfirmedBalance: unconfirmedBalance,
+	}, nil
 }
 
 // GetFeeReport retrieves the fee report from LND

@@ -99,17 +99,31 @@ type OpenChannelResponse struct {
 	OutputIndex      uint32 `json:"output_index"`
 }
 
+// Amount represents an amount with sat and msat values
+type Amount struct {
+	Sat  string `json:"sat"`
+	Msat string `json:"msat"`
+}
+
 // ChannelBalance represents channel balance information
 type ChannelBalance struct {
-	LocalBalance  int64 `json:"local_balance"`
-	RemoteBalance int64 `json:"remote_balance"`
+	Balance             string `json:"balance"`
+	PendingOpenBalance  string `json:"pending_open_balance"`
+	LocalBalance        Amount `json:"local_balance"`
+	RemoteBalance       Amount `json:"remote_balance"`
+	UnsettledLocal      Amount `json:"unsettled_local_balance"`
+	UnsettledRemote     Amount `json:"unsettled_remote_balance"`
+	PendingOpenLocal    Amount `json:"pending_open_local_balance"`
+	PendingOpenRemote   Amount `json:"pending_open_remote_balance"`
 }
 
 // WalletBalance represents wallet balance information
 type WalletBalance struct {
-	ConfirmedBalance   int64 `json:"confirmed_balance"`
-	UnconfirmedBalance int64 `json:"unconfirmed_balance"`
-	TotalBalance       int64 `json:"total_balance"`
+	TotalBalance              string `json:"total_balance"`
+	ConfirmedBalance          string `json:"confirmed_balance"`
+	UnconfirmedBalance        string `json:"unconfirmed_balance"`
+	LockedBalance             string `json:"locked_balance"`
+	ReservedBalanceAnchorChan string `json:"reserved_balance_anchor_chan"`
 }
 
 // Client represents an LND client
