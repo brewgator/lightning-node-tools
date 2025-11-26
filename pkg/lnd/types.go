@@ -101,15 +101,15 @@ type OpenChannelResponse struct {
 
 // ChannelBalance represents channel balance information
 type ChannelBalance struct {
-	LocalBalance  int64 `json:"local_balance,string"`
-	RemoteBalance int64 `json:"remote_balance,string"`
+	LocalBalance  int64 `json:"local_balance"`
+	RemoteBalance int64 `json:"remote_balance"`
 }
 
 // WalletBalance represents wallet balance information
 type WalletBalance struct {
-	ConfirmedBalance   int64 `json:"confirmed_balance,string"`
-	UnconfirmedBalance int64 `json:"unconfirmed_balance,string"`
-	TotalBalance       int64 `json:"total_balance,string"`
+	ConfirmedBalance   int64 `json:"confirmed_balance"`
+	UnconfirmedBalance int64 `json:"unconfirmed_balance"`
+	TotalBalance       int64 `json:"total_balance"`
 }
 
 // Client represents an LND client
