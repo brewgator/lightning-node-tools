@@ -188,7 +188,7 @@ func (c *Collector) collectOnchainData() (confirmed, unconfirmed int64, err erro
 
 	// Get on-chain balances using existing LND client
 	if c.config.LNDClient == nil {
-		return 0, 0, fmt.Errorf("LND client is not initialized")
+		return 0, 0, fmt.Errorf("LND client is nil")
 	}
 	balance, err := c.config.LNDClient.GetWalletBalance()
 	if err != nil {
