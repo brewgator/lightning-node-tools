@@ -50,7 +50,8 @@ func main() {
 
 	// Setup CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"},
+		// TODO: Replace with your actual frontend domain(s) in production.
+		AllowedOrigins: []string{"https://your-frontend-domain.com"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders: []string{"*"},
 	})
