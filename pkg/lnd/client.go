@@ -59,6 +59,11 @@ type ParsedWalletBalance struct {
 	UnconfirmedBalance int64
 }
 
+// parseBalanceString parses a balance string value to int64
+func parseBalanceString(s string) (int64, error) {
+	return strconv.ParseInt(s, 10, 64)
+}
+
 // GetChannelBalances retrieves the total channel balances
 func (c *Client) GetChannelBalances() (*ParsedChannelBalance, error) {
 	output, err := RunLNCLI("channelbalance")
@@ -72,12 +77,12 @@ func (c *Client) GetChannelBalances() (*ParsedChannelBalance, error) {
 	}
 
 	// Parse string values to int64
-	localBalance, err := strconv.ParseInt(balance.LocalBalance.Sat, 10, 64)
+	localBalance, err := parseBalanceString(balance.LocalBalance.Sat)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse local balance: %w", err)
 	}
 
-	remoteBalance, err := strconv.ParseInt(balance.RemoteBalance.Sat, 10, 64)
+	remoteBalance, err := parseBalanceString(balance.RemoteBalance.Sat)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse remote balance: %w", err)
 	}
@@ -101,12 +106,12 @@ func (c *Client) GetWalletBalance() (*ParsedWalletBalance, error) {
 	}
 
 	// Parse string values to int64
-	confirmedBalance, err := strconv.ParseInt(balance.ConfirmedBalance, 10, 64)
+	confirmedBalance, err := parseBalanceString(balance.ConfirmedBalance)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse confirmed balance: %w", err)
 	}
 
-	unconfirmedBalance, err := strconv.ParseInt(balance.UnconfirmedBalance, 10, 64)
+	unconfirmedBalance, err := parseBalanceString(balance.UnconfirmedBalance)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse unconfirmed balance: %w", err)
 	}

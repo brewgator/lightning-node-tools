@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"lightning-node-tools/pkg/db"
+	"github.com/brewgator/lightning-node-tools/pkg/db"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
@@ -30,7 +30,7 @@ func main() {
 	var (
 		dbPath = flag.String("db", "data/portfolio.db", "Path to SQLite database")
 		port   = flag.String("port", "8080", "Port to serve on")
-		host   = flag.String("host", "0.0.0.0", "Host to serve on")
+		host   = flag.String("host", "127.0.0.1", "Host to serve on")
 	)
 	flag.Parse()
 
@@ -83,6 +83,7 @@ func (s *Server) setupRoutes() {
 func (s *Server) handleCurrentPortfolio(w http.ResponseWriter, r *http.Request) {
 	snapshot, err := s.db.GetLatestBalanceSnapshot()
 	if err != nil {
+		log.Printf("handleCurrentPortfolio: failed to get latest balance snapshot: %v", err)
 		s.writeError(w, http.StatusInternalServerError, "Failed to get current portfolio")
 		return
 	}
@@ -111,6 +112,7 @@ func (s *Server) handlePortfolioHistory(w http.ResponseWriter, r *http.Request) 
 
 	snapshots, err := s.db.GetBalanceSnapshots(from, to)
 	if err != nil {
+		log.Printf("handlePortfolioHistory: failed to get balance snapshots: %v", err)
 		s.writeError(w, http.StatusInternalServerError, "Failed to get portfolio history")
 		return
 	}
@@ -130,14 +132,18 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) writeJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("Failed to encode JSON response: %v", err)
+	}
 }
 
 func (s *Server) writeError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(APIResponse{
+	if err := json.NewEncoder(w).Encode(APIResponse{
 		Success: false,
 		Error:   message,
-	})
+	}); err != nil {
+		log.Printf("Failed to encode error response (status %d, message %q): %v", status, message, err)
+	}
 }

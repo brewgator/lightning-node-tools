@@ -28,7 +28,7 @@ dashboard-collector:
 dashboard-api:
 	@echo "Building dashboard-api..."
 	@mkdir -p bin
-	go build -o bin/dashboard-api ./web/api
+	go build -o bin/dashboard-api ./cmd/dashboard-api
 
 # Build and start complete dashboard (collector + api)
 dashboard: dashboard-collector dashboard-api
@@ -49,7 +49,7 @@ install: build
 	go install ./cmd/channel-manager
 	go install ./cmd/telegram-monitor
 	go install ./cmd/dashboard-collector
-	go install ./web/api
+	go install ./cmd/dashboard-api
 
 # Run tests (if any exist)
 test:
