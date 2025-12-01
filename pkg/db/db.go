@@ -115,7 +115,8 @@ func (db *Database) initTables() error {
 	return nil
 }
 
-// InsertBalanceSnapshot inserts a new balance snapshot
+// InsertBalanceSnapshot inserts a new balance snapshot.
+// If a snapshot with the same timestamp already exists, it will be replaced due to the use of INSERT OR REPLACE.
 func (db *Database) InsertBalanceSnapshot(snapshot *BalanceSnapshot) error {
 	query := `
 		INSERT OR REPLACE INTO balance_snapshots

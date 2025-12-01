@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"lightning-node-tools/pkg/db"
-	"lightning-node-tools/pkg/lnd"
+	"github.com/brewgator/lightning-node-tools/pkg/db"
+	"github.com/brewgator/lightning-node-tools/pkg/lnd"
 )
 
 type Config struct {
@@ -169,6 +169,9 @@ func (c *Collector) collectLightningData() (local, remote int64, err error) {
 	}
 
 	// Get channel balances using existing LND client
+	if c.config.LNDClient == nil {
+		return 0, 0, fmt.Errorf("LND client is nil")
+	}
 	balances, err := c.config.LNDClient.GetChannelBalances()
 	if err != nil {
 		return 0, 0, err
@@ -185,7 +188,7 @@ func (c *Collector) collectOnchainData() (confirmed, unconfirmed int64, err erro
 
 	// Get on-chain balances using existing LND client
 	if c.config.LNDClient == nil {
-		return 0, 0, fmt.Errorf("LND client is not initialized")
+		return 0, 0, fmt.Errorf("LND client is nil")
 	}
 	balance, err := c.config.LNDClient.GetWalletBalance()
 	if err != nil {

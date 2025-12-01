@@ -177,7 +177,7 @@
             </div>
         </div>
 
-        <button class="refresh-btn" onclick="loadPortfolioData()">🔄 Refresh Data</button>
+        <button class="refresh-btn" id="refreshBtn" aria-label="Refresh portfolio data">🔄 Refresh Data</button>
     </div>
 
     <script>
@@ -301,11 +301,42 @@
             }
         }
 
-        // Load data when page loads
-        document.addEventListener('DOMContentLoaded', loadPortfolioData);
+        // Load data when page loads and set up event handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            loadPortfolioData();
+            document.getElementById('refreshBtn').addEventListener('click', loadPortfolioData);
+            startAutoRefresh();
+        });
 
-        // Auto-refresh every 5 minutes
-        setInterval(loadPortfolioData, 5 * 60 * 1000);
+        // Auto-refresh every 5 minutes, with visibility and unload management
+        let refreshIntervalId = null;
+        const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+        function startAutoRefresh() {
+            if (!refreshIntervalId) {
+                refreshIntervalId = setInterval(loadPortfolioData, REFRESH_INTERVAL_MS);
+            }
+        }
+
+        function stopAutoRefresh() {
+            if (refreshIntervalId) {
+                clearInterval(refreshIntervalId);
+                refreshIntervalId = null;
+            }
+        }
+
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else {
+                loadPortfolioData();
+                startAutoRefresh();
+            }
+        });
+
+        window.addEventListener('beforeunload', function() {
+            stopAutoRefresh();
+        });
     </script>
 </body>
 </html>
