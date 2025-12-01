@@ -410,7 +410,7 @@ func reportRoutingFee(event map[string]any, channelAliases map[string]string) {
 	// Get channel aliases
 	inAlias := channelAliases[chanIdIn]
 	outAlias := channelAliases[chanIdOut]
-	
+
 	if inAlias == "" {
 		inAlias = "Unknown"
 	}

@@ -1,10 +1,10 @@
-.PHONY: build clean all channel-manager telegram-monitor
+.PHONY: build clean all channel-manager telegram-monitor dashboard-collector dashboard-api dashboard
 
 # Default target - build all tools
 all: build
 
 # Build all tools
-build: channel-manager telegram-monitor
+build: channel-manager telegram-monitor dashboard-collector dashboard-api
 
 # Build channel-manager
 channel-manager:
@@ -18,6 +18,26 @@ telegram-monitor:
 	@mkdir -p bin
 	go build -o bin/telegram-monitor ./cmd/telegram-monitor
 
+# Build dashboard-collector
+dashboard-collector:
+	@echo "Building dashboard-collector..."
+	@mkdir -p bin
+	go build -o bin/dashboard-collector ./cmd/dashboard-collector
+
+# Build dashboard-api
+dashboard-api:
+	@echo "Building dashboard-api..."
+	@mkdir -p bin
+	go build -o bin/dashboard-api ./cmd/dashboard-api
+
+# Build and start complete dashboard (collector + api)
+dashboard: dashboard-collector dashboard-api
+	@echo "Dashboard components built successfully!"
+	@echo "To start:"
+	@echo "  1. ./bin/dashboard-collector --oneshot  # Test data collection"
+	@echo "  2. ./bin/dashboard-api                  # Start web API"
+	@echo "  3. Open http://localhost:8080           # View dashboard"
+
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
@@ -28,6 +48,8 @@ install: build
 	@echo "Installing tools to GOPATH/bin..."
 	go install ./cmd/channel-manager
 	go install ./cmd/telegram-monitor
+	go install ./cmd/dashboard-collector
+	go install ./cmd/dashboard-api
 
 # Run tests (if any exist)
 test:
@@ -44,12 +66,15 @@ lint:
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  build (default)    - Build all tools"
-	@echo "  channel-manager    - Build only channel-manager"
-	@echo "  telegram-monitor   - Build only telegram-monitor"
-	@echo "  clean             - Remove build artifacts"
-	@echo "  install           - Install tools to GOPATH/bin"
-	@echo "  test              - Run tests"
-	@echo "  fmt               - Format code"
-	@echo "  lint              - Lint code (requires golangci-lint)"
-	@echo "  help              - Show this help"
+	@echo "  build (default)     - Build all tools"
+	@echo "  channel-manager     - Build only channel-manager"
+	@echo "  telegram-monitor    - Build only telegram-monitor"
+	@echo "  dashboard-collector - Build only dashboard-collector"
+	@echo "  dashboard-api       - Build only dashboard-api"
+	@echo "  dashboard           - Build complete dashboard"
+	@echo "  clean              - Remove build artifacts"
+	@echo "  install            - Install tools to GOPATH/bin"
+	@echo "  test               - Run tests"
+	@echo "  fmt                - Format code"
+	@echo "  lint               - Lint code (requires golangci-lint)"
+	@echo "  help               - Show this help"

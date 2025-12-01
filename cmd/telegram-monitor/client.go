@@ -140,7 +140,7 @@ func getCurrentLightningState() (*LightningState, error) {
 
 	if fwdEvents, ok := fwdData["forwarding_events"].([]any); ok {
 		state.Forwards = len(fwdEvents)
-		
+
 		// Track the latest forward timestamp for routing fee detection
 		var latestTimestamp int64
 		for _, event := range fwdEvents {

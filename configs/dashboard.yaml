@@ -1,0 +1,26 @@
+# Dashboard Configuration
+database:
+  path: "./data/portfolio.db"
+
+collection:
+  interval_minutes: 15
+
+lightning:
+  # Uses existing LND configuration from .env
+
+onchain:
+  mempool_api_url: "https://mempool.space/api"
+  # Add Bitcoin addresses to track here
+  addresses: []
+
+web:
+  host: "127.0.0.1"
+  port: 8080
+
+# Cold storage tracking (manual entry support)
+cold_storage:
+  entries: []
+  # Example:
+  # - name: "Hardware Wallet 1"
+  #   balance_sats: 5000000
+  #   last_updated: "2024-01-01T00:00:00Z"
