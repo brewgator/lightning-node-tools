@@ -73,6 +73,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/portfolio/current", s.handleCurrentPortfolio).Methods("GET")
 	api.HandleFunc("/portfolio/history", s.handlePortfolioHistory).Methods("GET")
 
+	// Lightning endpoints
+	api.HandleFunc("/lightning/fees", s.handleLightningFees).Methods("GET")
+
 	// Health check
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
 
@@ -118,6 +121,71 @@ func (s *Server) handlePortfolioHistory(w http.ResponseWriter, r *http.Request) 
 	}
 
 	s.writeJSON(w, APIResponse{Success: true, Data: snapshots})
+}
+
+func (s *Server) handleLightningFees(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	daysStr := r.URL.Query().Get("days")
+	days := 30 // default
+	if daysStr != "" {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
+			days = d
+		} else if daysStr != "" {
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365")
+			return
+		}
+	}
+
+	// Calculate time range
+	to := time.Now()
+	from := to.AddDate(0, 0, -days)
+
+	feeData, err := s.db.GetForwardingEventsFees(from, to)
+	if err != nil {
+		log.Printf("handleLightningFees: failed to get forwarding fees: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get Lightning fee data")
+		return
+	}
+
+	// Format data for Chart.js consumption
+	chartData := map[string]interface{}{
+		"labels": make([]string, 0, len(feeData)),
+		"datasets": []map[string]interface{}{
+			{
+				"label":           "Daily Fees (sats)",
+				"data":            make([]int64, 0, len(feeData)),
+				"backgroundColor": "rgba(54, 162, 235, 0.2)",
+				"borderColor":     "rgba(54, 162, 235, 1)",
+				"borderWidth":     1,
+			},
+		},
+		"metadata": map[string]interface{}{
+			"total_fees":     int64(0),
+			"total_forwards": int64(0),
+			"days_requested": days,
+			"days_with_data": len(feeData),
+		},
+	}
+
+	// Calculate totals and populate chart data
+	var totalFees, totalForwards int64
+	labels := chartData["labels"].([]string)
+	data := chartData["datasets"].([]map[string]interface{})[0]["data"].([]int64)
+
+	for _, day := range feeData {
+		labels = append(labels, day.Date)
+		data = append(data, day.TotalFee)
+		totalFees += day.TotalFee
+		totalForwards += day.ForwardCount
+	}
+
+	// Update the slices in the map
+	chartData["labels"] = labels
+	chartData["datasets"].([]map[string]interface{})[0]["data"] = data
+	chartData["metadata"].(map[string]interface{})["total_fees"] = totalFees
+	chartData["metadata"].(map[string]interface{})["total_forwards"] = totalForwards
+
+	s.writeJSON(w, APIResponse{Success: true, Data: chartData})
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

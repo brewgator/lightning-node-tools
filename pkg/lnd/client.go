@@ -243,3 +243,23 @@ func OpenChannel(peerPubkey string, localAmt int64, satPerVbyte int64) (*OpenCha
 	return &response, nil
 }
 
+// GetForwardingHistory retrieves forwarding history for a time range
+func (c *Client) GetForwardingHistory(startTime, endTime string) (*ForwardingHistory, error) {
+	args := []string{"fwdinghistory", "--start_time", startTime}
+	if endTime != "" {
+		args = append(args, "--end_time", endTime)
+	}
+
+	output, err := RunLNCLI(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ForwardingHistory
+	if err := json.Unmarshal(output, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+

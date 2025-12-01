@@ -79,3 +79,10 @@ type ColdStorageEntry struct {
 	Notes       string    `json:"notes" db:"notes"`
 }
 
+// DailyFeeData represents aggregated fee data for a specific day
+type DailyFeeData struct {
+	Date         string `json:"date" db:"date"`
+	TotalFee     int64  `json:"total_fee" db:"total_fee"`
+	ForwardCount int64  `json:"forward_count" db:"forward_count"`
+}
+
