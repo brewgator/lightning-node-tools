@@ -128,7 +128,7 @@
             .container {
                 padding: 10px;
             }
-            
+
             .grid {
                 grid-template-columns: 1fr;
             }
@@ -232,7 +232,7 @@
             const container = document.getElementById('lightning-details');
             const total = data.lightning_local + data.lightning_remote;
             const localPercent = total > 0 ? ((data.lightning_local / total) * 100).toFixed(1) : 0;
-            
+
             container.innerHTML = `
                 <div class="balance-item">
                     <span class="balance-label">Total Capacity:</span>
@@ -252,7 +252,7 @@
         function updateOnchainDetails(data) {
             const container = document.getElementById('onchain-details');
             const total = data.onchain_confirmed + data.onchain_unconfirmed + data.tracked_addresses;
-            
+
             container.innerHTML = `
                 <div class="balance-item">
                     <span class="balance-label">Total On-chain:</span>
@@ -275,27 +275,27 @@
 
         async function loadPortfolioData() {
             showLoading();
-            
+
             try {
                 const response = await fetch('/api/portfolio/current');
                 const result = await response.json();
-                
+
                 if (!result.success) {
                     showError(result.error || 'Failed to load portfolio data');
                     return;
                 }
-                
+
                 const data = result.data;
-                
+
                 // Update all sections
                 updateCurrentBalances(data);
                 updateLightningDetails(data);
                 updateOnchainDetails(data);
-                
+
                 // Hide status and show dashboard
                 document.getElementById('status').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
-                
+
             } catch (error) {
                 showError(`Network error: ${error.message}`);
             }
@@ -303,7 +303,7 @@
 
         // Load data when page loads
         document.addEventListener('DOMContentLoaded', loadPortfolioData);
-        
+
         // Auto-refresh every 5 minutes
         setInterval(loadPortfolioData, 5 * 60 * 1000);
     </script>

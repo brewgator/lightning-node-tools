@@ -1,6 +1,12 @@
 # Lightning Node Tools
 
-A comprehensive toolkit for Lightning Network node management and monitoring. This repository contains multiple tools designed to help Lightning node operators manage their channels, monitor activity, and optimize performance.
+A comprehensive Bitcoin portfolio tracking and Lightning Network management toolkit. This project provides real-time monitoring, historical data collection, and web-based visualization for Lightning node operators who want complete visibility into their Bitcoin holdings.
+
+## 🎯 Project Vision
+
+Building a unified Bitcoin portfolio dashboard that combines Lightning Network monitoring with multi-source balance tracking. The goal is to replace manual spreadsheet tracking with automated data collection and beautiful visualizations.
+
+**Status:** Phase 2 in progress - Basic dashboard operational with real-time portfolio tracking
 
 ## Tools Overview
 
@@ -24,62 +30,95 @@ Real-time Lightning node monitoring with Telegram notifications for critical eve
 - Forward monitoring with detailed 24h summaries
 - Server reboot detection and notifications
 
-### Portfolio Dashboard
+### Portfolio Dashboard 🚀
 
-Web-based Bitcoin portfolio tracking dashboard with historical data visualization.
+Comprehensive Bitcoin portfolio tracking dashboard with automated data collection and web visualization.
 
-**Features:**
-- Real-time portfolio balance display aggregating all sources
-- Historical balance snapshots with SQLite storage
-- Lightning Network and on-chain balance tracking
-- Responsive web interface optimized for continuous monitoring
+**Current Features (Phase 1-2 Complete):**
+- ✅ **Automated Data Collection**: SQLite-backed service collecting Lightning + on-chain data every 15 minutes
+- ✅ **Real-time Dashboard**: Web interface showing total portfolio breakdown across all sources
+- ✅ **Lightning Integration**: Reuses existing LND client for seamless channel and wallet data
+- ✅ **Historical Storage**: Time-series snapshots with indexed queries for trend analysis
+- ✅ **Mock Mode**: Demo functionality for testing without live LND connection
+- ✅ **Configuration Management**: YAML-based settings for collection intervals and data sources
+
+**Planned Features (Phase 3+):**
+- 📈 Interactive historical charts with Chart.js
+- 🏦 Multiple on-chain address tracking via Mempool.space API
+- 📊 Monthly portfolio reports with CSV export
+- 💾 Cold storage balance management
+- 📱 Mobile-optimized progressive web app
+- 🔍 Lightning routing analytics and fee optimization
 
 ## Architecture
 
-The project uses a modular architecture with shared packages:
+The project uses a modular, service-oriented architecture:
 
-- **`pkg/lnd/`**: Shared Lightning Network API client and data structures
-- **`pkg/utils/`**: Common utility functions for formatting and calculations
-- **`pkg/db/`**: Database operations and historical data management
-- **`cmd/channel-manager/`**: Channel management tool implementation
-- **`cmd/telegram-monitor/`**: Telegram monitoring tool implementation
-- **`cmd/dashboard-collector/`**: Portfolio data collection service
-- **`web/api/`**: Web API server and dashboard interface
+### Core Services
+- **`cmd/dashboard-collector/`**: Automated data collection service (15min intervals)
+- **`web/api/`**: REST API server with dashboard web interface 
+- **`cmd/channel-manager/`**: Interactive channel management CLI tool
+- **`cmd/telegram-monitor/`**: Real-time alerting and notifications
+
+### Shared Infrastructure
+- **`pkg/lnd/`**: Lightning Network API client (shared across all tools)
+- **`pkg/db/`**: SQLite database operations for historical data
+- **`pkg/utils/`**: Common utilities for formatting and calculations
+
+### Data Flow
+```
+LND Node → dashboard-collector → SQLite DB → Web API → Dashboard UI
+    ↓
+Telegram Alerts (real-time)
+Channel Manager (on-demand)
+```
 
 ## Quick Start
 
-1. **Clone and configure**:
-   ```bash
-   git clone <your-repo-url>
-   cd lightning-node-tools
-   cp .env.example .env
-   # Edit .env with your Telegram bot token and chat ID
-   ```
+### 🚀 Portfolio Dashboard (Recommended)
 
-2. **Build tools**:
-   ```bash
-   make
-   ```
+```bash
+# 1. Clone and build
+git clone <your-repo-url>
+cd lightning-node-tools
+make
 
-3. **Run channel manager**:
-   ```bash
-   ./bin/channel-manager balance    # View channel liquidity
-   ./bin/channel-manager fees      # View current fees
-   ./bin/channel-manager earnings  # View fee earnings
-   ```
+# 2. Start with demo data
+./bin/dashboard-collector --oneshot --mock
+./start-dashboard.sh
+# Open http://localhost:8080
 
-4. **Set up monitoring**:
-   ```bash
-   ./bin/telegram-monitor          # Test manually
-   # Add to cron for automated monitoring:
-   # */2 * * * * /path/to/lightning-node-tools/bin/telegram-monitor >/dev/null 2>&1
-   ```
+# 3. Use with real LND data
+./bin/dashboard-collector --oneshot  # Test collection
+./bin/dashboard-collector             # Run continuously
+```
 
-5. **Start portfolio dashboard**:
-   ```bash
-   ./start-dashboard.sh            # Launch web dashboard
-   # Open http://localhost:8080 in your browser
-   ```
+### ⚡ Channel Management
+
+```bash
+# Build and configure
+make
+cp .env.example .env  # Add Telegram credentials if using alerts
+
+# Channel operations
+./bin/channel-manager balance    # Visual liquidity overview
+./bin/channel-manager fees       # Current fee settings  
+./bin/channel-manager earnings   # Fee earnings analysis
+
+# Fee optimization
+./bin/channel-manager suggest-fees     # AI-powered recommendations
+./bin/channel-manager fee-optimizer    # Apply optimizations
+```
+
+### 📱 Real-time Monitoring
+
+```bash
+# Set up Telegram alerts
+./bin/telegram-monitor           # Test manually
+
+# Add to cron for continuous monitoring
+*/2 * * * * /path/to/lightning-node-tools/bin/telegram-monitor >/dev/null 2>&1
+```
 
 ## Channel Manager Commands
 
@@ -149,12 +188,18 @@ lightning-node-tools/
 
 ## Build Targets
 
+**Primary:**
 - `make` or `make build` - Build all tools
+- `make dashboard` - Build dashboard components (collector + API)
 - `make clean` - Remove build artifacts
-- `make channel-manager` - Build only channel-manager
-- `make telegram-monitor` - Build only telegram-monitor
-- `make install` - Install tools to GOPATH/bin
 - `make help` - Show all available targets
+
+**Individual Tools:**
+- `make channel-manager` - Build channel management tool
+- `make telegram-monitor` - Build monitoring tool
+- `make dashboard-collector` - Build data collection service
+- `make dashboard-api` - Build web API server
+- `make install` - Install tools to GOPATH/bin
 
 ## Troubleshooting
 
@@ -163,11 +208,43 @@ lightning-node-tools/
 - Check that the `data` directory exists
 - Test the Telegram bot by sending a manual message first
 
+## 📋 Project Status & Roadmap
+
+**Current Phase:** Phase 2 - Basic Dashboard (🟡 In Progress)
+
+| Phase | Status | Key Features |
+|-------|--------|-------------|
+| **Phase 1: Data Foundation** | ✅ Complete | SQLite schema, automated collection, LND integration |
+| **Phase 2: Basic Dashboard** | 🟡 In Progress | Web API, real-time UI, portfolio breakdown |
+| **Phase 3: Portfolio Integration** | ⏳ Planned | Multi-address tracking, cold storage management |
+| **Phase 4: Monthly Tracking** | ⏳ Planned | Historical charts, monthly reports, CSV export |
+| **Phase 5: Lightning Analytics** | ⏳ Planned | Channel health scoring, routing optimization |
+| **Phase 6: Mobile & Polish** | ⏳ Planned | PWA, mobile responsiveness, production deployment |
+
+**Next Milestones:**
+- [ ] Complete historical chart integration (Chart.js)
+- [ ] Add Mempool.space API for address tracking
+- [ ] Implement monthly report generation
+
 ## Documentation
 
-- **[ROADMAP.md](ROADMAP.md)** - Planned features and future development
-- **[DASHBOARD.md](DASHBOARD.md)** - Portfolio Dashboard setup and usage guide
+- **[Detailed Roadmap](https://github.com/user/obsidian-vault/.../Bitcoin%20Portfolio%20Dashboard%20Roadmap.md)** - Complete 6-phase development plan
+- **[DASHBOARD.md](DASHBOARD.md)** - Portfolio dashboard setup and usage guide  
+- **[ROADMAP.md](ROADMAP.md)** - High-level planned features
 
-## Future Development
+## 🧪 Testing & Development
 
-See [ROADMAP.md](ROADMAP.md) for planned features and future development.
+**Mock Mode:** Test all features without a live Lightning node
+```bash
+./bin/dashboard-collector --mock --oneshot  # Generate sample data
+./start-dashboard.sh                        # View dashboard
+```
+
+**Real Data:** Connect to your Lightning node
+```bash
+# Ensure LND is running and lncli works
+lncli getinfo
+
+# Start data collection
+./bin/dashboard-collector --oneshot
+```

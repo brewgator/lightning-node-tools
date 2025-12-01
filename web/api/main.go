@@ -60,21 +60,21 @@ func main() {
 	addr := fmt.Sprintf("%s:%s", *host, *port)
 	fmt.Printf("🚀 Portfolio Dashboard API starting on http://%s\n", addr)
 	fmt.Printf("📊 Database: %s\n", *dbPath)
-	
+
 	log.Fatal(http.ListenAndServe(addr, handler))
 }
 
 func (s *Server) setupRoutes() {
 	// API routes
 	api := s.router.PathPrefix("/api").Subrouter()
-	
+
 	// Portfolio endpoints
 	api.HandleFunc("/portfolio/current", s.handleCurrentPortfolio).Methods("GET")
 	api.HandleFunc("/portfolio/history", s.handlePortfolioHistory).Methods("GET")
-	
+
 	// Health check
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
-	
+
 	// Static file serving
 	s.router.PathPrefix("/").Handler(http.FileServer(http.Dir("web/static/")))
 }

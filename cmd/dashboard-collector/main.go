@@ -15,9 +15,9 @@ import (
 )
 
 type Config struct {
-	DatabasePath     string
+	DatabasePath       string
 	CollectionInterval time.Duration
-	LNDClient        *lnd.Client
+	LNDClient          *lnd.Client
 }
 
 type Collector struct {
@@ -49,7 +49,7 @@ func main() {
 
 	// Initialize LND client (reusing existing client)
 	var lndClient *lnd.Client
-	
+
 	if *mockMode {
 		fmt.Println("⚠️  Running in mock mode - using test data")
 		lndClient = nil // We'll handle mock data in collection
@@ -91,7 +91,7 @@ func main() {
 	defer ticker.Stop()
 
 	fmt.Printf("Starting data collection every %v...\n", config.CollectionInterval)
-	
+
 	// Collect initial data
 	if err := collector.collectData(); err != nil {
 		log.Printf("Initial data collection failed: %v", err)
@@ -112,7 +112,7 @@ func main() {
 
 func (c *Collector) collectData() error {
 	timestamp := time.Now()
-	
+
 	fmt.Printf("[%s] Collecting portfolio data...\n", timestamp.Format("2006-01-02 15:04:05"))
 
 	// Collect Lightning data
@@ -167,7 +167,7 @@ func (c *Collector) collectLightningData() (local, remote int64, err error) {
 		// Return mock Lightning data
 		return 5000000, 3000000, nil // 5M local, 3M remote
 	}
-	
+
 	// Get channel balances using existing LND client
 	balances, err := c.config.LNDClient.GetChannelBalances()
 	if err != nil {
@@ -182,7 +182,7 @@ func (c *Collector) collectOnchainData() (confirmed, unconfirmed int64, err erro
 		// Return mock on-chain data
 		return 2000000, 100000, nil // 2M confirmed, 100K unconfirmed
 	}
-	
+
 	// Get on-chain balances using existing LND client
 	balance, err := c.config.LNDClient.GetWalletBalance()
 	if err != nil {
@@ -191,3 +191,4 @@ func (c *Collector) collectOnchainData() (confirmed, unconfirmed int64, err erro
 
 	return balance.ConfirmedBalance, balance.UnconfirmedBalance, nil
 }
+

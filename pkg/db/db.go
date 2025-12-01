@@ -118,12 +118,12 @@ func (db *Database) initTables() error {
 // InsertBalanceSnapshot inserts a new balance snapshot
 func (db *Database) InsertBalanceSnapshot(snapshot *BalanceSnapshot) error {
 	query := `
-		INSERT OR REPLACE INTO balance_snapshots 
-		(timestamp, lightning_local, lightning_remote, onchain_confirmed, onchain_unconfirmed, 
+		INSERT OR REPLACE INTO balance_snapshots
+		(timestamp, lightning_local, lightning_remote, onchain_confirmed, onchain_unconfirmed,
 		 tracked_addresses, cold_storage, total_portfolio, total_liquid)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	
+
 	_, err := db.conn.Exec(query,
 		snapshot.Timestamp,
 		snapshot.LightningLocal,
@@ -135,20 +135,20 @@ func (db *Database) InsertBalanceSnapshot(snapshot *BalanceSnapshot) error {
 		snapshot.TotalPortfolio,
 		snapshot.TotalLiquid,
 	)
-	
+
 	return err
 }
 
 // GetBalanceSnapshots retrieves balance snapshots within a time range
 func (db *Database) GetBalanceSnapshots(from, to time.Time) ([]BalanceSnapshot, error) {
 	query := `
-		SELECT id, timestamp, lightning_local, lightning_remote, onchain_confirmed, 
+		SELECT id, timestamp, lightning_local, lightning_remote, onchain_confirmed,
 		       onchain_unconfirmed, tracked_addresses, cold_storage, total_portfolio, total_liquid
-		FROM balance_snapshots 
+		FROM balance_snapshots
 		WHERE timestamp BETWEEN ? AND ?
 		ORDER BY timestamp ASC
 	`
-	
+
 	rows, err := db.conn.Query(query, from, to)
 	if err != nil {
 		return nil, err
@@ -175,20 +175,20 @@ func (db *Database) GetBalanceSnapshots(from, to time.Time) ([]BalanceSnapshot, 
 // GetLatestBalanceSnapshot retrieves the most recent balance snapshot
 func (db *Database) GetLatestBalanceSnapshot() (*BalanceSnapshot, error) {
 	query := `
-		SELECT id, timestamp, lightning_local, lightning_remote, onchain_confirmed, 
+		SELECT id, timestamp, lightning_local, lightning_remote, onchain_confirmed,
 		       onchain_unconfirmed, tracked_addresses, cold_storage, total_portfolio, total_liquid
-		FROM balance_snapshots 
-		ORDER BY timestamp DESC 
+		FROM balance_snapshots
+		ORDER BY timestamp DESC
 		LIMIT 1
 	`
-	
+
 	var s BalanceSnapshot
 	err := db.conn.QueryRow(query).Scan(
 		&s.ID, &s.Timestamp, &s.LightningLocal, &s.LightningRemote,
 		&s.OnchainConfirmed, &s.OnchainUnconfirmed, &s.TrackedAddresses,
 		&s.ColdStorage, &s.TotalPortfolio, &s.TotalLiquid,
 	)
-	
+
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -198,3 +198,4 @@ func (db *Database) GetLatestBalanceSnapshot() (*BalanceSnapshot, error) {
 
 	return &s, nil
 }
+

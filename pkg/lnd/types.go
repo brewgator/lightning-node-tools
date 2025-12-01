@@ -107,14 +107,14 @@ type Amount struct {
 
 // ChannelBalance represents channel balance information
 type ChannelBalance struct {
-	Balance             string `json:"balance"`
-	PendingOpenBalance  string `json:"pending_open_balance"`
-	LocalBalance        Amount `json:"local_balance"`
-	RemoteBalance       Amount `json:"remote_balance"`
-	UnsettledLocal      Amount `json:"unsettled_local_balance"`
-	UnsettledRemote     Amount `json:"unsettled_remote_balance"`
-	PendingOpenLocal    Amount `json:"pending_open_local_balance"`
-	PendingOpenRemote   Amount `json:"pending_open_remote_balance"`
+	Balance            string `json:"balance"`
+	PendingOpenBalance string `json:"pending_open_balance"`
+	LocalBalance       Amount `json:"local_balance"`
+	RemoteBalance      Amount `json:"remote_balance"`
+	UnsettledLocal     Amount `json:"unsettled_local_balance"`
+	UnsettledRemote    Amount `json:"unsettled_remote_balance"`
+	PendingOpenLocal   Amount `json:"pending_open_local_balance"`
+	PendingOpenRemote  Amount `json:"pending_open_remote_balance"`
 }
 
 // WalletBalance represents wallet balance information
@@ -131,3 +131,4 @@ type Client struct {
 	// This is a simple wrapper around lncli commands
 	// In a production setup, you might use gRPC instead
 }
+

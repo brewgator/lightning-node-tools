@@ -76,7 +76,7 @@ func (c *Client) GetChannelBalances() (*ParsedChannelBalance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse local balance: %w", err)
 	}
-	
+
 	remoteBalance, err := strconv.ParseInt(balance.RemoteBalance.Sat, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse remote balance: %w", err)
@@ -105,7 +105,7 @@ func (c *Client) GetWalletBalance() (*ParsedWalletBalance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse confirmed balance: %w", err)
 	}
-	
+
 	unconfirmedBalance, err := strconv.ParseInt(balance.UnconfirmedBalance, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse unconfirmed balance: %w", err)
@@ -237,3 +237,4 @@ func OpenChannel(peerPubkey string, localAmt int64, satPerVbyte int64) (*OpenCha
 
 	return &response, nil
 }
+

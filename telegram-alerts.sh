@@ -24,7 +24,7 @@ send_telegram() {
     curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
         -d chat_id="${CHAT_ID}" \
         -d text="${MESSAGE}" \
-        -d parse_mode="HTML" > /dev/null
+        -d parse_mode="HTML" >/dev/null
 }
 
 # Function to format satoshi amounts
@@ -56,7 +56,7 @@ Uptime: $CURRENT_UPTIME seconds
 Previous uptime was: $PREV_UPTIME seconds"
     fi
 fi
-echo "$CURRENT_UPTIME" > "$UPTIME_FILE"
+echo "$CURRENT_UPTIME" >"$UPTIME_FILE"
 
 # Get current Lightning state with default values for null
 CURRENT_CHANNELS=$(lncli listchannels | jq '.channels | length // 0')
@@ -94,7 +94,7 @@ mkdir -p "$SCRIPT_DIR/data"
 
 # Initialize state file if it doesn't exist
 if [ ! -f "$STATE_FILE" ]; then
-    echo "{\"channels\": $CURRENT_CHANNELS, \"pending_open\": $CURRENT_PENDING, \"pending_close\": $CURRENT_CLOSING, \"invoices\": $CURRENT_INVOICES, \"forwards\": $RECENT_FORWARDS, \"onchain_balance\": $CURRENT_ONCHAIN, \"local_balance\": $CURRENT_TOTAL_LOCAL, \"remote_balance\": $CURRENT_TOTAL_REMOTE, \"total_balance\": $CURRENT_TOTAL_ALL}" > "$STATE_FILE"
+    echo "{\"channels\": $CURRENT_CHANNELS, \"pending_open\": $CURRENT_PENDING, \"pending_close\": $CURRENT_CLOSING, \"invoices\": $CURRENT_INVOICES, \"forwards\": $RECENT_FORWARDS, \"onchain_balance\": $CURRENT_ONCHAIN, \"local_balance\": $CURRENT_TOTAL_LOCAL, \"remote_balance\": $CURRENT_TOTAL_REMOTE, \"total_balance\": $CURRENT_TOTAL_ALL}" >"$STATE_FILE"
 
     send_telegram "Lightning Monitor Started
 Active channels: $CURRENT_CHANNELS
@@ -122,8 +122,8 @@ PREV_REMOTE=$(jq '.remote_balance // 0' "$STATE_FILE")
 PREV_TOTAL=$(jq '.total_balance // 0' "$STATE_FILE")
 
 # Balance change thresholds (in satoshis)
-BALANCE_THRESHOLD=10000  # Only notify for changes > 10k sats
-SIGNIFICANT_THRESHOLD=1000000  # Highlight changes > 1M sats
+BALANCE_THRESHOLD=10000       # Only notify for changes > 10k sats
+SIGNIFICANT_THRESHOLD=1000000 # Highlight changes > 1M sats
 
 # Check for channel opens (pending -> active)
 if [ "$CURRENT_CHANNELS" -gt "$PREV_CHANNELS" ]; then
@@ -192,7 +192,7 @@ create_balance_message() {
     else
         emoji="📉"
         direction="decreased"
-        amount=$((amount * -1))  # Make positive for display
+        amount=$((amount * -1)) # Make positive for display
     fi
 
     if [ "$amount" -ge "$SIGNIFICANT_THRESHOLD" ]; then
@@ -233,4 +233,5 @@ Lightning: $(format_sats $CURRENT_TOTAL_LIGHTNING) ($(printf "%+d" $((LOCAL_CHAN
 fi
 
 # Update state file
-echo "{\"channels\": $CURRENT_CHANNELS, \"pending_open\": $CURRENT_PENDING, \"pending_close\": $CURRENT_CLOSING, \"invoices\": $CURRENT_INVOICES, \"forwards\": $RECENT_FORWARDS, \"onchain_balance\": $CURRENT_ONCHAIN, \"local_balance\": $CURRENT_TOTAL_LOCAL, \"remote_balance\": $CURRENT_TOTAL_REMOTE, \"total_balance\": $CURRENT_TOTAL_ALL}" > "$STATE_FILE"
+echo "{\"channels\": $CURRENT_CHANNELS, \"pending_open\": $CURRENT_PENDING, \"pending_close\": $CURRENT_CLOSING, \"invoices\": $CURRENT_INVOICES, \"forwards\": $RECENT_FORWARDS, \"onchain_balance\": $CURRENT_ONCHAIN, \"local_balance\": $CURRENT_TOTAL_LOCAL, \"remote_balance\": $CURRENT_TOTAL_REMOTE, \"total_balance\": $CURRENT_TOTAL_ALL}" >"$STATE_FILE"
+

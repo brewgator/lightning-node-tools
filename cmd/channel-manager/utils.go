@@ -24,3 +24,4 @@ func getChannelStatus(channel Channel) string {
 
 	return status
 }
+
