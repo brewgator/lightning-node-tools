@@ -251,7 +251,7 @@
             Chart.defaults.borderColor = darkTheme.gridColor;
             Chart.defaults.backgroundColor = darkTheme.backgroundColor;
             Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-            
+
             console.log('Chart.js initialized successfully');
             return true;
         }
@@ -353,13 +353,13 @@
             try {
                 const response = await fetch('/api/portfolio/history?days=30');
                 const result = await response.json();
-                
+
                 if (!result.success || !result.data || result.data.length === 0) {
                     return;
                 }
 
                 const ctx = document.getElementById('portfolioChart').getContext('2d');
-                
+
                 // Prepare data
                 const labels = result.data.map(item => new Date(item.timestamp).toLocaleDateString());
                 const portfolioData = result.data.map(item => item.total_portfolio);
@@ -452,18 +452,18 @@
             try {
                 const response = await fetch('/api/lightning/fees?days=30');
                 const result = await response.json();
-                
+
                 if (!result.success || !result.data) {
                     return;
                 }
 
                 const ctx = document.getElementById('feesChart').getContext('2d');
-                
+
                 // Prepare data
                 const chartData = result.data;
                 const labels = chartData.labels || [];
                 const dailyFees = chartData.datasets?.[0]?.data || [];
-                
+
                 // Calculate cumulative fees
                 let cumulative = 0;
                 const cumulativeFees = dailyFees.map(fee => cumulative += fee);
@@ -577,28 +577,28 @@
             try {
                 const response = await fetch('/api/lightning/forwards?days=30');
                 const result = await response.json();
-                
+
                 if (!result.success || !result.data) {
                     return;
                 }
 
                 const ctx = document.getElementById('forwardsChart').getContext('2d');
-                
+
                 // Prepare data
                 const chartData = result.data;
                 const labels = chartData.labels || [];
                 const forwardCounts = chartData.datasets?.[0]?.data || [];
-                
+
                 // Find high-volume days (above 75th percentile)
                 const sorted = [...forwardCounts].sort((a, b) => a - b);
                 const q3Index = Math.floor(sorted.length * 0.75);
                 const highVolumeThreshold = sorted[q3Index] || 0;
 
                 // Color bars based on volume
-                const backgroundColors = forwardCounts.map(count => 
+                const backgroundColors = forwardCounts.map(count =>
                     count >= highVolumeThreshold ? darkTheme.warningColor + '80' : darkTheme.accentColor + '80'
                 );
-                const borderColors = forwardCounts.map(count => 
+                const borderColors = forwardCounts.map(count =>
                     count >= highVolumeThreshold ? darkTheme.warningColor : darkTheme.accentColor
                 );
 
@@ -676,7 +676,7 @@
 
         async function loadPortfolioData() {
             showLoading();
-            
+
             // Initialize Chart.js if not already done
             if (!initializeChartDefaults()) {
                 showError('Chart.js library failed to load');
