@@ -1,32 +1,144 @@
-# Environment variables
-.env
-
-# Data directory
-data/
-
-# Go binary
-bin/
-
-# Go build cache
+# Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+bin/
+dist/
+
+# Test binary, built with `go test -c`
 *.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+# Dependency directories
+vendor/
 
 # Go workspace files
 go.work
 go.work.sum
 
-# IDE files
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Legacy state files (if still using bash script)
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment and configuration files
+.env
+.env.local
+.env.*.local
+
+# Data directory and database files
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+*.log.*
+
+# Runtime state files
 last_state.json
 last_uptime.txt
+data/last_state.json
+data/last_uptime.txt
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build artifacts
+build/
+target/
+
+# Certificate and key files (security sensitive)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+tls.cert
+tls.key
+admin.macaroon
+readonly.macaroon
+invoice.macaroon
+
+# LND specific files (if accidentally copied)
+lnd.conf
+lnd.log*
+*.macaroon
+
+# Backup files
+*.bak
+*.backup
+
+# Node modules (if any frontend dependencies)
+node_modules/
+
+# Coverage reports
+coverage.txt
+coverage.html
+coverage.out
+
+# Profiling data
+*.pprof
+
+# Local configuration overrides
+config.local.yaml
+config.local.yml
+*.local.yaml
+*.local.yml
+
+# Package files
+*.tar.gz
+*.zip
+*.rar
+
+# Scripts that might contain sensitive data
+*secret*
+*private*
+
+# JetBrains IDEs
+*.iml
+*.ipr
+*.iws
+
+# Emacs
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Air live reload tool for Go development
+tmp/
+
+# Debug files
+debug
+debug.test
+*.debug

@@ -1,0 +1,24 @@
+[Unit]
+Description=Bitcoin Lightning Forwarding Events Collector
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{USER}}
+Group={{USER}}
+WorkingDirectory={{WORKING_DIRECTORY}}
+ExecStart={{WORKING_DIRECTORY}}/bin/forwarding-collector --interval=5m
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths={{WORKING_DIRECTORY}}/data
+
+[Install]
+WantedBy=multi-user.target

@@ -9,7 +9,7 @@ Real-time Bitcoin portfolio tracking dashboard that combines Lightning Network m
 make dashboard
 
 # Start the dashboard (with demo data)
-./start-dashboard.sh
+./scripts/start-dashboard.sh
 
 # Open http://localhost:8080 in your browser
 ```
@@ -169,7 +169,7 @@ lncli getinfo
 ./bin/dashboard-collector --oneshot
 
 # Start full dashboard
-./start-dashboard.sh
+./scripts/start-dashboard.sh
 ```
 
 ## 🔮 Future Enhancements
