@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Portfolio Dashboard</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -99,14 +101,39 @@
         }
 
         .chart-container {
+            position: relative;
             height: 300px;
             background: #0d1117;
             border: 1px solid #30363d;
             border-radius: 8px;
+            padding: 10px;
+        }
+
+        .chart-container canvas {
+            max-height: 100%;
+            max-width: 100%;
+        }
+
+        .chart-placeholder {
+            height: 300px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #8b949e;
+            text-align: center;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr 1fr;
+            }
         }
 
         .refresh-btn {
@@ -171,8 +198,23 @@
             <div class="card">
                 <h2>📈 Portfolio History (30 days)</h2>
                 <div class="chart-container">
-                    Chart visualization coming soon...
-                    <br><small>Will show balance trends over time</small>
+                    <canvas id="portfolioChart"></canvas>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="card">
+                    <h2>⚡ Lightning Fees Earned</h2>
+                    <div class="chart-container">
+                        <canvas id="feesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>🔀 Forward Counts</h2>
+                    <div class="chart-container">
+                        <canvas id="forwardsChart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -181,6 +223,28 @@
     </div>
 
     <script>
+        // Global variables for chart instances
+        let portfolioChart = null;
+        let feesChart = null;
+        let forwardsChart = null;
+
+        // Dark theme configuration for Chart.js
+        const darkTheme = {
+            backgroundColor: '#0d1117',
+            borderColor: '#30363d',
+            textColor: '#c9d1d9',
+            gridColor: '#21262d',
+            accentColor: '#f0883e',
+            successColor: '#238636',
+            warningColor: '#d29922',
+        };
+
+        // Chart.js default configuration
+        Chart.defaults.color = darkTheme.textColor;
+        Chart.defaults.borderColor = darkTheme.gridColor;
+        Chart.defaults.backgroundColor = darkTheme.backgroundColor;
+        Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
         function formatSats(sats) {
             if (sats >= 100000000) {
                 return (sats / 100000000).toFixed(2) + ' BTC';
@@ -273,6 +337,332 @@
             `;
         }
 
+        // Chart 1: Portfolio Balance History (Line Chart)
+        async function createPortfolioChart() {
+            try {
+                const response = await fetch('/api/portfolio/history?days=30');
+                const result = await response.json();
+                
+                if (!result.success || !result.data || result.data.length === 0) {
+                    return;
+                }
+
+                const ctx = document.getElementById('portfolioChart').getContext('2d');
+                
+                // Prepare data
+                const labels = result.data.map(item => new Date(item.timestamp).toLocaleDateString());
+                const portfolioData = result.data.map(item => item.total_portfolio);
+                const liquidData = result.data.map(item => item.total_liquid);
+
+                // Destroy existing chart
+                if (portfolioChart) {
+                    portfolioChart.destroy();
+                }
+
+                portfolioChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Total Portfolio',
+                            data: portfolioData,
+                            borderColor: darkTheme.accentColor,
+                            backgroundColor: darkTheme.accentColor + '20',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                        }, {
+                            label: 'Liquid (No Cold Storage)',
+                            data: liquidData,
+                            borderColor: darkTheme.successColor,
+                            backgroundColor: darkTheme.successColor + '20',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index',
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                grid: {
+                                    color: darkTheme.gridColor,
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return formatSats(value);
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: darkTheme.gridColor,
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                backgroundColor: darkTheme.borderColor,
+                                titleColor: darkTheme.textColor,
+                                bodyColor: darkTheme.textColor,
+                                borderColor: darkTheme.gridColor,
+                                borderWidth: 1,
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${formatSats(context.parsed.y)}`;
+                                    }
+                                }
+                            },
+                            legend: {
+                                labels: {
+                                    color: darkTheme.textColor,
+                                }
+                            }
+                        },
+                        animation: {
+                            duration: 1000,
+                            easing: 'easeInOutQuart',
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to load portfolio chart:', error);
+            }
+        }
+
+        // Chart 2: Lightning Fees (Bar + Line Combo)
+        async function createFeesChart() {
+            try {
+                const response = await fetch('/api/lightning/fees?days=30');
+                const result = await response.json();
+                
+                if (!result.success || !result.data) {
+                    return;
+                }
+
+                const ctx = document.getElementById('feesChart').getContext('2d');
+                
+                // Prepare data
+                const chartData = result.data;
+                const labels = chartData.labels || [];
+                const dailyFees = chartData.datasets?.[0]?.data || [];
+                
+                // Calculate cumulative fees
+                let cumulative = 0;
+                const cumulativeFees = dailyFees.map(fee => cumulative += fee);
+
+                // Destroy existing chart
+                if (feesChart) {
+                    feesChart.destroy();
+                }
+
+                feesChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Daily Fees (sats)',
+                            data: dailyFees,
+                            backgroundColor: darkTheme.accentColor + '80',
+                            borderColor: darkTheme.accentColor,
+                            borderWidth: 1,
+                            yAxisID: 'y',
+                        }, {
+                            label: 'Cumulative Fees',
+                            data: cumulativeFees,
+                            type: 'line',
+                            borderColor: darkTheme.successColor,
+                            backgroundColor: darkTheme.successColor + '20',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                            yAxisID: 'y1',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index',
+                        },
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                beginAtZero: true,
+                                grid: {
+                                    color: darkTheme.gridColor,
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + ' sats';
+                                    }
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                beginAtZero: true,
+                                grid: {
+                                    drawOnChartArea: false,
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return formatSats(value);
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: darkTheme.gridColor,
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                backgroundColor: darkTheme.borderColor,
+                                titleColor: darkTheme.textColor,
+                                bodyColor: darkTheme.textColor,
+                                borderColor: darkTheme.gridColor,
+                                borderWidth: 1,
+                                callbacks: {
+                                    label: function(context) {
+                                        if (context.datasetIndex === 0) {
+                                            return `Daily Fees: ${context.parsed.y} sats`;
+                                        } else {
+                                            return `Cumulative: ${formatSats(context.parsed.y)}`;
+                                        }
+                                    }
+                                }
+                            },
+                            legend: {
+                                labels: {
+                                    color: darkTheme.textColor,
+                                }
+                            }
+                        },
+                        animation: {
+                            duration: 1000,
+                            easing: 'easeInOutQuart',
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to load fees chart:', error);
+            }
+        }
+
+        // Chart 3: Forward Counts (Bar Chart)
+        async function createForwardsChart() {
+            try {
+                const response = await fetch('/api/lightning/forwards?days=30');
+                const result = await response.json();
+                
+                if (!result.success || !result.data) {
+                    return;
+                }
+
+                const ctx = document.getElementById('forwardsChart').getContext('2d');
+                
+                // Prepare data
+                const chartData = result.data;
+                const labels = chartData.labels || [];
+                const forwardCounts = chartData.datasets?.[0]?.data || [];
+                
+                // Find high-volume days (above 75th percentile)
+                const sorted = [...forwardCounts].sort((a, b) => a - b);
+                const q3Index = Math.floor(sorted.length * 0.75);
+                const highVolumeThreshold = sorted[q3Index] || 0;
+
+                // Color bars based on volume
+                const backgroundColors = forwardCounts.map(count => 
+                    count >= highVolumeThreshold ? darkTheme.warningColor + '80' : darkTheme.accentColor + '80'
+                );
+                const borderColors = forwardCounts.map(count => 
+                    count >= highVolumeThreshold ? darkTheme.warningColor : darkTheme.accentColor
+                );
+
+                // Destroy existing chart
+                if (forwardsChart) {
+                    forwardsChart.destroy();
+                }
+
+                forwardsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Forward Count',
+                            data: forwardCounts,
+                            backgroundColor: backgroundColors,
+                            borderColor: borderColors,
+                            borderWidth: 1,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index',
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: darkTheme.gridColor,
+                                },
+                                ticks: {
+                                    stepSize: 1,
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: darkTheme.gridColor,
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                backgroundColor: darkTheme.borderColor,
+                                titleColor: darkTheme.textColor,
+                                bodyColor: darkTheme.textColor,
+                                borderColor: darkTheme.gridColor,
+                                borderWidth: 1,
+                                callbacks: {
+                                    label: function(context) {
+                                        const count = context.parsed.y;
+                                        const isHighVolume = count >= highVolumeThreshold;
+                                        return `Forwards: ${count}${isHighVolume ? ' (High Volume)' : ''}`;
+                                    }
+                                }
+                            },
+                            legend: {
+                                labels: {
+                                    color: darkTheme.textColor,
+                                }
+                            }
+                        },
+                        animation: {
+                            duration: 1000,
+                            easing: 'easeInOutQuart',
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to load forwards chart:', error);
+            }
+        }
+
         async function loadPortfolioData() {
             showLoading();
 
@@ -291,6 +681,13 @@
                 updateCurrentBalances(data);
                 updateLightningDetails(data);
                 updateOnchainDetails(data);
+
+                // Load charts
+                await Promise.all([
+                    createPortfolioChart(),
+                    createFeesChart(),
+                    createForwardsChart()
+                ]);
 
                 // Hide status and show dashboard
                 document.getElementById('status').style.display = 'none';
