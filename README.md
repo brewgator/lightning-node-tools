@@ -85,7 +85,7 @@ make
 
 # 2. Start with demo data
 ./bin/dashboard-collector --oneshot --mock
-./start-dashboard.sh
+./scripts/start-dashboard.sh
 # Open http://localhost:8080
 
 # 3. Use with real LND data
@@ -118,6 +118,89 @@ cp .env.example .env  # Add Telegram credentials if using alerts
 
 # Add to cron for continuous monitoring
 */2 * * * * /path/to/lightning-node-tools/bin/telegram-monitor >/dev/null 2>&1
+```
+
+## 🚀 Production Deployment
+
+### Systemd Service Setup
+
+The project includes automated deployment tools for running services in production with systemd:
+
+#### One-time Setup
+```bash
+# Install systemd service files (run once)
+make install-services
+
+# Or manually:
+./scripts/install-services.sh
+```
+
+#### Deploy Updates
+```bash
+# Complete deployment: stop services, build, restart
+make deploy
+
+# Or manually:
+./scripts/deploy.sh
+```
+
+### Service Management
+
+**Individual service control:**
+```bash
+# Check service status
+sudo systemctl status bitcoin-dashboard-api
+sudo systemctl status bitcoin-forwarding-collector  
+sudo systemctl status bitcoin-dashboard-collector
+
+# View logs
+sudo journalctl -u bitcoin-dashboard-api -f
+sudo journalctl -u bitcoin-forwarding-collector -f
+```
+
+**Manual service operations:**
+```bash
+# Stop all services
+sudo systemctl stop bitcoin-dashboard-api bitcoin-forwarding-collector bitcoin-dashboard-collector
+
+# Start all services  
+sudo systemctl start bitcoin-dashboard-api bitcoin-forwarding-collector bitcoin-dashboard-collector
+
+# Enable auto-start on boot
+sudo systemctl enable bitcoin-dashboard-api bitcoin-forwarding-collector bitcoin-dashboard-collector
+```
+
+### Deployment Workflow
+
+1. **Development**: Make code changes locally
+2. **Commit & Push**: Git commit and push changes
+3. **Server Deploy**: Run `make deploy` on server
+4. **Verify**: Check endpoints and service logs
+
+**API Endpoints:**
+```bash
+# Health check
+curl "http://localhost:8090/api/health"
+
+# Portfolio data
+curl "http://localhost:8090/api/portfolio/current"
+
+# Lightning fees (last 7 days)
+curl "http://localhost:8090/api/lightning/fees?days=7"
+
+# Forward counts (last 7 days)
+curl "http://localhost:8090/api/lightning/forwards?days=7"
+```
+
+### Initial Data Collection
+
+**Collect historical forwarding data:**
+```bash
+# Catch up last 30 days of forwarding events
+./bin/forwarding-collector --catchup --days=30
+
+# Test with mock data  
+./bin/forwarding-collector --catchup --days=30 --mock
 ```
 
 ## Channel Manager Commands
@@ -174,16 +257,30 @@ The telegram monitor uses adaptive balance change thresholds:
 
 ```text
 lightning-node-tools/
-├── cmd/
+├── cmd/                         # Application binaries
 │   ├── channel-manager/          # Channel management tool
+│   ├── dashboard-api/            # REST API server
+│   ├── dashboard-collector/      # Data collection service
+│   ├── forwarding-collector/     # Forwarding events collector
 │   └── telegram-monitor/         # Telegram monitoring tool
-├── pkg/
-│   ├── lnd/                     # Shared Lightning Network functionality
-│   └── utils/                   # Shared utility functions
+├── pkg/                         # Shared packages
+│   ├── db/                      # Database operations
+│   ├── lnd/                     # Lightning Network client
+│   └── utils/                   # Utility functions
+├── scripts/                     # Automation scripts
+│   ├── deploy.sh                # Production deployment
+│   ├── install-services.sh      # Systemd service installer
+│   ├── start-dashboard.sh       # Development dashboard starter
+│   └── telegram-alerts.sh       # Legacy bash monitoring
+├── systemd/                     # Service templates
+│   ├── bitcoin-dashboard-api.service
+│   ├── bitcoin-dashboard-collector.service
+│   └── bitcoin-forwarding-collector.service
+├── web/static/                  # Web dashboard files
+├── configs/                     # Configuration files
 ├── bin/                         # Compiled binaries (after building)
 ├── data/                        # Runtime data storage
-├── .env                         # Configuration (not tracked by git)
-└── telegram-alerts.sh           # Legacy bash monitoring script
+└── .env                         # Configuration (not tracked by git)
 ```
 
 ## Build Targets
@@ -191,6 +288,8 @@ lightning-node-tools/
 **Primary:**
 - `make` or `make build` - Build all tools
 - `make dashboard` - Build dashboard components (collector + API)
+- `make deploy` - Stop services, build, restart services
+- `make install-services` - Install systemd service files
 - `make clean` - Remove build artifacts
 - `make help` - Show all available targets
 
@@ -199,6 +298,7 @@ lightning-node-tools/
 - `make telegram-monitor` - Build monitoring tool
 - `make dashboard-collector` - Build data collection service
 - `make dashboard-api` - Build web API server
+- `make forwarding-collector` - Build forwarding events collector
 - `make install` - Install tools to GOPATH/bin
 
 ## Troubleshooting
@@ -237,7 +337,7 @@ lightning-node-tools/
 **Mock Mode:** Test all features without a live Lightning node
 ```bash
 ./bin/dashboard-collector --mock --oneshot  # Generate sample data
-./start-dashboard.sh                        # View dashboard
+./scripts/start-dashboard.sh                        # View dashboard
 ```
 
 **Real Data:** Connect to your Lightning node

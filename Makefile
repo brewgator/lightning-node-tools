@@ -1,10 +1,10 @@
-.PHONY: build clean all channel-manager telegram-monitor dashboard-collector dashboard-api dashboard
+.PHONY: build clean all channel-manager telegram-monitor dashboard-collector dashboard-api forwarding-collector dashboard deploy install-services
 
 # Default target - build all tools
 all: build
 
 # Build all tools
-build: channel-manager telegram-monitor dashboard-collector dashboard-api
+build: channel-manager telegram-monitor dashboard-collector dashboard-api forwarding-collector
 
 # Build channel-manager
 channel-manager:
@@ -29,6 +29,12 @@ dashboard-api:
 	@echo "Building dashboard-api..."
 	@mkdir -p bin
 	go build -o bin/dashboard-api ./cmd/dashboard-api
+
+# Build forwarding-collector
+forwarding-collector:
+	@echo "Building forwarding-collector..."
+	@mkdir -p bin
+	go build -o bin/forwarding-collector ./cmd/forwarding-collector
 
 # Build and start complete dashboard (collector + api)
 dashboard: dashboard-collector dashboard-api
@@ -63,6 +69,16 @@ fmt:
 lint:
 	golangci-lint run
 
+# Install/update systemd service files
+install-services:
+	@echo "Installing systemd service files..."
+	./scripts/install-services.sh
+
+# Deploy: stop services, build, restart services
+deploy:
+	@echo "Deploying services..."
+	./scripts/deploy.sh
+
 # Show help
 help:
 	@echo "Available targets:"
@@ -71,7 +87,10 @@ help:
 	@echo "  telegram-monitor    - Build only telegram-monitor"
 	@echo "  dashboard-collector - Build only dashboard-collector"
 	@echo "  dashboard-api       - Build only dashboard-api"
+	@echo "  forwarding-collector - Build only forwarding-collector"
 	@echo "  dashboard           - Build complete dashboard"
+	@echo "  install-services    - Install/update systemd service files"
+	@echo "  deploy              - Stop services, build, restart services"
 	@echo "  clean              - Remove build artifacts"
 	@echo "  install            - Install tools to GOPATH/bin"
 	@echo "  test               - Run tests"

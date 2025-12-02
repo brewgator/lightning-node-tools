@@ -67,7 +67,7 @@ The project uses a modular architecture with shared packages for common function
 4. **Make the script executable**:
 
    ```bash
-   chmod +x telegram-alerts.sh
+   chmod +x scripts/telegram-alerts.sh
    ```
 
 5. **Create the data directory**:
@@ -508,13 +508,13 @@ You can still use the original bash script:
 1. **Run manually to test**:
 
    ```bash
-   ./telegram-alerts.sh
+   ./scripts/telegram-alerts.sh
    ```
 
 2. **Set up with cron**:
 
    ```bash
-   */2 * * * * /path/to/lightning-node-tools/telegram-alerts.sh >/dev/null 2>&1
+   */2 * * * * /path/to/lightning-node-tools/scripts/telegram-alerts.sh >/dev/null 2>&1
    ```
 
 ## What Gets Monitored
@@ -587,7 +587,7 @@ lightning-node-tools/
 │   └── last_uptime.txt          # Server uptime tracking
 ├── .env                         # Configuration (not tracked by git)
 ├── .env.example                 # Configuration template
-└── telegram-alerts.sh           # Legacy bash monitoring script
+└── scripts/telegram-alerts.sh           # Legacy bash monitoring script
 ```
 
 ## Troubleshooting
