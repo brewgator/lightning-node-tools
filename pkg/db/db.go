@@ -200,3 +200,90 @@ func (db *Database) GetLatestBalanceSnapshot() (*BalanceSnapshot, error) {
 	return &s, nil
 }
 
+// GetForwardingEventsFees retrieves forwarding fee data aggregated by day within a time range
+func (db *Database) GetForwardingEventsFees(from, to time.Time) ([]DailyFeeData, error) {
+	query := `
+		SELECT 
+			DATE(timestamp) as date,
+			SUM(fee) as total_fee,
+			COUNT(*) as forward_count
+		FROM forwarding_events 
+		WHERE timestamp BETWEEN ? AND ?
+		GROUP BY DATE(timestamp)
+		ORDER BY date ASC
+	`
+
+	rows, err := db.conn.Query(query, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var feeData []DailyFeeData
+	for rows.Next() {
+		var d DailyFeeData
+		err := rows.Scan(&d.Date, &d.TotalFee, &d.ForwardCount)
+		if err != nil {
+			return nil, err
+		}
+		feeData = append(feeData, d)
+	}
+
+	return feeData, rows.Err()
+}
+
+// InsertForwardingEvent inserts a new forwarding event
+func (db *Database) InsertForwardingEvent(event *ForwardingEvent) error {
+	query := `
+		INSERT INTO forwarding_events
+		(timestamp, channel_in_id, channel_out_id, amount_in, amount_out, fee)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := db.conn.Exec(query,
+		event.Timestamp,
+		event.ChannelInID,
+		event.ChannelOutID,
+		event.AmountIn,
+		event.AmountOut,
+		event.Fee,
+	)
+
+	return err
+}
+
+// InsertForwardingEventIgnoreDuplicate inserts a new forwarding event, ignoring duplicates
+func (db *Database) InsertForwardingEventIgnoreDuplicate(event *ForwardingEvent) error {
+	// Check if event already exists (same timestamp, channel_in_id, channel_out_id)
+	checkQuery := `
+		SELECT id FROM forwarding_events 
+		WHERE timestamp = ? AND channel_in_id = ? AND channel_out_id = ?
+		LIMIT 1
+	`
+	
+	var existingID int64
+	err := db.conn.QueryRow(checkQuery, event.Timestamp, event.ChannelInID, event.ChannelOutID).Scan(&existingID)
+	if err == nil {
+		// Event already exists, ignore
+		return nil
+	}
+
+	// Insert the new event
+	insertQuery := `
+		INSERT INTO forwarding_events
+		(timestamp, channel_in_id, channel_out_id, amount_in, amount_out, fee)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+
+	_, err = db.conn.Exec(insertQuery,
+		event.Timestamp,
+		event.ChannelInID,
+		event.ChannelOutID,
+		event.AmountIn,
+		event.AmountOut,
+		event.Fee,
+	)
+
+	return err
+}
+
