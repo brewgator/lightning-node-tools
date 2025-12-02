@@ -35,4 +35,3 @@ echo "Press Ctrl+C to stop..."
 
 # Start the API server (this will also serve static files)
 ./bin/dashboard-api
-

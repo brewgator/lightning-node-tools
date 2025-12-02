@@ -234,4 +234,3 @@ fi
 
 # Update state file
 echo "{\"channels\": $CURRENT_CHANNELS, \"pending_open\": $CURRENT_PENDING, \"pending_close\": $CURRENT_CLOSING, \"invoices\": $CURRENT_INVOICES, \"forwards\": $RECENT_FORWARDS, \"onchain_balance\": $CURRENT_ONCHAIN, \"local_balance\": $CURRENT_TOTAL_LOCAL, \"remote_balance\": $CURRENT_TOTAL_REMOTE, \"total_balance\": $CURRENT_TOTAL_ALL}" >"$STATE_FILE"
-

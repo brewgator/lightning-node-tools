@@ -3,7 +3,7 @@
 # Bitcoin Lightning Node Tools - Service Installation Script
 # Installs or updates systemd service files
 
-set -e  # Exit on any error
+set -e # Exit on any error
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SYSTEMD_DIR="${PROJECT_ROOT}/systemd"
@@ -30,25 +30,25 @@ for template_file in "${SYSTEMD_DIR}"/*.service; do
     if [ ! -f "${template_file}" ]; then
         continue
     fi
-    
+
     service_name=$(basename "${template_file}")
     temp_file="/tmp/${service_name}"
-    
+
     echo ""
     echo "📝 Processing ${service_name}..."
-    
+
     # Replace template variables
     sed -e "s|{{USER}}|${CURRENT_USER}|g" \
         -e "s|{{WORKING_DIRECTORY}}|${PROJECT_ROOT}|g" \
-        "${template_file}" > "${temp_file}"
-    
+        "${template_file}" >"${temp_file}"
+
     # Copy to systemd directory
     echo "  📋 Installing to /etc/systemd/system/${service_name}"
     sudo cp "${temp_file}" "/etc/systemd/system/${service_name}"
-    
+
     # Clean up temp file
     rm "${temp_file}"
-    
+
     echo "  ✅ ${service_name} installed"
 done
 
@@ -64,7 +64,7 @@ for template_file in "${SYSTEMD_DIR}"/*.service; do
     if [ ! -f "${template_file}" ]; then
         continue
     fi
-    
+
     service_name=$(basename "${template_file}")
     echo "  Enabling ${service_name}..."
     sudo systemctl enable "${service_name}"
@@ -76,3 +76,4 @@ echo ""
 echo "💡 Next steps:"
 echo "  - Run './scripts/deploy.sh' to build and start services"
 echo "  - Check logs with: sudo journalctl -u bitcoin-dashboard-api -f"
+

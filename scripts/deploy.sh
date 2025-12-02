@@ -3,7 +3,7 @@
 # Bitcoin Lightning Node Tools - Deployment Script
 # Stops services, builds binaries, and restarts services
 
-set -e  # Exit on any error
+set -e # Exit on any error
 
 # Configuration
 SERVICES=(
@@ -47,10 +47,10 @@ cd "${PROJECT_ROOT}"
 for binary_info in "${BINARIES[@]}"; do
     binary_name=$(echo "${binary_info}" | cut -d: -f1)
     source_path=$(echo "${binary_info}" | cut -d: -f2)
-    
+
     echo "  Building ${binary_name}..."
     go build -o "${BIN_DIR}/${binary_name}" "./${source_path}"
-    
+
     if [ -f "${BIN_DIR}/${binary_name}" ]; then
         echo "    ✅ ${binary_name} built successfully"
     else
@@ -65,10 +65,10 @@ echo "▶️  Starting services..."
 for service in "${SERVICES[@]}"; do
     echo "  Starting ${service}..."
     sudo systemctl start "${service}"
-    
+
     # Wait a moment for service to start
     sleep 2
-    
+
     if systemctl is-active --quiet "${service}"; then
         echo "    ✅ ${service} started successfully"
     else
