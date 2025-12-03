@@ -38,7 +38,7 @@ When mock mode is enabled:
 # Generate mock historical data
 ./bin/forwarding-collector --catchup --days=30 --mock
 
-# Run continuous mock collection  
+# Run continuous mock collection
 ./bin/forwarding-collector --mock --interval=5m
 ```
 
@@ -81,7 +81,7 @@ You can verify data isolation by checking API responses:
 # Real data API (if available)
 curl http://localhost:8080/api/portfolio/current
 
-# Mock data API  
+# Mock data API
 curl http://localhost:8081/api/portfolio/current
 ```
 
@@ -91,7 +91,7 @@ The responses will show different timestamps and data, confirming isolation.
 
 ### Regular Tables:
 - `balance_snapshots`
-- `forwarding_events` 
+- `forwarding_events`
 - `channel_snapshots`
 - `onchain_addresses`
 - `address_balances`
@@ -100,7 +100,7 @@ The responses will show different timestamps and data, confirming isolation.
 ### Mock Tables:
 - `balance_snapshots_mock`
 - `forwarding_events_mock`
-- `channel_snapshots_mock` 
+- `channel_snapshots_mock`
 - `onchain_addresses_mock`
 - `address_balances_mock`
 - `cold_storage_entries_mock`
@@ -108,7 +108,7 @@ The responses will show different timestamps and data, confirming isolation.
 ## Benefits
 
 1. **Safe Testing**: No risk of corrupting real Lightning node data
-2. **Parallel Development**: Run real and mock systems simultaneously  
+2. **Parallel Development**: Run real and mock systems simultaneously
 3. **Demonstrations**: Show features without requiring live Lightning infrastructure
 4. **Development**: Test new features with controlled data sets
 5. **CI/CD**: Run tests with mock data in automated environments

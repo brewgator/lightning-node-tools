@@ -6,7 +6,7 @@ This directory contains GitHub Actions workflows for continuous integration and 
 
 ### 1. `test.yml` - Basic Test Workflow
 - **Triggers**: Push to `main`/`develop` branches, PRs to `main`
-- **Actions**: 
+- **Actions**:
   - Checkout code
   - Set up Go 1.21
   - Install dependencies
@@ -14,11 +14,11 @@ This directory contains GitHub Actions workflows for continuous integration and 
   - Run tests with coverage
   - Build all components
 
-### 2. `ci.yml` - Comprehensive CI Pipeline  
+### 2. `ci.yml` - Comprehensive CI Pipeline
 - **Triggers**: Push to `main`/`develop` branches, PRs to `main`
 - **Go Versions**: Tests against Go 1.20 and 1.21
 - **Actions**:
-  - **Test Job**: 
+  - **Test Job**:
     - Dependency verification
     - Unit tests
     - Race condition detection
@@ -40,7 +40,7 @@ make fmt
 # Run all tests
 make test
 
-# Run tests with race detection  
+# Run tests with race detection
 make test-race
 
 # Run tests with coverage
@@ -69,19 +69,19 @@ fi
 
 ### 1. `test.yml` - Basic Test Workflow ⚡
 **Recommended for most users** - Simple, fast, reliable
-- Single Go version (1.25.0)
+- Single Go version (1.21)
 - Basic tests, coverage, and build
 - Codecov integration
 
-### 2. `simple-ci.yml` - Multi-Version CI 🔧  
+### 2. `simple-ci.yml` - Multi-Version CI 🔧
 **Good balance of speed and coverage**
-- Tests against Go 1.24 and 1.25  
+- Tests against Go 1.20 and 1.21
 - Includes formatting, vetting, race detection
 - No external linter dependencies
 
 ### 3. `ci.yml` - Full CI Pipeline 🚀
 **Most comprehensive** - May need tuning for specific environments
-- Multi-version matrix testing (Go 1.24 & 1.25)
+- Multi-version matrix testing (Go 1.20 & 1.21)
 - Advanced linting and security checks
 - All quality gates enabled
 

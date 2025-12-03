@@ -158,7 +158,7 @@ help:
 	@echo "  install            - Install tools to GOPATH/bin"
 	@echo "  test               - Run all tests"
 	@echo "  test-verbose       - Run tests with verbose output"
-	@echo "  test-coverage      - Run tests with coverage report (Go 1.25 compatible)"
+	@echo "  test-coverage      - Run tests with coverage report (Go 1.22 compatible)"
 	@echo "  test-coverage-compat - Run tests with coverage (fallback for older Go versions)"
 	@echo "  test-unit          - Run unit tests only"
 	@echo "  test-integration   - Run integration tests only"
