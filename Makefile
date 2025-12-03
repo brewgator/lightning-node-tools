@@ -67,6 +67,14 @@ test-verbose:
 
 # Run tests with coverage
 test-coverage:
+	@echo "Running tests with coverage..."
+	@# Only test packages that have test files
+	go test -v -coverprofile=coverage.out ./pkg/db ./cmd/dashboard-api ./cmd/dashboard-collector ./cmd/forwarding-collector
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# Run tests with coverage (compatible mode for older Go versions)
+test-coverage-compat:
 	go test -v -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
@@ -150,7 +158,8 @@ help:
 	@echo "  install            - Install tools to GOPATH/bin"
 	@echo "  test               - Run all tests"
 	@echo "  test-verbose       - Run tests with verbose output"
-	@echo "  test-coverage      - Run tests with coverage report"
+	@echo "  test-coverage      - Run tests with coverage report (Go 1.25 compatible)"
+	@echo "  test-coverage-compat - Run tests with coverage (fallback for older Go versions)"
 	@echo "  test-unit          - Run unit tests only"
 	@echo "  test-integration   - Run integration tests only"
 	@echo "  test-api           - Run API tests only"
