@@ -35,7 +35,7 @@ echo "🧪 Running tests..."
 make test
 echo "✅ Tests passed"
 
-# Test with race detection  
+# Test with race detection
 echo "🏃 Testing with race detection..."
 make test-race
 echo "✅ Race detection tests passed"

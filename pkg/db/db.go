@@ -42,7 +42,10 @@ func (db *Database) IsMockMode() bool {
 	return db.mockMode
 }
 
-// getTableName returns the appropriate table name based on mock mode
+// getTableName returns the appropriate table name based on mock mode.
+// SECURITY NOTE: baseName must ONLY be hardcoded string literals, never user input.
+// The mockMode flag is an internal boolean set at database initialization.
+// This function is safe because it only uses validated, internal parameters.
 func (db *Database) getTableName(baseName string) string {
 	if db.mockMode {
 		return baseName + "_mock"
