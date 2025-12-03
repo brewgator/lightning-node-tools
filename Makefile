@@ -1,4 +1,4 @@
-.PHONY: build clean all channel-manager telegram-monitor dashboard-collector dashboard-api forwarding-collector dashboard deploy install-services
+.PHONY: build clean all channel-manager telegram-monitor dashboard-collector dashboard-api forwarding-collector dashboard deploy install-services test test-verbose test-coverage test-unit test-integration test-api test-collector test-forwarding test-db test-utils test-race test-clean
 
 # Default target - build all tools
 all: build
@@ -57,9 +57,52 @@ install: build
 	go install ./cmd/dashboard-collector
 	go install ./cmd/dashboard-api
 
-# Run tests (if any exist)
+# Run tests
 test:
 	go test ./...
+
+# Run tests with verbose output
+test-verbose:
+	go test -v ./...
+
+# Run tests with coverage
+test-coverage:
+	go test -v -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# Run unit tests only (exclude integration tests)
+test-unit:
+	go test -short ./...
+
+# Run integration tests only
+test-integration:
+	go test -run Integration ./test/...
+
+# Run specific package tests
+test-api:
+	go test -v ./cmd/dashboard-api/...
+
+test-collector:
+	go test -v ./cmd/dashboard-collector/...
+
+test-forwarding:
+	go test -v ./cmd/forwarding-collector/...
+
+test-db:
+	go test -v ./pkg/db/...
+
+test-utils:
+	go test -v ./pkg/testutils/...
+
+# Run tests with race detection
+test-race:
+	go test -race ./...
+
+# Clean test artifacts
+test-clean:
+	rm -f coverage.out coverage.html
+	go clean -testcache
 
 # Format code
 fmt:
@@ -93,7 +136,17 @@ help:
 	@echo "  deploy              - Stop services, build, restart services"
 	@echo "  clean              - Remove build artifacts"
 	@echo "  install            - Install tools to GOPATH/bin"
-	@echo "  test               - Run tests"
+	@echo "  test               - Run all tests"
+	@echo "  test-verbose       - Run tests with verbose output"
+	@echo "  test-coverage      - Run tests with coverage report"
+	@echo "  test-unit          - Run unit tests only"
+	@echo "  test-integration   - Run integration tests only"
+	@echo "  test-api           - Run API tests only"
+	@echo "  test-collector     - Run collector tests only"
+	@echo "  test-forwarding    - Run forwarding tests only"
+	@echo "  test-db            - Run database tests only"
+	@echo "  test-race          - Run tests with race detection"
+	@echo "  test-clean         - Clean test artifacts"
 	@echo "  fmt                - Format code"
 	@echo "  lint               - Lint code (requires golangci-lint)"
 	@echo "  help               - Show this help"

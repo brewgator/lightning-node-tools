@@ -121,4 +121,3 @@ func displayChannel(channel Channel) {
 
 	fmt.Println()
 }
-

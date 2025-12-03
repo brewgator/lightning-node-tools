@@ -85,4 +85,3 @@ type DailyFeeData struct {
 	TotalFee     int64  `json:"total_fee" db:"total_fee"`
 	ForwardCount int64  `json:"forward_count" db:"forward_count"`
 }
-

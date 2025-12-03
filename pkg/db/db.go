@@ -9,22 +9,50 @@ import (
 )
 
 type Database struct {
-	conn *sql.DB
+	conn     *sql.DB
+	mockMode bool
 }
 
 // NewDatabase creates a new database connection and initializes tables
 func NewDatabase(dbPath string) (*Database, error) {
+	return NewDatabaseWithMockMode(dbPath, false)
+}
+
+// NewDatabaseWithMockMode creates a new database connection with mock mode option
+func NewDatabaseWithMockMode(dbPath string, mockMode bool) (*Database, error) {
 	conn, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	db := &Database{conn: conn}
+	db := &Database{
+		conn:     conn,
+		mockMode: mockMode,
+	}
+
 	if err := db.initTables(); err != nil {
 		return nil, fmt.Errorf("failed to initialize tables: %w", err)
 	}
 
 	return db, nil
+}
+
+// IsMockMode returns true if the database is running in mock mode
+func (db *Database) IsMockMode() bool {
+	return db.mockMode
+}
+
+// getTableName returns the appropriate table name based on mock mode
+func (db *Database) getTableName(baseName string) string {
+	if db.mockMode {
+		return baseName + "_mock"
+	}
+	return baseName
+}
+
+// GetTableName returns the appropriate table name based on mock mode (public for testing)
+func (db *Database) GetTableName(baseName string) string {
+	return db.getTableName(baseName)
 }
 
 // Close closes the database connection
@@ -35,6 +63,7 @@ func (db *Database) Close() error {
 // initTables creates all required tables
 func (db *Database) initTables() error {
 	queries := []string{
+		// Real data tables
 		`CREATE TABLE IF NOT EXISTS balance_snapshots (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			timestamp DATETIME NOT NULL,
@@ -104,6 +133,77 @@ func (db *Database) initTables() error {
 			last_updated DATETIME NOT NULL,
 			notes TEXT
 		);`,
+
+		// Mock data tables (identical structure with _mock suffix)
+		`CREATE TABLE IF NOT EXISTS balance_snapshots_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			timestamp DATETIME NOT NULL,
+			lightning_local INTEGER NOT NULL DEFAULT 0,
+			lightning_remote INTEGER NOT NULL DEFAULT 0,
+			onchain_confirmed INTEGER NOT NULL DEFAULT 0,
+			onchain_unconfirmed INTEGER NOT NULL DEFAULT 0,
+			tracked_addresses INTEGER NOT NULL DEFAULT 0,
+			cold_storage INTEGER NOT NULL DEFAULT 0,
+			total_portfolio INTEGER NOT NULL DEFAULT 0,
+			total_liquid INTEGER NOT NULL DEFAULT 0,
+			UNIQUE(timestamp)
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_balance_snapshots_mock_timestamp ON balance_snapshots_mock(timestamp);`,
+
+		`CREATE TABLE IF NOT EXISTS channel_snapshots_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			timestamp DATETIME NOT NULL,
+			channel_id TEXT NOT NULL,
+			capacity INTEGER NOT NULL,
+			local_balance INTEGER NOT NULL,
+			remote_balance INTEGER NOT NULL,
+			active BOOLEAN NOT NULL,
+			peer_alias TEXT,
+			fee_ppm INTEGER,
+			base_fee INTEGER
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_channel_snapshots_mock_timestamp ON channel_snapshots_mock(timestamp);`,
+		`CREATE INDEX IF NOT EXISTS idx_channel_snapshots_mock_channel_id ON channel_snapshots_mock(channel_id);`,
+
+		`CREATE TABLE IF NOT EXISTS forwarding_events_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			timestamp DATETIME NOT NULL,
+			channel_in_id TEXT NOT NULL,
+			channel_out_id TEXT NOT NULL,
+			amount_in INTEGER NOT NULL,
+			amount_out INTEGER NOT NULL,
+			fee INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_forwarding_events_mock_timestamp ON forwarding_events_mock(timestamp);`,
+
+		`CREATE TABLE IF NOT EXISTS onchain_addresses_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			address TEXT UNIQUE NOT NULL,
+			label TEXT,
+			active BOOLEAN NOT NULL DEFAULT 1
+		);`,
+
+		`CREATE TABLE IF NOT EXISTS address_balances_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			address_id INTEGER NOT NULL,
+			timestamp DATETIME NOT NULL,
+			balance INTEGER NOT NULL,
+			tx_count INTEGER NOT NULL,
+			FOREIGN KEY(address_id) REFERENCES onchain_addresses_mock(id)
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_address_balances_mock_timestamp ON address_balances_mock(timestamp);`,
+
+		`CREATE TABLE IF NOT EXISTS cold_storage_entries_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT UNIQUE NOT NULL,
+			balance INTEGER NOT NULL,
+			last_updated DATETIME NOT NULL,
+			notes TEXT
+		);`,
 	}
 
 	for _, query := range queries {
@@ -118,12 +218,13 @@ func (db *Database) initTables() error {
 // InsertBalanceSnapshot inserts a new balance snapshot.
 // If a snapshot with the same timestamp already exists, it will be replaced due to the use of INSERT OR REPLACE.
 func (db *Database) InsertBalanceSnapshot(snapshot *BalanceSnapshot) error {
-	query := `
-		INSERT OR REPLACE INTO balance_snapshots
+	tableName := db.getTableName("balance_snapshots")
+	query := fmt.Sprintf(`
+		INSERT OR REPLACE INTO %s
 		(timestamp, lightning_local, lightning_remote, onchain_confirmed, onchain_unconfirmed,
 		 tracked_addresses, cold_storage, total_portfolio, total_liquid)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
+	`, tableName)
 
 	_, err := db.conn.Exec(query,
 		snapshot.Timestamp,
@@ -142,13 +243,14 @@ func (db *Database) InsertBalanceSnapshot(snapshot *BalanceSnapshot) error {
 
 // GetBalanceSnapshots retrieves balance snapshots within a time range
 func (db *Database) GetBalanceSnapshots(from, to time.Time) ([]BalanceSnapshot, error) {
-	query := `
+	tableName := db.getTableName("balance_snapshots")
+	query := fmt.Sprintf(`
 		SELECT id, timestamp, lightning_local, lightning_remote, onchain_confirmed,
 		       onchain_unconfirmed, tracked_addresses, cold_storage, total_portfolio, total_liquid
-		FROM balance_snapshots
+		FROM %s
 		WHERE timestamp BETWEEN ? AND ?
 		ORDER BY timestamp ASC
-	`
+	`, tableName)
 
 	rows, err := db.conn.Query(query, from, to)
 	if err != nil {
@@ -175,13 +277,14 @@ func (db *Database) GetBalanceSnapshots(from, to time.Time) ([]BalanceSnapshot, 
 
 // GetLatestBalanceSnapshot retrieves the most recent balance snapshot
 func (db *Database) GetLatestBalanceSnapshot() (*BalanceSnapshot, error) {
-	query := `
+	tableName := db.getTableName("balance_snapshots")
+	query := fmt.Sprintf(`
 		SELECT id, timestamp, lightning_local, lightning_remote, onchain_confirmed,
 		       onchain_unconfirmed, tracked_addresses, cold_storage, total_portfolio, total_liquid
-		FROM balance_snapshots
+		FROM %s
 		ORDER BY timestamp DESC
 		LIMIT 1
-	`
+	`, tableName)
 
 	var s BalanceSnapshot
 	err := db.conn.QueryRow(query).Scan(
@@ -202,16 +305,17 @@ func (db *Database) GetLatestBalanceSnapshot() (*BalanceSnapshot, error) {
 
 // GetForwardingEventsFees retrieves forwarding fee data aggregated by day within a time range
 func (db *Database) GetForwardingEventsFees(from, to time.Time) ([]DailyFeeData, error) {
-	query := `
+	tableName := db.getTableName("forwarding_events")
+	query := fmt.Sprintf(`
 		SELECT 
 			DATE(timestamp) as date,
 			SUM(fee) as total_fee,
 			COUNT(*) as forward_count
-		FROM forwarding_events 
+		FROM %s 
 		WHERE timestamp BETWEEN ? AND ?
 		GROUP BY DATE(timestamp)
 		ORDER BY date ASC
-	`
+	`, tableName)
 
 	rows, err := db.conn.Query(query, from, to)
 	if err != nil {
@@ -234,11 +338,12 @@ func (db *Database) GetForwardingEventsFees(from, to time.Time) ([]DailyFeeData,
 
 // InsertForwardingEvent inserts a new forwarding event
 func (db *Database) InsertForwardingEvent(event *ForwardingEvent) error {
-	query := `
-		INSERT INTO forwarding_events
+	tableName := db.getTableName("forwarding_events")
+	query := fmt.Sprintf(`
+		INSERT INTO %s
 		(timestamp, channel_in_id, channel_out_id, amount_in, amount_out, fee)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`
+	`, tableName)
 
 	_, err := db.conn.Exec(query,
 		event.Timestamp,
@@ -254,13 +359,15 @@ func (db *Database) InsertForwardingEvent(event *ForwardingEvent) error {
 
 // InsertForwardingEventIgnoreDuplicate inserts a new forwarding event, ignoring duplicates
 func (db *Database) InsertForwardingEventIgnoreDuplicate(event *ForwardingEvent) error {
+	tableName := db.getTableName("forwarding_events")
+
 	// Check if event already exists (same timestamp, channel_in_id, channel_out_id)
-	checkQuery := `
-		SELECT id FROM forwarding_events 
+	checkQuery := fmt.Sprintf(`
+		SELECT id FROM %s 
 		WHERE timestamp = ? AND channel_in_id = ? AND channel_out_id = ?
 		LIMIT 1
-	`
-	
+	`, tableName)
+
 	var existingID int64
 	err := db.conn.QueryRow(checkQuery, event.Timestamp, event.ChannelInID, event.ChannelOutID).Scan(&existingID)
 	if err == nil {
@@ -269,11 +376,11 @@ func (db *Database) InsertForwardingEventIgnoreDuplicate(event *ForwardingEvent)
 	}
 
 	// Insert the new event
-	insertQuery := `
-		INSERT INTO forwarding_events
+	insertQuery := fmt.Sprintf(`
+		INSERT INTO %s
 		(timestamp, channel_in_id, channel_out_id, amount_in, amount_out, fee)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`
+	`, tableName)
 
 	_, err = db.conn.Exec(insertQuery,
 		event.Timestamp,
@@ -286,4 +393,3 @@ func (db *Database) InsertForwardingEventIgnoreDuplicate(event *ForwardingEvent)
 
 	return err
 }
-
