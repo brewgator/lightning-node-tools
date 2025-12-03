@@ -69,19 +69,19 @@ fi
 
 ### 1. `test.yml` - Basic Test Workflow ⚡
 **Recommended for most users** - Simple, fast, reliable
-- Single Go version (1.21)
+- Single Go version (1.25.0)
 - Basic tests, coverage, and build
 - Codecov integration
 
 ### 2. `simple-ci.yml` - Multi-Version CI 🔧  
 **Good balance of speed and coverage**
-- Tests against Go 1.20 and 1.21  
+- Tests against Go 1.24 and 1.25  
 - Includes formatting, vetting, race detection
 - No external linter dependencies
 
 ### 3. `ci.yml` - Full CI Pipeline 🚀
 **Most comprehensive** - May need tuning for specific environments
-- Multi-version matrix testing
+- Multi-version matrix testing (Go 1.24 & 1.25)
 - Advanced linting and security checks
 - All quality gates enabled
 
