@@ -1,21 +1,21 @@
 run:
   timeout: 5m
   tests: true
+  go: '1.21'
 
 linters-settings:
   govet:
-    check-shadowing: true
-  golint:
-    min-confidence: 0.8
+    enable:
+      - shadow
   gocyclo:
     min-complexity: 15
-  maligned:
-    suggest-new: true
   dupl:
     threshold: 100
   goconst:
     min-len: 2
     min-occurrences: 2
+  lll:
+    line-length: 120
 
 linters:
   disable-all: true
@@ -36,8 +36,8 @@ linters:
     - unparam
     - nakedret
     - prealloc
-    - scopelint
     - gocritic
+    - revive
 
 issues:
   exclude-rules:
@@ -53,6 +53,3 @@ issues:
     - text: "weak cryptographic primitive"
       linters:
         - gosec
-    - text: "ST1003:"
-      linters:
-        - stylecheck

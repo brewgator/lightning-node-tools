@@ -1,0 +1,64 @@
+name: Simple CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    name: Test and Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.20', '1.21']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+        cache: true
+        cache-dependency-path: go.sum
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Check formatting
+      run: |
+        unformatted=$(gofmt -s -l .)
+        if [ -n "$unformatted" ]; then
+          echo "The following files need formatting:"
+          echo "$unformatted"
+          exit 1
+        fi
+
+    - name: Vet code
+      run: go vet ./...
+
+    - name: Run tests
+      run: make test
+
+    - name: Run tests with race detection
+      run: make test-race
+
+    - name: Build all components
+      run: make build
+
+    - name: Generate test coverage
+      if: matrix.go-version == '1.21'
+      run: make test-coverage
+
+    - name: Upload coverage to Codecov
+      if: matrix.go-version == '1.21'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        fail_ci_if_error: false

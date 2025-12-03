@@ -8,15 +8,22 @@ on:
 
 jobs:
   test:
+    name: Test and Build
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
     
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
+        cache: true
+        cache-dependency-path: go.sum
+    
+    - name: Verify dependencies
+      run: go mod verify
     
     - name: Install dependencies
       run: go mod download
@@ -29,3 +36,10 @@ jobs:
     
     - name: Build all components
       run: make build
+      
+    - name: Upload coverage reports to Codecov
+      if: success()
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        fail_ci_if_error: false

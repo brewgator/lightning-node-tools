@@ -65,11 +65,35 @@ fi
 - **Go modules**: Dependencies managed via `go.mod`
 - **Test coverage**: Reports generated as `coverage.html`
 
+## Available Workflows
+
+### 1. `test.yml` - Basic Test Workflow ⚡
+**Recommended for most users** - Simple, fast, reliable
+- Single Go version (1.21)
+- Basic tests, coverage, and build
+- Codecov integration
+
+### 2. `simple-ci.yml` - Multi-Version CI 🔧  
+**Good balance of speed and coverage**
+- Tests against Go 1.20 and 1.21  
+- Includes formatting, vetting, race detection
+- No external linter dependencies
+
+### 3. `ci.yml` - Full CI Pipeline 🚀
+**Most comprehensive** - May need tuning for specific environments
+- Multi-version matrix testing
+- Advanced linting and security checks
+- All quality gates enabled
+
+## Recommended Approach
+
+Start with `test.yml` for basic CI, then enable `simple-ci.yml` for more comprehensive testing. Use `ci.yml` only if you need the most thorough checks.
+
 ## Status Badges
 
-Add these badges to your README.md:
+Add these badges to your main README.md:
 
 ```markdown
 [![Test](https://github.com/your-username/lightning-node-tools/actions/workflows/test.yml/badge.svg)](https://github.com/your-username/lightning-node-tools/actions/workflows/test.yml)
-[![CI](https://github.com/your-username/lightning-node-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/lightning-node-tools/actions/workflows/ci.yml)
+[![Simple CI](https://github.com/your-username/lightning-node-tools/actions/workflows/simple-ci.yml/badge.svg)](https://github.com/your-username/lightning-node-tools/actions/workflows/simple-ci.yml)
 ```

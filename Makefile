@@ -122,6 +122,18 @@ deploy:
 	@echo "Deploying services..."
 	./scripts/deploy.sh
 
+# Validate CI pipeline locally
+validate-ci:
+	./scripts/validate-ci.sh
+
+# Install pre-commit hook for CI validation
+install-pre-commit-hook:
+	./scripts/install-pre-commit-hook.sh
+
+# Verify code is ready for CI
+ci-ready: fmt test test-race build
+	@echo "✅ Code is CI-ready!"
+
 # Show help
 help:
 	@echo "Available targets:"
@@ -149,4 +161,7 @@ help:
 	@echo "  test-clean         - Clean test artifacts"
 	@echo "  fmt                - Format code"
 	@echo "  lint               - Lint code (requires golangci-lint)"
+	@echo "  validate-ci        - Validate CI pipeline locally"
+	@echo "  install-pre-commit-hook - Install pre-commit hook for CI validation"
+	@echo "  ci-ready           - Verify code is ready for CI"
 	@echo "  help               - Show this help"
