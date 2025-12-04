@@ -29,11 +29,10 @@ type APIResponse struct {
 }
 
 func getVersion() string {
-	// Try to get git commit hash
-	if cmd := exec.Command("git", "rev-parse", "--short", "HEAD"); cmd.Dir == "." {
-		if output, err := cmd.Output(); err == nil {
-			return strings.TrimSpace(string(output))
-		}
+	// Use absolute path to git and set working directory
+	cmd := exec.Command("/usr/bin/git", "rev-parse", "--short", "HEAD")
+	if output, err := cmd.Output(); err == nil {
+		return strings.TrimSpace(string(output))
 	}
 	return "unknown"
 }

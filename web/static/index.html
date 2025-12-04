@@ -758,7 +758,7 @@
                 const response = await fetch('/api/version');
                 const data = await response.json();
                 if (data.success && data.data.version) {
-                    document.getElementById('version-info').textContent = `v${data.data.version}`;
+                    document.getElementById('version-info').textContent = `${data.data.version}`;
                 } else {
                     document.getElementById('version-info').textContent = 'unknown';
                 }
@@ -775,7 +775,7 @@
     <!-- Version Footer -->
     <footer style="text-align: center; padding: 20px; margin-top: 40px; border-top: 1px solid #30363d; color: #8b949e; font-size: 0.85em;">
         <div>
-            Lightning Node Tools 
+            Lightning Node Tools
             <span id="version-info">loading...</span>
         </div>
     </footer>
