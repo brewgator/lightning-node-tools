@@ -1,0 +1,41 @@
+[Unit]
+Description=Lightning Node Tools Webhook Deployer
+Documentation=https://github.com/brewgator/lightning-node-tools
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=lightning
+Group=lightning
+WorkingDirectory=/opt/lightning-node-tools
+ExecStart=/opt/lightning-node-tools/bin/webhook-deployer \
+  --port=9000 \
+  --repo=/opt/lightning-node-tools \
+  --branch=main \
+  --script=./scripts/auto-deploy.sh
+
+# Environment variables
+Environment=WEBHOOK_SECRET_FILE=/opt/lightning-node-tools/secrets/webhook.secret
+EnvironmentFile=-/opt/lightning-node-tools/.env
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/lightning-node-tools /var/log /tmp
+
+# Restart policy
+Restart=always
+RestartSec=5
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=webhook-deployer
+
+[Install]
+WantedBy=multi-user.target
