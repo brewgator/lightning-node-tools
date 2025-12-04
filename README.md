@@ -73,40 +73,94 @@ Advanced Lightning channel management with smart fee optimization.
 
 GitHub webhook-based auto-deployment system for production servers.
 
-**Setup:**
-```bash
-# One-command server setup
-sudo ./scripts/setup-auto-deploy.sh
+### Quick Setup
 
-# Configure GitHub webhook:
-# URL: http://YOUR_SERVER_IP:9000/webhook
-# Secret: (displayed by setup script)
+**1. Server Setup:**
+```bash
+# One-command installation
+sudo ./scripts/setup-auto-deploy.sh
 ```
 
-**Features:**
-- ✅ HMAC-SHA256 webhook verification
-- ✅ Automatic git pull, test, build, restart
-- ✅ Rollback on failure with health checks
-- ✅ Systemd service management
-- ✅ Comprehensive logging and monitoring
+**2. GitHub Webhook:**
+- Go to repo **Settings → Webhooks → Add webhook**
+- **Payload URL**: `http://YOUR_SERVER_IP:9000/webhook`  
+- **Content type**: `application/json`
+- **Secret**: (copy from setup script output)
+- **Events**: "Just the push event"
+
+**3. Test Deployment:**
+```bash
+# Health check
+curl http://YOUR_SERVER_IP:9000/health
+
+# Full test suite
+sudo ./scripts/test-webhook.sh all
+```
+
+### Features
+- ✅ **HMAC-SHA256 verification** - Only authentic GitHub webhooks accepted
+- ✅ **Automatic deployment** - Pull, test, build, restart on main branch push
+- ✅ **Rollback protection** - Automatic rollback on failure
+- ✅ **Health monitoring** - Service verification and status endpoints
+- ✅ **Security hardening** - Dedicated user, restricted permissions
+
+### Deployment Process
+When you push to `main`:
+1. **GitHub webhook** → Your server receives HMAC-verified request
+2. **Backup created** → Current version saved for rollback
+3. **Code updated** → `git pull` latest changes  
+4. **Testing** → `make test` ensures quality
+5. **Building** → `make build` compiles binaries
+6. **Service restart** → All Lightning services restarted
+7. **Health checks** → Verify services are healthy
+8. **Rollback** → Automatic rollback if any step fails
+
+### Service Management
+```bash
+# Check webhook service
+sudo systemctl status webhook-deployer
+sudo journalctl -u webhook-deployer -f
+
+# Monitor deployments
+tail -f /var/log/lightning-deploy.log
+
+# Test webhook manually
+sudo ./scripts/test-webhook.sh webhook
+```
 
 ## 🧪 Testing & CI/CD
 
-**Local Testing:**
+### Local Development
+**Before pushing code:**
 ```bash
-make test                    # Run all tests
-make test-race              # Race condition detection
 make ci-ready               # Full CI validation
+make test                   # Run all tests
+make test-race             # Race condition detection
+make fmt                   # Format code
 
 # Mock mode testing
-make test-mock              # Test with mock data
+make test-mock             # Test with mock data
 ```
 
-**CI/CD:**
-- ✅ GitHub Actions with Go 1.24 & 1.25
-- ✅ Automated testing, formatting, security checks
-- ✅ Coverage reporting and quality gates
-- ✅ Auto-deployment on main branch pushes
+### GitHub Actions Workflows
+**Available workflows:**
+- **`test.yml`** ⚡ - Basic CI (recommended) - Single Go version, fast
+- **`simple-ci.yml`** 🔧 - Multi-version testing - Go 1.24 & 1.25 matrix
+- **`ci.yml`** 🚀 - Full pipeline - Advanced linting and security
+- **`deploy.yml`** 🚀 - Auto-deployment coordination with webhooks
+
+**Quality Gates:**
+- ✅ Code formatting (gofmt)
+- ✅ Code quality (go vet)  
+- ✅ Unit tests with race detection
+- ✅ Build verification
+- ✅ Coverage reporting with Codecov
+- ✅ Multi-version Go compatibility (1.24 & 1.25)
+
+**Auto-deployment:**
+- ✅ Tests must pass before deployment
+- ✅ Automatic rollback on failure
+- ✅ Health verification after deployment
 
 ## 📱 Telegram Monitor
 
