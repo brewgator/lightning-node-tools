@@ -93,6 +93,11 @@ jobs:
     if: needs.test-before-deploy.outputs.should_deploy == 'true'
     
     steps:
+    - name: Connect to Tailscale
+      uses: tailscale/github-action@v2
+      with:
+        authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+        
     - name: Trigger deployment webhook
       run: |
         echo "🚀 Triggering deployment webhook..."
