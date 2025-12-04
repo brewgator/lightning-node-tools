@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should_deploy: ${{ steps.test_result.outputs.should_deploy }}
-      
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -69,12 +69,12 @@ jobs:
         RACE_TESTS_PASSED="${{ steps.run_race_tests.outputs.race_tests_passed }}"
         BUILD_PASSED="${{ steps.build.outputs.build_passed }}"
         FORCE_DEPLOY="${{ github.event.inputs.force_deploy }}"
-        
+
         echo "Tests passed: $TESTS_PASSED"
-        echo "Race tests passed: $RACE_TESTS_PASSED" 
+        echo "Race tests passed: $RACE_TESTS_PASSED"
         echo "Build passed: $BUILD_PASSED"
         echo "Force deploy: $FORCE_DEPLOY"
-        
+
         if [[ "$TESTS_PASSED" == "true" && "$RACE_TESTS_PASSED" == "true" && "$BUILD_PASSED" == "true" ]]; then
           echo "✅ All checks passed - deployment approved"
           echo "should_deploy=true" >> $GITHUB_OUTPUT
@@ -91,19 +91,45 @@ jobs:
     runs-on: ubuntu-latest
     needs: test-before-deploy
     if: needs.test-before-deploy.outputs.should_deploy == 'true'
-    
+
     steps:
     - name: Connect to Tailscale
       uses: tailscale/github-action@v2
       with:
         authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-        
+
     - name: Trigger deployment webhook
       run: |
         echo "🚀 Triggering deployment webhook..."
-        echo "This will be handled automatically by GitHub's webhook system"
-        echo "Your server should receive the webhook and start deployment"
-        
+        # Create a fake GitHub webhook payload
+        payload=$(cat <<EOF
+        {
+          "ref": "refs/heads/main",
+          "repository": {
+            "name": "lightning-node-tools",
+            "full_name": "brewgator/lightning-node-tools"
+          },
+          "head_commit": {
+            "id": "${{ github.sha }}",
+            "message": "${{ github.event.head_commit.message }}",
+            "author": {
+              "name": "${{ github.actor }}",
+              "email": "noreply@github.com"
+            }
+          }
+        }
+        EOF
+        )
+
+        # Calculate HMAC signature
+        signature="sha256=$(echo -n "$payload" | openssl dgst -sha256 -hmac "${{ secrets.WEBHOOK_SECRET }}" | cut -d' ' -f2)"
+
+        # Send webhook to server
+        curl -X POST -H "Content-Type: application/json" \
+             -H "X-Hub-Signature-256: $signature" \
+             -d "$payload" \
+             "${{ secrets.WEBHOOK_URL }}"
+
         # Optional: Send a notification to your monitoring system
         if [[ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]]; then
           curl -X POST -H 'Content-type: application/json' \
@@ -136,18 +162,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: test-before-deploy
     if: needs.test-before-deploy.outputs.should_deploy == 'false'
-    
+
     steps:
     - name: Notify deployment blocked
       run: |
         echo "🚫 Deployment blocked due to failed checks"
         echo "Fix the issues and push again, or use workflow_dispatch with force_deploy=true"
-        
+
         # Optional: Send notification
         if [[ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]]; then
           curl -X POST -H 'Content-type: application/json' \
             --data '{"text":"🚫 Lightning Node Tools deployment blocked - tests failed"}' \
             "${{ secrets.SLACK_WEBHOOK_URL }}"
         fi
-        
+
         exit 1
