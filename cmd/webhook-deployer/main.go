@@ -216,7 +216,7 @@ func (d *Deployer) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (d *Deployer) handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	// Get current git commit
 	cmd := exec.Command("git", "rev-parse", "HEAD")
 	cmd.Dir = d.config.RepoPath
