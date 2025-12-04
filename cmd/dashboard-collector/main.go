@@ -40,12 +40,16 @@ func main() {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}
 
-	// Initialize database
-	database, err := db.NewDatabase(*dbPath)
+	// Initialize database with mock mode support
+	database, err := db.NewDatabaseWithMockMode(*dbPath, *mockMode)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.Close()
+
+	if *mockMode {
+		fmt.Println("📊 Using mock database tables (data will not affect real data)")
+	}
 
 	// Initialize LND client (reusing existing client)
 	var lndClient *lnd.Client
@@ -197,4 +201,3 @@ func (c *Collector) collectOnchainData() (confirmed, unconfirmed int64, err erro
 
 	return balance.ConfirmedBalance, balance.UnconfirmedBalance, nil
 }
-

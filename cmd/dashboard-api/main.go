@@ -28,18 +28,23 @@ type APIResponse struct {
 
 func main() {
 	var (
-		dbPath = flag.String("db", "data/portfolio.db", "Path to SQLite database")
-		port   = flag.String("port", "8080", "Port to serve on")
-		host   = flag.String("host", "127.0.0.1", "Host to serve on")
+		dbPath   = flag.String("db", "data/portfolio.db", "Path to SQLite database")
+		port     = flag.String("port", "8080", "Port to serve on")
+		host     = flag.String("host", "127.0.0.1", "Host to serve on")
+		mockMode = flag.Bool("mock", false, "Use mock data for testing without real data")
 	)
 	flag.Parse()
 
-	// Initialize database
-	database, err := db.NewDatabase(*dbPath)
+	// Initialize database with mock mode support
+	database, err := db.NewDatabaseWithMockMode(*dbPath, *mockMode)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.Close()
+
+	if *mockMode {
+		fmt.Println("📊 API running in mock mode (using mock database tables)")
+	}
 
 	server := &Server{
 		db:     database,
@@ -60,7 +65,11 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%s", *host, *port)
 	fmt.Printf("🚀 Portfolio Dashboard API starting on http://%s\n", addr)
-	fmt.Printf("📊 Database: %s\n", *dbPath)
+	fmt.Printf("📊 Database: %s", *dbPath)
+	if *mockMode {
+		fmt.Printf(" (mock mode)")
+	}
+	fmt.Printf("\n")
 
 	log.Fatal(http.ListenAndServe(addr, handler))
 }
@@ -226,11 +235,11 @@ func (s *Server) handleLightningForwards(w http.ResponseWriter, r *http.Request)
 			},
 		},
 		"metadata": map[string]interface{}{
-			"total_forwards":   int64(0),
-			"total_fees":       int64(0),
-			"success_rate":     float64(100.0), // Currently no failure data available
-			"days_requested":   days,
-			"days_with_data":   len(forwardData),
+			"total_forwards": int64(0),
+			"total_fees":     int64(0),
+			"success_rate":   float64(100.0), // Currently no failure data available
+			"days_requested": days,
+			"days_with_data": len(forwardData),
 		},
 	}
 

@@ -262,4 +262,3 @@ func (c *Client) GetForwardingHistory(startTime, endTime string) (*ForwardingHis
 
 	return &response, nil
 }
-

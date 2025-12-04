@@ -131,4 +131,3 @@ type Client struct {
 	// This is a simple wrapper around lncli commands
 	// In a production setup, you might use gRPC instead
 }
-

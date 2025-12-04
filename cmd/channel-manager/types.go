@@ -8,4 +8,3 @@ type ChannelFeeReport = lnd.ChannelFeeReport
 type FeeReportResponse = lnd.FeeReportResponse
 type ForwardingHistory = lnd.ForwardingHistory
 type ForwardingEvent = lnd.ForwardingEvent
-
