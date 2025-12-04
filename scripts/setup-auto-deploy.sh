@@ -5,9 +5,9 @@
 set -e
 
 # Configuration
-REPO_PATH="/opt/lightning-node-tools"
-USER="lightning"
-GROUP="lightning"
+REPO_PATH="$(pwd)"  # Use current directory (where script is run from)
+USER="$(whoami)"    # Use current user
+GROUP="$(id -gn)"   # Use current user's primary group
 PORT="9000"
 
 # Colors for output
@@ -83,7 +83,11 @@ success "Webhook deployer built successfully"
 
 # Install systemd service
 log "⚙️  Installing systemd service..."
-cp systemd/webhook-deployer.service /etc/systemd/system/
+# Create service file with dynamic paths
+sed -e "s|__USER__|$USER|g" \
+    -e "s|__GROUP__|$GROUP|g" \
+    -e "s|__REPO_PATH__|$REPO_PATH|g" \
+    systemd/webhook-deployer.service > /etc/systemd/system/webhook-deployer.service
 systemctl daemon-reload
 systemctl enable webhook-deployer
 success "Systemd service installed"

@@ -4,9 +4,11 @@
 
 set -e
 
-# Configuration
+# Configuration - Auto-detect paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WEBHOOK_URL="http://localhost:9000"
-SECRET_FILE="/opt/lightning-node-tools/secrets/webhook.secret"
+SECRET_FILE="$REPO_DIR/secrets/webhook.secret"
 
 # Colors
 RED='\033[0;31m'
