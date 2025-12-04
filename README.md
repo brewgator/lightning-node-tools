@@ -1,350 +1,227 @@
 # Lightning Node Tools
 
-A comprehensive Bitcoin portfolio tracking and Lightning Network management toolkit. This project provides real-time monitoring, historical data collection, and web-based visualization for Lightning node operators who want complete visibility into their Bitcoin holdings.
+Lightning Network node management toolkit with portfolio tracking, channel management, and auto-deployment.
 
-## 🎯 Project Vision
-
-Building a unified Bitcoin portfolio dashboard that combines Lightning Network monitoring with multi-source balance tracking. The goal is to replace manual spreadsheet tracking with automated data collection and beautiful visualizations.
-
-**Status:** Phase 2 in progress - Basic dashboard operational with real-time portfolio tracking
-
-## Tools Overview
-
-### Channel Manager
-
-Advanced Lightning Network channel management and fee optimization tool with comprehensive analytics.
-
-**Features:**
-- Visual channel balances with interactive liquidity display
-- Fee management and optimization with smart suggestions
-- Earnings analytics with detailed per-channel breakdowns
-- Performance monitoring and routing statistics
-
-### Telegram Monitor
-
-Real-time Lightning node monitoring with Telegram notifications for critical events.
-
-**Features:**
-- Real-time Lightning node monitoring with instant alerts
-- Smart balance tracking with adaptive thresholds
-- Forward monitoring with detailed 24h summaries
-- Server reboot detection and notifications
-
-### Portfolio Dashboard 🚀
-
-Comprehensive Bitcoin portfolio tracking dashboard with automated data collection and web visualization.
-
-**Current Features (Phase 1-2 Complete):**
-- ✅ **Automated Data Collection**: SQLite-backed service collecting Lightning + on-chain data every 15 minutes
-- ✅ **Real-time Dashboard**: Web interface showing total portfolio breakdown across all sources
-- ✅ **Lightning Integration**: Reuses existing LND client for seamless channel and wallet data
-- ✅ **Historical Storage**: Time-series snapshots with indexed queries for trend analysis
-- ✅ **Mock Mode**: Demo functionality for testing without live LND connection
-- ✅ **Configuration Management**: YAML-based settings for collection intervals and data sources
-
-**Planned Features (Phase 3+):**
-- 📈 Interactive historical charts with Chart.js
-- 🏦 Multiple on-chain address tracking via Mempool.space API
-- 📊 Monthly portfolio reports with CSV export
-- 💾 Cold storage balance management
-- 📱 Mobile-optimized progressive web app
-- 🔍 Lightning routing analytics and fee optimization
-
-## Architecture
-
-The project uses a modular, service-oriented architecture:
-
-### Core Services
-- **`cmd/dashboard-collector/`**: Automated data collection service (15min intervals)
-- **`web/api/`**: REST API server with dashboard web interface 
-- **`cmd/channel-manager/`**: Interactive channel management CLI tool
-- **`cmd/telegram-monitor/`**: Real-time alerting and notifications
-
-### Shared Infrastructure
-- **`pkg/lnd/`**: Lightning Network API client (shared across all tools)
-- **`pkg/db/`**: SQLite database operations for historical data
-- **`pkg/utils/`**: Common utilities for formatting and calculations
-
-### Data Flow
-```
-LND Node → dashboard-collector → SQLite DB → Web API → Dashboard UI
-    ↓
-Telegram Alerts (real-time)
-Channel Manager (on-demand)
-```
-
-## Quick Start
-
-### 🚀 Portfolio Dashboard (Recommended)
+## 🚀 Quick Start
 
 ```bash
-# 1. Clone and build
-git clone <your-repo-url>
-cd lightning-node-tools
+# Build tools
 make
 
-# 2. Start with demo data
+# Start portfolio dashboard with sample data
 ./bin/dashboard-collector --oneshot --mock
 ./scripts/start-dashboard.sh
 # Open http://localhost:8080
 
-# 3. Use with real LND data
-./bin/dashboard-collector --oneshot  # Test collection
-./bin/dashboard-collector             # Run continuously
+# Channel management
+./bin/channel-manager balance
+./bin/channel-manager fees
+
+# Real data (requires LND)
+./bin/dashboard-collector --oneshot
 ```
 
-### ⚡ Channel Management
+## 📊 Portfolio Dashboard
 
+Real-time Bitcoin portfolio tracking with Lightning Network and on-chain monitoring.
+
+**Features:**
+- ✅ Real-time portfolio overview (Lightning + on-chain + cold storage)
+- ✅ Interactive Chart.js visualizations 
+- ✅ Historical data collection every 15 minutes
+- ✅ Mock mode for testing/demos
+- ✅ REST API with web interface
+
+**Usage:**
 ```bash
-# Build and configure
-make
-cp .env.example .env  # Add Telegram credentials if using alerts
+# Data collection
+./bin/dashboard-collector --oneshot          # One-time collection
+./bin/dashboard-collector                    # Continuous collection
 
-# Channel operations
-./bin/channel-manager balance    # Visual liquidity overview
-./bin/channel-manager fees       # Current fee settings  
-./bin/channel-manager earnings   # Fee earnings analysis
+# Web API
+./bin/dashboard-api                          # Start API server
+curl http://localhost:8090/api/portfolio/current
+
+# Test with mock data
+./bin/dashboard-collector --oneshot --mock
+./bin/dashboard-api --mock --port=8081
+```
+
+## ⚡ Channel Manager
+
+Advanced Lightning channel management with smart fee optimization.
+
+**Features:**
+- Visual channel balances and liquidity display
+- Smart fee optimization with AI-powered suggestions
+- Fee earnings analytics and performance monitoring
+- Bulk operations for managing multiple channels
+
+**Commands:**
+```bash
+./bin/channel-manager balance                # Visual liquidity overview
+./bin/channel-manager fees                  # Current fee settings
+./bin/channel-manager earnings              # Fee earnings analysis
 
 # Fee optimization
-./bin/channel-manager suggest-fees     # AI-powered recommendations
-./bin/channel-manager fee-optimizer    # Apply optimizations
+./bin/channel-manager suggest-fees          # Analyze optimal fees
+./bin/channel-manager fee-optimizer --dry-run  # Preview changes
+./bin/channel-manager fee-optimizer         # Apply optimizations
 ```
 
-### 📱 Real-time Monitoring
+## 🤖 Auto-Deployment
 
+GitHub webhook-based auto-deployment system for production servers.
+
+**Setup:**
 ```bash
-# Set up Telegram alerts
-./bin/telegram-monitor           # Test manually
+# One-command server setup
+sudo ./scripts/setup-auto-deploy.sh
+
+# Configure GitHub webhook:
+# URL: http://YOUR_SERVER_IP:9000/webhook
+# Secret: (displayed by setup script)
+```
+
+**Features:**
+- ✅ HMAC-SHA256 webhook verification
+- ✅ Automatic git pull, test, build, restart
+- ✅ Rollback on failure with health checks
+- ✅ Systemd service management
+- ✅ Comprehensive logging and monitoring
+
+## 🧪 Testing & CI/CD
+
+**Local Testing:**
+```bash
+make test                    # Run all tests
+make test-race              # Race condition detection
+make ci-ready               # Full CI validation
+
+# Mock mode testing
+make test-mock              # Test with mock data
+```
+
+**CI/CD:**
+- ✅ GitHub Actions with Go 1.24 & 1.25
+- ✅ Automated testing, formatting, security checks
+- ✅ Coverage reporting and quality gates
+- ✅ Auto-deployment on main branch pushes
+
+## 📱 Telegram Monitor
+
+Real-time Lightning node monitoring with Telegram alerts.
+
+**Features:**
+- Balance change notifications with adaptive thresholds
+- Channel open/close alerts and forward monitoring
+- Server reboot detection and earnings summaries
+
+**Setup:**
+```bash
+# Configure Telegram bot (see .env.example)
+./bin/telegram-monitor
 
 # Add to cron for continuous monitoring
-*/2 * * * * /path/to/lightning-node-tools/bin/telegram-monitor >/dev/null 2>&1
+*/2 * * * * /path/to/telegram-monitor >/dev/null 2>&1
 ```
 
-## 🚀 Production Deployment
+## 🛠️ Production Deployment
 
-### Systemd Service Setup
-
-The project includes automated deployment tools for running services in production with systemd:
-
-#### One-time Setup
+**Systemd Services:**
 ```bash
-# Install systemd service files (run once)
+# Install services
 make install-services
 
-# Or manually:
-./scripts/install-services.sh
-```
-
-#### Deploy Updates
-```bash
-# Complete deployment: stop services, build, restart
+# Deploy updates
 make deploy
 
-# Or manually:
-./scripts/deploy.sh
-```
-
-### Service Management
-
-**Individual service control:**
-```bash
-# Check service status
+# Service management
 sudo systemctl status bitcoin-dashboard-api
-sudo systemctl status bitcoin-forwarding-collector  
 sudo systemctl status bitcoin-dashboard-collector
-
-# View logs
-sudo journalctl -u bitcoin-dashboard-api -f
-sudo journalctl -u bitcoin-forwarding-collector -f
+sudo systemctl status bitcoin-forwarding-collector
 ```
-
-**Manual service operations:**
-```bash
-# Stop all services
-sudo systemctl stop bitcoin-dashboard-api bitcoin-forwarding-collector bitcoin-dashboard-collector
-
-# Start all services  
-sudo systemctl start bitcoin-dashboard-api bitcoin-forwarding-collector bitcoin-dashboard-collector
-
-# Enable auto-start on boot
-sudo systemctl enable bitcoin-dashboard-api bitcoin-forwarding-collector bitcoin-dashboard-collector
-```
-
-### Deployment Workflow
-
-1. **Development**: Make code changes locally
-2. **Commit & Push**: Git commit and push changes
-3. **Server Deploy**: Run `make deploy` on server
-4. **Verify**: Check endpoints and service logs
 
 **API Endpoints:**
 ```bash
-# Health check
 curl "http://localhost:8090/api/health"
-
-# Portfolio data
 curl "http://localhost:8090/api/portfolio/current"
-
-# Lightning fees (last 7 days)
 curl "http://localhost:8090/api/lightning/fees?days=7"
-
-# Forward counts (last 7 days)
 curl "http://localhost:8090/api/lightning/forwards?days=7"
 ```
 
-### Initial Data Collection
+## 🔧 Configuration
 
-**Collect historical forwarding data:**
+**Environment Setup:**
 ```bash
-# Catch up last 30 days of forwarding events
-./bin/forwarding-collector --catchup --days=30
-
-# Test with mock data  
-./bin/forwarding-collector --catchup --days=30 --mock
+cp .env.example .env
+# Add Telegram credentials and LND settings
 ```
 
-## Channel Manager Commands
+**Mock Mode:**
+All tools support `--mock` flag for testing without live LND connection.
 
-**Basic Operations:**
+**Build Targets:**
 ```bash
-./bin/channel-manager balance     # Visual channel liquidity overview
-./bin/channel-manager fees       # Current fee settings
-./bin/channel-manager earnings   # Fee earnings summary
-./bin/channel-manager earnings -d # Detailed earnings breakdown
+make                        # Build all tools
+make dashboard             # Build dashboard components
+make deploy                # Production deployment
+make clean                 # Clean build artifacts
 ```
 
-**Fee Management:**
-```bash
-# Set fees for specific channel
-./bin/channel-manager set-fees --channel-id 12345 --ppm 1 --base-fee 1000
+## 📋 Architecture
 
-# Set fees for all channels
-./bin/channel-manager bulk-set-fees --ppm 1
-
-# Smart fee optimization
-./bin/channel-manager suggest-fees           # Analyze and suggest optimal fees
-./bin/channel-manager fee-optimizer --dry-run # Preview optimizations
-./bin/channel-manager fee-optimizer          # Apply optimizations
 ```
-
-## Smart Fee Optimization
-
-The Channel Manager includes intelligent fee optimization with automated suggestions based on channel performance, liquidity distribution, and routing activity.
-
-## Configuration
-
-The telegram monitor uses adaptive balance change thresholds:
-- **Very small accounts** (<100k sats): 1 sat minimum change detection
-- **Small accounts** (<1M sats): 100 sats threshold
-- **Medium accounts** (<10M sats): 1k sats threshold
-- **Large accounts** (10M+ sats): 5k sats threshold
-
-## What Gets Monitored
-
-- **Channel Events**: Opens, closes, pending operations
-- **Balance Changes**: On-chain and Lightning balances with adaptive thresholds
-- **Payment Activity**: New invoices and forwards
-- **Server Status**: Reboot detection
-- **Routing Fees**: Recent forwarding activity and fees earned
-
-## Requirements
-
-- Lightning Network node with `lncli` installed and configured
-- Go 1.19+ for building the tools
-- Telegram bot token and chat ID (for telegram-monitor)
-
-## Project Structure
-
-```text
 lightning-node-tools/
-├── cmd/                         # Application binaries
-│   ├── channel-manager/          # Channel management tool
-│   ├── dashboard-api/            # REST API server
-│   ├── dashboard-collector/      # Data collection service
-│   ├── forwarding-collector/     # Forwarding events collector
-│   └── telegram-monitor/         # Telegram monitoring tool
-├── pkg/                         # Shared packages
-│   ├── db/                      # Database operations
-│   ├── lnd/                     # Lightning Network client
-│   └── utils/                   # Utility functions
-├── scripts/                     # Automation scripts
-│   ├── deploy.sh                # Production deployment
-│   ├── install-services.sh      # Systemd service installer
-│   ├── start-dashboard.sh       # Development dashboard starter
-│   └── telegram-alerts.sh       # Legacy bash monitoring
-├── systemd/                     # Service templates
-│   ├── bitcoin-dashboard-api.service
-│   ├── bitcoin-dashboard-collector.service
-│   └── bitcoin-forwarding-collector.service
-├── web/static/                  # Web dashboard files
-├── configs/                     # Configuration files
-├── bin/                         # Compiled binaries (after building)
-├── data/                        # Runtime data storage
-└── .env                         # Configuration (not tracked by git)
+├── cmd/                   # Application binaries
+│   ├── channel-manager/   # Channel management tool
+│   ├── dashboard-api/     # REST API server
+│   ├── dashboard-collector/   # Data collection service
+│   ├── forwarding-collector/  # Forwarding events collector
+│   ├── telegram-monitor/  # Telegram monitoring
+│   └── webhook-deployer/  # Auto-deployment service
+├── pkg/                   # Shared packages
+│   ├── db/               # Database operations
+│   ├── lnd/              # Lightning Network client
+│   └── utils/            # Common utilities
+├── scripts/              # Automation scripts
+├── systemd/              # Service templates
+└── web/static/           # Dashboard web interface
 ```
 
-## Build Targets
+## 🔒 Security
 
-**Primary:**
-- `make` or `make build` - Build all tools
-- `make dashboard` - Build dashboard components (collector + API)
-- `make deploy` - Stop services, build, restart services
-- `make install-services` - Install systemd service files
-- `make clean` - Remove build artifacts
-- `make help` - Show all available targets
+**Auto-deployment security:**
+- HMAC-SHA256 webhook signature verification
+- Service isolation with dedicated user
+- Automatic rollback on deployment failure
+- Restricted systemd permissions
 
-**Individual Tools:**
-- `make channel-manager` - Build channel management tool
-- `make telegram-monitor` - Build monitoring tool
-- `make dashboard-collector` - Build data collection service
-- `make dashboard-api` - Build web API server
-- `make forwarding-collector` - Build forwarding events collector
-- `make install` - Install tools to GOPATH/bin
+**Best practices:**
+- Never commit secrets or API keys
+- Use mock mode for testing
+- Proper file permissions and service hardening
 
-## Troubleshooting
+## 📞 Requirements
 
-- Ensure your Lightning node is running and `lncli` commands work
-- Verify your `.env` file has correct bot token and chat ID
-- Check that the `data` directory exists
-- Test the Telegram bot by sending a manual message first
+- Lightning Network node with `lncli` installed
+- Go 1.24+ for building
+- SQLite for data storage
+- Telegram bot token (for monitoring)
+- Systemd for production services
 
-## 📋 Project Status & Roadmap
+## 🎯 Status
 
-**Current Phase:** Phase 2 - Basic Dashboard (🟡 In Progress)
+**✅ Complete:**
+- Portfolio dashboard with Chart.js visualizations
+- Smart fee optimization with AI suggestions  
+- Mock mode for isolated testing
+- Comprehensive test suite with 80%+ coverage
+- GitHub Actions CI/CD with auto-deployment
+- Production systemd service deployment
 
-| Phase | Status | Key Features |
-|-------|--------|-------------|
-| **Phase 1: Data Foundation** | ✅ Complete | SQLite schema, automated collection, LND integration |
-| **Phase 2: Basic Dashboard** | 🟡 In Progress | Web API, real-time UI, portfolio breakdown |
-| **Phase 3: Portfolio Integration** | ⏳ Planned | Multi-address tracking, cold storage management |
-| **Phase 4: Monthly Tracking** | ⏳ Planned | Historical charts, monthly reports, CSV export |
-| **Phase 5: Lightning Analytics** | ⏳ Planned | Channel health scoring, routing optimization |
-| **Phase 6: Mobile & Polish** | ⏳ Planned | PWA, mobile responsiveness, production deployment |
-
-**Next Milestones:**
-- [ ] Complete historical chart integration (Chart.js)
-- [ ] Add Mempool.space API for address tracking
-- [ ] Implement monthly report generation
-
-## Documentation
-
-- **[Detailed Roadmap](https://github.com/user/obsidian-vault/.../Bitcoin%20Portfolio%20Dashboard%20Roadmap.md)** - Complete 6-phase development plan
-- **[DASHBOARD.md](DASHBOARD.md)** - Portfolio dashboard setup and usage guide  
-- **[ROADMAP.md](ROADMAP.md)** - High-level planned features
-
-## 🧪 Testing & Development
-
-**Mock Mode:** Test all features without a live Lightning node
-```bash
-./bin/dashboard-collector --mock --oneshot  # Generate sample data
-./scripts/start-dashboard.sh                        # View dashboard
-```
-
-**Real Data:** Connect to your Lightning node
-```bash
-# Ensure LND is running and lncli works
-lncli getinfo
-
-# Start data collection
-./bin/dashboard-collector --oneshot
-```
+**🔮 Planned:**
+- Mempool.space API integration for address tracking
+- Monthly portfolio reports with CSV export
+- Mobile-responsive PWA
+- Advanced Lightning routing analytics
