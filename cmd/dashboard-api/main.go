@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/brewgator/lightning-node-tools/pkg/db"
@@ -24,6 +26,16 @@ type APIResponse struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`
 	Error   string      `json:"error,omitempty"`
+}
+
+func getVersion() string {
+	// Try to get git commit hash
+	if cmd := exec.Command("git", "rev-parse", "--short", "HEAD"); cmd.Dir == "." {
+		if output, err := cmd.Output(); err == nil {
+			return strings.TrimSpace(string(output))
+		}
+	}
+	return "unknown"
 }
 
 func main() {
@@ -88,6 +100,9 @@ func (s *Server) setupRoutes() {
 
 	// Health check
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
+
+	// Version info
+	api.HandleFunc("/version", s.handleVersion).Methods("GET")
 
 	// Static file serving
 	s.router.PathPrefix("/").Handler(http.FileServer(http.Dir("web/static/")))
@@ -270,6 +285,15 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Data: map[string]interface{}{
 			"status":    "healthy",
 			"timestamp": time.Now(),
+		},
+	})
+}
+
+func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data: map[string]interface{}{
+			"version": getVersion(),
 		},
 	})
 }
