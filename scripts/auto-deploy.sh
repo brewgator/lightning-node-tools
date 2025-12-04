@@ -5,9 +5,9 @@
 
 set -e
 
-# Configuration
-REPO_DIR="/opt/lightning-node-tools"
-BACKUP_DIR="/opt/lightning-node-tools-backups"
+# Configuration - Auto-detect repository directory
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BACKUP_DIR="${REPO_DIR}-backups"
 LOG_FILE="/var/log/lightning-deploy.log"
 MAX_BACKUPS=5
 
