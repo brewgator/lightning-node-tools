@@ -278,4 +278,4 @@ lightning-node-tools/
 - Mempool.space API integration for address tracking
 - Monthly portfolio reports with CSV export
 - Mobile-responsive PWA
-- Advanced Lightning routing analytics# Testing updated Tailscale auth key
+- Advanced Lightning routing analytics
