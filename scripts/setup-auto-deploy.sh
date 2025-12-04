@@ -6,7 +6,7 @@ set -e
 
 # Configuration
 REPO_PATH="$(pwd)"  # Use current directory (where script is run from)
-USER="$(whoami)"    # Use current user
+USER="${SUDO_USER:-$(whoami)}"    # Use current user
 GROUP="$(id -gn)"   # Use current user's primary group
 PORT="9000"
 
