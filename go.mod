@@ -1,6 +1,6 @@
 module github.com/brewgator/lightning-node-tools
 
-go 1.25.0
+go 1.25
 
 require (
 	github.com/gorilla/mux v1.8.1
