@@ -129,15 +129,22 @@ func (s *Server) handlePortfolioHistory(w http.ResponseWriter, r *http.Request) 
 	days := 30 // default
 	var from, to time.Time
 
-	if daysStr == "all" || daysStr == "" {
+	if daysStr == "all" {
 		// For "all" data, get from the earliest possible date
 		to = time.Now()
 		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
-	} else {
-		if d, err := strconv.Atoi(daysStr); err == nil {
+	} else if daysStr != "" {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
 			days = d
+		} else {
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
+			return
 		}
 		// Calculate time range
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
+	} else {
+		// Default case
 		to = time.Now()
 		from = to.AddDate(0, 0, -days)
 	}
@@ -165,7 +172,7 @@ func (s *Server) handleLightningFees(w http.ResponseWriter, r *http.Request) {
 	} else if daysStr != "" {
 		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
 			days = d
-		} else if daysStr != "" {
+		} else {
 			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
 			return
 		}
@@ -239,7 +246,7 @@ func (s *Server) handleLightningForwards(w http.ResponseWriter, r *http.Request)
 	} else if daysStr != "" {
 		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
 			days = d
-		} else if daysStr != "" {
+		} else {
 			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
 			return
 		}

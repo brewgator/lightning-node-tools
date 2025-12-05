@@ -266,13 +266,13 @@
 
             <div class="card">
                 <h2>📈 Portfolio History</h2>
-                <div class="date-range-selector">
+                <div class="date-range-selector portfolio-range">
                     <span class="date-range-label">Time Range:</span>
-                    <button class="date-range-btn" data-days="7">7D</button>
-                    <button class="date-range-btn active" data-days="30">30D</button>
-                    <button class="date-range-btn" data-days="90">90D</button>
-                    <button class="date-range-btn" data-days="365">1Y</button>
-                    <button class="date-range-btn" data-days="all">ALL</button>
+                    <button class="date-range-btn portfolio-range" data-days="7">7D</button>
+                    <button class="date-range-btn portfolio-range active" data-days="30">30D</button>
+                    <button class="date-range-btn portfolio-range" data-days="90">90D</button>
+                    <button class="date-range-btn portfolio-range" data-days="365">1Y</button>
+                    <button class="date-range-btn portfolio-range" data-days="all">ALL</button>
                 </div>
                 <div class="chart-container">
                     <div class="chart-loading" id="portfolioChartLoading">⏳ Loading chart data...</div>
@@ -283,7 +283,7 @@
             <div class="charts-grid">
                 <div class="card">
                     <h2>⚡ Lightning Fees Earned</h2>
-                    <div class="date-range-selector">
+                    <div class="date-range-selector fees-range">
                         <span class="date-range-label">Time Range:</span>
                         <button class="date-range-btn fees-range" data-days="7">7D</button>
                         <button class="date-range-btn fees-range active" data-days="30">30D</button>
@@ -299,7 +299,7 @@
 
                 <div class="card">
                     <h2>🔀 Forward Counts</h2>
-                    <div class="date-range-selector">
+                    <div class="date-range-selector forwards-range">
                         <span class="date-range-label">Time Range:</span>
                         <button class="date-range-btn forwards-range" data-days="7">7D</button>
                         <button class="date-range-btn forwards-range active" data-days="30">30D</button>
@@ -338,14 +338,13 @@
 
         // Load date ranges from localStorage
         function loadDateRangesFromStorage() {
-            currentPortfolioRange = parseInt(localStorage.getItem(STORAGE_KEYS.PORTFOLIO_RANGE)) || 30;
-            currentFeesRange = parseInt(localStorage.getItem(STORAGE_KEYS.FEES_RANGE)) || 30;
-            currentForwardsRange = parseInt(localStorage.getItem(STORAGE_KEYS.FORWARDS_RANGE)) || 30;
-
-            // Handle "all" case
-            if (localStorage.getItem(STORAGE_KEYS.PORTFOLIO_RANGE) === 'all') currentPortfolioRange = 'all';
-            if (localStorage.getItem(STORAGE_KEYS.FEES_RANGE) === 'all') currentFeesRange = 'all';
-            if (localStorage.getItem(STORAGE_KEYS.FORWARDS_RANGE) === 'all') currentForwardsRange = 'all';
+            const portfolioVal = localStorage.getItem(STORAGE_KEYS.PORTFOLIO_RANGE);
+            const feesVal = localStorage.getItem(STORAGE_KEYS.FEES_RANGE);
+            const forwardsVal = localStorage.getItem(STORAGE_KEYS.FORWARDS_RANGE);
+            
+            currentPortfolioRange = portfolioVal === 'all' ? 'all' : (parseInt(portfolioVal) || 30);
+            currentFeesRange = feesVal === 'all' ? 'all' : (parseInt(feesVal) || 30);
+            currentForwardsRange = forwardsVal === 'all' ? 'all' : (parseInt(forwardsVal) || 30);
         }
 
         // Save date range to localStorage
@@ -357,11 +356,11 @@
         function updateActiveButton(chartType, days) {
             let selector;
             if (chartType === 'portfolio') {
-                selector = '.date-range-selector:not(.fees-range):not(.forwards-range)';
+                selector = '.portfolio-range';
             } else if (chartType === 'fees') {
-                selector = '.card:has(#feesChart) .date-range-selector';
+                selector = '.card .fees-range';
             } else if (chartType === 'forwards') {
-                selector = '.card:has(#forwardsChart) .date-range-selector';
+                selector = '.card .forwards-range';
             }
 
             // Remove active class from all buttons in the selector group
@@ -518,10 +517,14 @@
 
                 const daysParam = currentPortfolioRange === 'all' ? '?days=all' : `?days=${currentPortfolioRange}`;
                 const response = await fetch(`/api/portfolio/history${daysParam}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                }
                 const result = await response.json();
 
                 if (!result.success || !result.data || result.data.length === 0) {
                     hideChartLoading('portfolioChart');
+                    console.error('No portfolio history data available:', result.error || 'Empty dataset');
                     return;
                 }
 
@@ -624,10 +627,14 @@
 
                 const daysParam = currentFeesRange === 'all' ? '?days=all' : `?days=${currentFeesRange}`;
                 const response = await fetch(`/api/lightning/fees${daysParam}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                }
                 const result = await response.json();
 
                 if (!result.success || !result.data) {
                     hideChartLoading('feesChart');
+                    console.error('No fees data available:', result.error || 'Empty dataset');
                     return;
                 }
 
@@ -756,10 +763,14 @@
 
                 const daysParam = currentForwardsRange === 'all' ? '?days=all' : `?days=${currentForwardsRange}`;
                 const response = await fetch(`/api/lightning/forwards${daysParam}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                }
                 const result = await response.json();
 
                 if (!result.success || !result.data) {
                     hideChartLoading('forwardsChart');
+                    console.error('No forwards data available:', result.error || 'Empty dataset');
                     return;
                 }
 
@@ -908,7 +919,7 @@
         // Event handlers for date range buttons
         function setupDateRangeHandlers() {
             // Portfolio chart buttons
-            document.querySelectorAll('.date-range-selector:not(.fees-range):not(.forwards-range) .date-range-btn').forEach(btn => {
+            document.querySelectorAll('.portfolio-range.date-range-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const days = this.getAttribute('data-days');
                     const numDays = days === 'all' ? 'all' : parseInt(days);
@@ -921,7 +932,7 @@
             });
 
             // Fees chart buttons
-            document.querySelectorAll('.fees-range').forEach(btn => {
+            document.querySelectorAll('.fees-range.date-range-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const days = this.getAttribute('data-days');
                     const numDays = days === 'all' ? 'all' : parseInt(days);
@@ -934,7 +945,7 @@
             });
 
             // Forwards chart buttons
-            document.querySelectorAll('.forwards-range').forEach(btn => {
+            document.querySelectorAll('.forwards-range.date-range-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const days = this.getAttribute('data-days');
                     const numDays = days === 'all' ? 'all' : parseInt(days);

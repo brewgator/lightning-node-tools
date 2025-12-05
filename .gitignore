@@ -142,3 +142,4 @@ tmp/
 debug
 debug.test
 *.debug
+/dashboard-api
