@@ -224,8 +224,8 @@ func TestPortfolioHistoryWithInvalidDays(t *testing.T) {
 	rr := httptest.NewRecorder()
 	server.router.ServeHTTP(rr, req)
 
-	// Should still work with default value
-	testutils.AssertEqual(t, rr.Code, http.StatusOK)
+	// Should return bad request for invalid days
+	testutils.AssertEqual(t, rr.Code, http.StatusBadRequest)
 }
 
 func TestLightningFeesEndpoint(t *testing.T) {
