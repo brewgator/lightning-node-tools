@@ -127,15 +127,20 @@ func (s *Server) handlePortfolioHistory(w http.ResponseWriter, r *http.Request) 
 	// Parse query parameters
 	daysStr := r.URL.Query().Get("days")
 	days := 30 // default
-	if daysStr != "" {
+	var from, to time.Time
+
+	if daysStr == "all" || daysStr == "" {
+		// For "all" data, get from the earliest possible date
+		to = time.Now()
+		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
+	} else {
 		if d, err := strconv.Atoi(daysStr); err == nil {
 			days = d
 		}
+		// Calculate time range
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
 	}
-
-	// Calculate time range
-	to := time.Now()
-	from := to.AddDate(0, 0, -days)
 
 	snapshots, err := s.db.GetBalanceSnapshots(from, to)
 	if err != nil {
@@ -151,18 +156,27 @@ func (s *Server) handleLightningFees(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	daysStr := r.URL.Query().Get("days")
 	days := 30 // default
-	if daysStr != "" {
+	var from, to time.Time
+
+	if daysStr == "all" {
+		// For "all" data, get from the earliest possible date
+		to = time.Now()
+		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
+	} else if daysStr != "" {
 		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
 			days = d
 		} else if daysStr != "" {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
 			return
 		}
+		// Calculate time range
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
+	} else {
+		// Default case
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
 	}
-
-	// Calculate time range
-	to := time.Now()
-	from := to.AddDate(0, 0, -days)
 
 	feeData, err := s.db.GetForwardingEventsFees(from, to)
 	if err != nil {
@@ -216,18 +230,27 @@ func (s *Server) handleLightningForwards(w http.ResponseWriter, r *http.Request)
 	// Parse query parameters
 	daysStr := r.URL.Query().Get("days")
 	days := 30 // default
-	if daysStr != "" {
+	var from, to time.Time
+
+	if daysStr == "all" {
+		// For "all" data, get from the earliest possible date
+		to = time.Now()
+		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
+	} else if daysStr != "" {
 		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
 			days = d
 		} else if daysStr != "" {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
 			return
 		}
+		// Calculate time range
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
+	} else {
+		// Default case
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
 	}
-
-	// Calculate time range
-	to := time.Now()
-	from := to.AddDate(0, 0, -days)
 
 	forwardData, err := s.db.GetForwardingEventsFees(from, to)
 	if err != nil {

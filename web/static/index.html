@@ -151,12 +151,81 @@
             background: #2ea043;
         }
 
+        .date-range-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .date-range-label {
+            color: #8b949e;
+            font-size: 0.9em;
+            margin-right: 5px;
+        }
+
+        .date-range-btn {
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
+        }
+
+        .date-range-btn:hover {
+            background: #30363d;
+            border-color: #484f58;
+        }
+
+        .date-range-btn.active {
+            background: #f0883e;
+            color: #0d1117;
+            border-color: #f0883e;
+        }
+
+        .chart-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #f0883e;
+            font-size: 0.9em;
+            z-index: 10;
+            display: none;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
             }
 
             .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .date-range-selector {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 5px;
+            }
+
+            .date-range-label {
+                width: 100%;
+                text-align: center;
+                margin-bottom: 5px;
+            }
+
+            .date-range-btn {
+                flex: 1;
+                min-width: 60px;
+                text-align: center;
+            }
+
+            .charts-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -196,8 +265,17 @@
             </div>
 
             <div class="card">
-                <h2>📈 Portfolio History (30 days)</h2>
+                <h2>📈 Portfolio History</h2>
+                <div class="date-range-selector">
+                    <span class="date-range-label">Time Range:</span>
+                    <button class="date-range-btn" data-days="7">7D</button>
+                    <button class="date-range-btn active" data-days="30">30D</button>
+                    <button class="date-range-btn" data-days="90">90D</button>
+                    <button class="date-range-btn" data-days="365">1Y</button>
+                    <button class="date-range-btn" data-days="all">ALL</button>
+                </div>
                 <div class="chart-container">
+                    <div class="chart-loading" id="portfolioChartLoading">⏳ Loading chart data...</div>
                     <canvas id="portfolioChart"></canvas>
                 </div>
             </div>
@@ -205,14 +283,32 @@
             <div class="charts-grid">
                 <div class="card">
                     <h2>⚡ Lightning Fees Earned</h2>
+                    <div class="date-range-selector">
+                        <span class="date-range-label">Time Range:</span>
+                        <button class="date-range-btn fees-range" data-days="7">7D</button>
+                        <button class="date-range-btn fees-range active" data-days="30">30D</button>
+                        <button class="date-range-btn fees-range" data-days="90">90D</button>
+                        <button class="date-range-btn fees-range" data-days="365">1Y</button>
+                        <button class="date-range-btn fees-range" data-days="all">ALL</button>
+                    </div>
                     <div class="chart-container">
+                        <div class="chart-loading" id="feesChartLoading">⏳ Loading chart data...</div>
                         <canvas id="feesChart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <h2>🔀 Forward Counts</h2>
+                    <div class="date-range-selector">
+                        <span class="date-range-label">Time Range:</span>
+                        <button class="date-range-btn forwards-range" data-days="7">7D</button>
+                        <button class="date-range-btn forwards-range active" data-days="30">30D</button>
+                        <button class="date-range-btn forwards-range" data-days="90">90D</button>
+                        <button class="date-range-btn forwards-range" data-days="365">1Y</button>
+                        <button class="date-range-btn forwards-range" data-days="all">ALL</button>
+                    </div>
                     <div class="chart-container">
+                        <div class="chart-loading" id="forwardsChartLoading">⏳ Loading chart data...</div>
                         <canvas id="forwardsChart"></canvas>
                     </div>
                 </div>
@@ -227,6 +323,58 @@
         let portfolioChart = null;
         let feesChart = null;
         let forwardsChart = null;
+
+        // Global variables for date ranges
+        let currentPortfolioRange = 30;
+        let currentFeesRange = 30;
+        let currentForwardsRange = 30;
+
+        // LocalStorage keys
+        const STORAGE_KEYS = {
+            PORTFOLIO_RANGE: 'portfolio_date_range',
+            FEES_RANGE: 'fees_date_range',
+            FORWARDS_RANGE: 'forwards_date_range'
+        };
+
+        // Load date ranges from localStorage
+        function loadDateRangesFromStorage() {
+            currentPortfolioRange = parseInt(localStorage.getItem(STORAGE_KEYS.PORTFOLIO_RANGE)) || 30;
+            currentFeesRange = parseInt(localStorage.getItem(STORAGE_KEYS.FEES_RANGE)) || 30;
+            currentForwardsRange = parseInt(localStorage.getItem(STORAGE_KEYS.FORWARDS_RANGE)) || 30;
+
+            // Handle "all" case
+            if (localStorage.getItem(STORAGE_KEYS.PORTFOLIO_RANGE) === 'all') currentPortfolioRange = 'all';
+            if (localStorage.getItem(STORAGE_KEYS.FEES_RANGE) === 'all') currentFeesRange = 'all';
+            if (localStorage.getItem(STORAGE_KEYS.FORWARDS_RANGE) === 'all') currentForwardsRange = 'all';
+        }
+
+        // Save date range to localStorage
+        function saveDateRangeToStorage(key, value) {
+            localStorage.setItem(key, value);
+        }
+
+        // Update active button state
+        function updateActiveButton(chartType, days) {
+            let selector;
+            if (chartType === 'portfolio') {
+                selector = '.date-range-selector:not(.fees-range):not(.forwards-range)';
+            } else if (chartType === 'fees') {
+                selector = '.card:has(#feesChart) .date-range-selector';
+            } else if (chartType === 'forwards') {
+                selector = '.card:has(#forwardsChart) .date-range-selector';
+            }
+
+            // Remove active class from all buttons in the selector group
+            document.querySelectorAll(`${selector} .date-range-btn`).forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Add active class to the clicked button
+            const activeBtn = document.querySelector(`${selector} .date-range-btn[data-days="${days}"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+        }
 
         // Dark theme configuration for Chart.js
         const darkTheme = {
@@ -348,13 +496,32 @@
             `;
         }
 
+        // Show/hide loading indicator
+        function showChartLoading(chartId) {
+            const loadingEl = document.getElementById(`${chartId}Loading`);
+            if (loadingEl) {
+                loadingEl.style.display = 'block';
+            }
+        }
+
+        function hideChartLoading(chartId) {
+            const loadingEl = document.getElementById(`${chartId}Loading`);
+            if (loadingEl) {
+                loadingEl.style.display = 'none';
+            }
+        }
+
         // Chart 1: Portfolio Balance History (Line Chart)
         async function createPortfolioChart() {
             try {
-                const response = await fetch('/api/portfolio/history?days=30');
+                showChartLoading('portfolioChart');
+
+                const daysParam = currentPortfolioRange === 'all' ? '?days=all' : `?days=${currentPortfolioRange}`;
+                const response = await fetch(`/api/portfolio/history${daysParam}`);
                 const result = await response.json();
 
                 if (!result.success || !result.data || result.data.length === 0) {
+                    hideChartLoading('portfolioChart');
                     return;
                 }
 
@@ -442,18 +609,25 @@
                         }
                     }
                 });
+
+                hideChartLoading('portfolioChart');
             } catch (error) {
                 console.error('Failed to load portfolio chart:', error);
+                hideChartLoading('portfolioChart');
             }
         }
 
         // Chart 2: Lightning Fees (Bar + Line Combo)
         async function createFeesChart() {
             try {
-                const response = await fetch('/api/lightning/fees?days=30');
+                showChartLoading('feesChart');
+
+                const daysParam = currentFeesRange === 'all' ? '?days=all' : `?days=${currentFeesRange}`;
+                const response = await fetch(`/api/lightning/fees${daysParam}`);
                 const result = await response.json();
 
                 if (!result.success || !result.data) {
+                    hideChartLoading('feesChart');
                     return;
                 }
 
@@ -567,18 +741,25 @@
                         }
                     }
                 });
+
+                hideChartLoading('feesChart');
             } catch (error) {
                 console.error('Failed to load fees chart:', error);
+                hideChartLoading('feesChart');
             }
         }
 
         // Chart 3: Forward Counts (Bar Chart)
         async function createForwardsChart() {
             try {
-                const response = await fetch('/api/lightning/forwards?days=30');
+                showChartLoading('forwardsChart');
+
+                const daysParam = currentForwardsRange === 'all' ? '?days=all' : `?days=${currentForwardsRange}`;
+                const response = await fetch(`/api/lightning/forwards${daysParam}`);
                 const result = await response.json();
 
                 if (!result.success || !result.data) {
+                    hideChartLoading('forwardsChart');
                     return;
                 }
 
@@ -669,8 +850,11 @@
                         }
                     }
                 });
+
+                hideChartLoading('forwardsChart');
             } catch (error) {
                 console.error('Failed to load forwards chart:', error);
+                hideChartLoading('forwardsChart');
             }
         }
 
@@ -682,6 +866,12 @@
                 showError('Chart.js library failed to load');
                 return;
             }
+
+            // Load date ranges from storage and update button states
+            loadDateRangesFromStorage();
+            updateActiveButton('portfolio', currentPortfolioRange);
+            updateActiveButton('fees', currentFeesRange);
+            updateActiveButton('forwards', currentForwardsRange);
 
             try {
                 const response = await fetch('/api/portfolio/current');
@@ -715,9 +905,52 @@
             }
         }
 
+        // Event handlers for date range buttons
+        function setupDateRangeHandlers() {
+            // Portfolio chart buttons
+            document.querySelectorAll('.date-range-selector:not(.fees-range):not(.forwards-range) .date-range-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const days = this.getAttribute('data-days');
+                    const numDays = days === 'all' ? 'all' : parseInt(days);
+
+                    currentPortfolioRange = numDays;
+                    saveDateRangeToStorage(STORAGE_KEYS.PORTFOLIO_RANGE, days);
+                    updateActiveButton('portfolio', days);
+                    createPortfolioChart();
+                });
+            });
+
+            // Fees chart buttons
+            document.querySelectorAll('.fees-range').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const days = this.getAttribute('data-days');
+                    const numDays = days === 'all' ? 'all' : parseInt(days);
+
+                    currentFeesRange = numDays;
+                    saveDateRangeToStorage(STORAGE_KEYS.FEES_RANGE, days);
+                    updateActiveButton('fees', days);
+                    createFeesChart();
+                });
+            });
+
+            // Forwards chart buttons
+            document.querySelectorAll('.forwards-range').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const days = this.getAttribute('data-days');
+                    const numDays = days === 'all' ? 'all' : parseInt(days);
+
+                    currentForwardsRange = numDays;
+                    saveDateRangeToStorage(STORAGE_KEYS.FORWARDS_RANGE, days);
+                    updateActiveButton('forwards', days);
+                    createForwardsChart();
+                });
+            });
+        }
+
         // Load data when page loads and set up event handlers
         document.addEventListener('DOMContentLoaded', function() {
             loadPortfolioData();
+            setupDateRangeHandlers();
             document.getElementById('refreshBtn').addEventListener('click', loadPortfolioData);
             startAutoRefresh();
         });
