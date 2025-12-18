@@ -310,11 +310,11 @@ func (db *Database) GetLatestBalanceSnapshot() (*BalanceSnapshot, error) {
 func (db *Database) GetForwardingEventsFees(from, to time.Time) ([]DailyFeeData, error) {
 	tableName := db.getTableName("forwarding_events")
 	query := fmt.Sprintf(`
-		SELECT 
+		SELECT
 			DATE(timestamp) as date,
 			SUM(fee) as total_fee,
 			COUNT(*) as forward_count
-		FROM %s 
+		FROM %s
 		WHERE timestamp BETWEEN ? AND ?
 		GROUP BY DATE(timestamp)
 		ORDER BY date ASC
@@ -366,7 +366,7 @@ func (db *Database) InsertForwardingEventIgnoreDuplicate(event *ForwardingEvent)
 
 	// Check if event already exists (same timestamp, channel_in_id, channel_out_id)
 	checkQuery := fmt.Sprintf(`
-		SELECT id FROM %s 
+		SELECT id FROM %s
 		WHERE timestamp = ? AND channel_in_id = ? AND channel_out_id = ?
 		LIMIT 1
 	`, tableName)
@@ -392,6 +392,157 @@ func (db *Database) InsertForwardingEventIgnoreDuplicate(event *ForwardingEvent)
 		event.AmountIn,
 		event.AmountOut,
 		event.Fee,
+	)
+
+	return err
+}
+
+// GetOnchainAddresses retrieves all tracked onchain addresses
+func (db *Database) GetOnchainAddresses() ([]OnchainAddress, error) {
+	tableName := db.getTableName("onchain_addresses")
+	query := fmt.Sprintf(`
+		SELECT id, address, label, active
+		FROM %s
+		ORDER BY id ASC
+	`, tableName)
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var addresses []OnchainAddress
+	for rows.Next() {
+		var addr OnchainAddress
+		err := rows.Scan(&addr.ID, &addr.Address, &addr.Label, &addr.Active)
+		if err != nil {
+			return nil, err
+		}
+		addresses = append(addresses, addr)
+	}
+
+	return addresses, rows.Err()
+}
+
+// GetOnchainAddressByID retrieves a specific onchain address by ID
+func (db *Database) GetOnchainAddressByID(id int64) (*OnchainAddress, error) {
+	tableName := db.getTableName("onchain_addresses")
+	query := fmt.Sprintf(`
+		SELECT id, address, label, active
+		FROM %s
+		WHERE id = ?
+	`, tableName)
+
+	var addr OnchainAddress
+	err := db.conn.QueryRow(query, id).Scan(&addr.ID, &addr.Address, &addr.Label, &addr.Active)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &addr, nil
+}
+
+// InsertOnchainAddress adds a new tracked onchain address
+func (db *Database) InsertOnchainAddress(address, label string) (*OnchainAddress, error) {
+	tableName := db.getTableName("onchain_addresses")
+	query := fmt.Sprintf(`
+		INSERT INTO %s (address, label, active)
+		VALUES (?, ?, 1)
+	`, tableName)
+
+	result, err := db.conn.Exec(query, address, label)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	return &OnchainAddress{
+		ID:      id,
+		Address: address,
+		Label:   label,
+		Active:  true,
+	}, nil
+}
+
+// DeleteOnchainAddress removes a tracked onchain address
+func (db *Database) DeleteOnchainAddress(id int64) error {
+	tableName := db.getTableName("onchain_addresses")
+	query := fmt.Sprintf(`DELETE FROM %s WHERE id = ?`, tableName)
+
+	result, err := db.conn.Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+// GetAddressBalanceHistory retrieves balance history for a specific address
+func (db *Database) GetAddressBalanceHistory(address string, from, to time.Time) ([]AddressBalance, error) {
+	tableName := db.getTableName("address_balances")
+	addrTableName := db.getTableName("onchain_addresses")
+
+	query := fmt.Sprintf(`
+		SELECT ab.id, ab.address_id, ab.timestamp, ab.balance, ab.tx_count
+		FROM %s ab
+		JOIN %s oa ON ab.address_id = oa.id
+		WHERE oa.address = ? AND ab.timestamp BETWEEN ? AND ?
+		ORDER BY ab.timestamp ASC
+	`, tableName, addrTableName)
+
+	rows, err := db.conn.Query(query, address, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var balances []AddressBalance
+	for rows.Next() {
+		var balance AddressBalance
+		err := rows.Scan(
+			&balance.ID, &balance.AddressID, &balance.Timestamp,
+			&balance.Balance, &balance.TxCount,
+		)
+		if err != nil {
+			return nil, err
+		}
+		balances = append(balances, balance)
+	}
+
+	return balances, rows.Err()
+}
+
+// InsertAddressBalance adds a new balance record for an address
+func (db *Database) InsertAddressBalance(balance *AddressBalance) error {
+	tableName := db.getTableName("address_balances")
+	query := fmt.Sprintf(`
+		INSERT OR REPLACE INTO %s
+		(address_id, timestamp, balance, tx_count)
+		VALUES (?, ?, ?, ?)
+	`, tableName)
+
+	_, err := db.conn.Exec(query,
+		balance.AddressID,
+		balance.Timestamp,
+		balance.Balance,
+		balance.TxCount,
 	)
 
 	return err
