@@ -1,6 +1,6 @@
 package main
 
-import "github.com/brewgator/lightning-node-tools/pkg/lnd"
+import "github.com/brewgator/lightning-node-tools/internal/lnd"
 
 // Type aliases for convenience - use shared types from pkg/lnd
 type Channel = lnd.Channel

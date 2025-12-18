@@ -1,0 +1,21 @@
+# Lightning Node Tools - Crontab Configuration
+# Copy this to your server's crontab: crontab -e
+
+# Daily channel backup at 2:00 AM
+0 2 * * * lncli exportchanbackup --all --output_file ~/backups/channels-$(date +\%Y\%m\%d).backup
+
+# Weekly fee optimizer at 2:15 AM on Sundays (after backup)
+15 2 * * 0 $HOME/lightning-node-tools/bin/channel-manager fee-optimizer >> $HOME/lightning-node-tools/logs/fee-optimizer-$(date +\%Y\%m\%d).log 2>&1
+
+# Telegram monitor every 2 minutes
+*/2 * * * * $HOME/lightning-node-tools/bin/telegram-monitor >> $HOME/lightning-node-tools/logs/telegram-monitor.log 2>&1
+
+# Log rotation - runs daily at 3:00 AM to clean up old logs
+0 3 * * * find $HOME/lightning-node-tools/logs -name "*.log" -mtime +30 -delete 2>/dev/null
+0 3 * * * find ~/backups -name "channels-*.backup" -mtime +90 -delete 2>/dev/null
+
+# Usage:
+# 1. Copy this file: cp deployment/crontab.example /tmp/mycron
+# 2. Edit paths to match your setup: nano /tmp/mycron
+# 3. Install: crontab /tmp/mycron
+# 4. Verify: crontab -l

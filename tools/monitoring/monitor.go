@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brewgator/lightning-node-tools/pkg/lnd"
+	"github.com/brewgator/lightning-node-tools/internal/lnd"
 )
 
 // checkChannelChanges monitors and reports channel state changes

@@ -32,7 +32,7 @@ jobs:
       run: make test
     
     - name: Run tests with coverage
-      run: ./scripts/test-coverage-ci.sh
+      run: ./deployment/scripts/test-coverage-ci.sh
     
     - name: Build all components
       run: make build

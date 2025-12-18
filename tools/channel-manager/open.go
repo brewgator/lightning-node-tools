@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/brewgator/lightning-node-tools/pkg/lnd"
+	"github.com/brewgator/lightning-node-tools/internal/lnd"
 )
 
 // openChannelToPeer opens a new channel to a peer

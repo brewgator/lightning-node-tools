@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brewgator/lightning-node-tools/pkg/testutils"
+	"github.com/brewgator/lightning-node-tools/internal/testutils"
 )
 
 func createTestDB(t *testing.T) *Database {

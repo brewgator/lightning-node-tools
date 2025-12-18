@@ -74,6 +74,6 @@ echo ""
 echo "🎉 Service installation completed!"
 echo ""
 echo "💡 Next steps:"
-echo "  - Run './scripts/deploy.sh' to build and start services"
+echo "  - Run './deployment/scripts/deploy.sh' to build and start services"
 echo "  - Check logs with: sudo journalctl -u bitcoin-dashboard-api -f"
 

@@ -2,15 +2,67 @@
 
 Lightning Network node management toolkit with portfolio tracking, channel management, and auto-deployment.
 
+## 🏗️ Architecture
+
+```
+lightning-node-tools/
+├── services/                    # Long-running services (systemd)
+│   ├── portfolio/              
+│   │   ├── api/               # REST API server (port 8090)
+│   │   └── collector/         # Data collection service (15min intervals)
+│   ├── lightning/             
+│   │   └── forwarding-collector/  # Forwarding events collector
+│   └── deployment/            
+│       └── webhook-deployer/  # Auto-deploy webhook (port 9000)
+│
+├── tools/                      # CLI utilities & cron jobs
+│   ├── channel-manager/       # Lightning channel management
+│   └── monitoring/            # Telegram monitoring (cron every 2min)
+│
+├── internal/                   # Shared internal packages
+│   ├── db/                    # Database operations
+│   ├── lnd/                   # Lightning client
+│   └── utils/                 # Common utilities
+│
+├── deployment/                 # Infrastructure & deployment
+│   ├── systemd/               # Service files
+│   ├── scripts/               # Automation scripts  
+│   ├── configs/               # Configuration files
+│   ├── crontab.example        # Cron job template
+│   └── DEPLOYMENT.md          # Detailed deployment guide
+│
+└── web/                        # Web assets
+    ├── static/
+    └── templates/
+```
+
+## 🚦 Runtime Overview
+
+### Always Running (Systemd Services)
+- **bitcoin-dashboard-api** → Portfolio REST API (port 8090)
+- **bitcoin-dashboard-collector** → Data collection every 15 minutes  
+- **bitcoin-forwarding-collector** → Lightning forwarding events
+- **webhook-deployer** → Auto-deployment server (port 9000)
+
+### Scheduled Tasks (Cron Jobs)
+- **Daily 2:00 AM** → Channel backups (`lncli exportchanbackup`)
+- **Weekly Sun 2:15 AM** → Fee optimization (`tools/channel-manager/`)
+- **Every 2 minutes** → Telegram monitoring (`tools/monitoring/`)
+- **Daily 3:00 AM** → Log cleanup & backup rotation
+
+### On-Demand Tools
+- **tools/channel-manager/** → Interactive channel management CLI
+- **tools/monitoring/** → Manual monitoring checks
+
 ## 🚀 Quick Start
 
 ```bash
-# Build tools
-make
+# Build all tools
+make build
 
 # Start portfolio dashboard with sample data
 ./bin/dashboard-collector --oneshot --mock
-./scripts/start-dashboard.sh
+./deployment/scripts/start-dashboard.sh
 # Open http://localhost:8080
 
 # Channel management
@@ -31,6 +83,10 @@ Real-time Bitcoin portfolio tracking with Lightning Network and on-chain monitor
 - ✅ Historical data collection every 15 minutes
 - ✅ Mock mode for testing/demos
 - ✅ REST API with web interface
+
+**Services Running:**
+- `bitcoin-dashboard-api.service` → REST API server
+- `bitcoin-dashboard-collector.service` → Continuous data collection
 
 **Usage:**
 ```bash
@@ -57,6 +113,10 @@ Advanced Lightning channel management with smart fee optimization.
 - Fee earnings analytics and performance monitoring
 - Bulk operations for managing multiple channels
 
+**Runtime:**
+- **Cron Job:** Weekly fee optimization (Sundays 2:15 AM)
+- **On-Demand:** Interactive CLI tool
+
 **Commands:**
 ```bash
 ./bin/channel-manager balance                # Visual liquidity overview
@@ -69,16 +129,40 @@ Advanced Lightning channel management with smart fee optimization.
 ./bin/channel-manager fee-optimizer         # Apply optimizations
 ```
 
+## 📱 Telegram Monitor
+
+Real-time Lightning node monitoring with Telegram alerts.
+
+**Features:**
+- Balance change notifications with adaptive thresholds
+- Channel open/close alerts and forward monitoring
+- Server reboot detection and earnings summaries
+
+**Runtime:**
+- **Cron Job:** Every 2 minutes monitoring (`*/2 * * * *`)
+- **On-Demand:** Manual checks
+
+**Setup:**
+```bash
+# Configure Telegram bot (see .env.example)
+./bin/telegram-monitor
+
+# Add to cron for continuous monitoring (already included in deployment/crontab.example)
+```
+
 ## 🤖 Auto-Deployment
 
 GitHub webhook-based auto-deployment system for production servers.
+
+**Service Running:**
+- `webhook-deployer.service` → Webhook server on port 9000
 
 ### Quick Setup
 
 **1. Server Setup:**
 ```bash
 # One-command installation
-sudo ./scripts/setup-auto-deploy.sh
+sudo ./deployment/scripts/setup-auto-deploy.sh
 ```
 
 **2. GitHub Webhook:**
@@ -94,7 +178,7 @@ sudo ./scripts/setup-auto-deploy.sh
 curl http://YOUR_SERVER_IP:9000/health
 
 # Full test suite
-sudo ./scripts/test-webhook.sh all
+sudo ./deployment/scripts/test-webhook.sh all
 ```
 
 ### Features
@@ -104,99 +188,39 @@ sudo ./scripts/test-webhook.sh all
 - ✅ **Health monitoring** - Service verification and status endpoints
 - ✅ **Security hardening** - Dedicated user, restricted permissions
 
-### Deployment Process
-When you push to `main`:
-1. **GitHub webhook** → Your server receives HMAC-verified request
-2. **Backup created** → Current version saved for rollback
-3. **Code updated** → `git pull` latest changes  
-4. **Testing** → `make test` ensures quality
-5. **Building** → `make build` compiles binaries
-6. **Service restart** → All Lightning services restarted
-7. **Health checks** → Verify services are healthy
-8. **Rollback** → Automatic rollback if any step fails
-
-### Service Management
-```bash
-# Check webhook service
-sudo systemctl status webhook-deployer
-sudo journalctl -u webhook-deployer -f
-
-# Monitor deployments
-tail -f /var/log/lightning-deploy.log
-
-# Test webhook manually
-sudo ./scripts/test-webhook.sh webhook
-```
-
-## 🧪 Testing & CI/CD
-
-### Local Development
-**Before pushing code:**
-```bash
-make ci-ready               # Full CI validation
-make test                   # Run all tests
-make test-race             # Race condition detection
-make fmt                   # Format code
-
-# Mock mode testing
-make test-mock             # Test with mock data
-```
-
-### GitHub Actions Workflows
-**Available workflows:**
-- **`test.yml`** ⚡ - Basic CI (recommended) - Single Go version, fast
-- **`simple-ci.yml`** 🔧 - Multi-version testing - Go 1.24 & 1.25 matrix
-- **`ci.yml`** 🚀 - Full pipeline - Advanced linting and security
-- **`deploy.yml`** 🚀 - Auto-deployment coordination with webhooks
-
-**Quality Gates:**
-- ✅ Code formatting (gofmt)
-- ✅ Code quality (go vet)  
-- ✅ Unit tests with race detection
-- ✅ Build verification
-- ✅ Coverage reporting with Codecov
-- ✅ Multi-version Go compatibility (1.24 & 1.25)
-
-**Auto-deployment:**
-- ✅ Tests must pass before deployment
-- ✅ Automatic rollback on failure
-- ✅ Health verification after deployment
-
-## 📱 Telegram Monitor
-
-Real-time Lightning node monitoring with Telegram alerts.
-
-**Features:**
-- Balance change notifications with adaptive thresholds
-- Channel open/close alerts and forward monitoring
-- Server reboot detection and earnings summaries
-
-**Setup:**
-```bash
-# Configure Telegram bot (see .env.example)
-./bin/telegram-monitor
-
-# Add to cron for continuous monitoring
-*/2 * * * * /path/to/telegram-monitor >/dev/null 2>&1
-```
-
 ## 🛠️ Production Deployment
 
-**Systemd Services:**
+### Quick Deploy
 ```bash
 # Install services
 make install-services
 
+# Install cron jobs  
+cp deployment/crontab.example /tmp/mycron
+# Edit paths to match your setup
+nano /tmp/mycron
+crontab /tmp/mycron
+
 # Deploy updates
 make deploy
-
-# Service management
-sudo systemctl status bitcoin-dashboard-api
-sudo systemctl status bitcoin-dashboard-collector
-sudo systemctl status bitcoin-forwarding-collector
 ```
 
-**API Endpoints:**
+### Service Management
+```bash
+# Check all services
+systemctl --user list-units --type=service | grep -E "(bitcoin|webhook)"
+
+# Individual service status
+systemctl --user status bitcoin-dashboard-api
+systemctl --user status bitcoin-dashboard-collector  
+systemctl --user status bitcoin-forwarding-collector
+systemctl --user status webhook-deployer
+
+# View logs
+journalctl --user -u bitcoin-dashboard-api -f
+```
+
+### API Endpoints
 ```bash
 curl "http://localhost:8090/api/health"
 curl "http://localhost:8090/api/portfolio/current"
@@ -223,25 +247,20 @@ make deploy                # Production deployment
 make clean                 # Clean build artifacts
 ```
 
-## 📋 Architecture
+## 🧪 Testing & CI/CD
 
+### Local Development
+```bash
+make ci-ready               # Full CI validation
+make test                   # Run all tests
+make test-race             # Race condition detection
+make fmt                   # Format code
 ```
-lightning-node-tools/
-├── cmd/                   # Application binaries
-│   ├── channel-manager/   # Channel management tool
-│   ├── dashboard-api/     # REST API server
-│   ├── dashboard-collector/   # Data collection service
-│   ├── forwarding-collector/  # Forwarding events collector
-│   ├── telegram-monitor/  # Telegram monitoring
-│   └── webhook-deployer/  # Auto-deployment service
-├── pkg/                   # Shared packages
-│   ├── db/               # Database operations
-│   ├── lnd/              # Lightning Network client
-│   └── utils/            # Common utilities
-├── scripts/              # Automation scripts
-├── systemd/              # Service templates
-└── web/static/           # Dashboard web interface
-```
+
+### Deployment Files
+- **deployment/systemd/** → Service templates
+- **deployment/crontab.example** → Cron job template  
+- **deployment/DEPLOYMENT.md** → Complete deployment guide
 
 ## 🔒 Security
 
@@ -279,3 +298,8 @@ lightning-node-tools/
 - Monthly portfolio reports with CSV export
 - Mobile-responsive PWA
 - Advanced Lightning routing analytics
+
+---
+
+📋 **See [deployment/DEPLOYMENT.md](deployment/DEPLOYMENT.md) for detailed setup instructions**
+📋 **See [deployment/crontab.example](deployment/crontab.example) for cron configuration**

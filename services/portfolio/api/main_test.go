@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brewgator/lightning-node-tools/pkg/db"
-	"github.com/brewgator/lightning-node-tools/pkg/testutils"
+	"github.com/brewgator/lightning-node-tools/internal/db"
+	"github.com/brewgator/lightning-node-tools/internal/testutils"
 	"github.com/gorilla/mux"
 )
 
