@@ -12,9 +12,17 @@ import (
 	"time"
 
 	"github.com/brewgator/lightning-node-tools/internal/db"
+	"github.com/brewgator/lightning-node-tools/internal/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+)
+
+const (
+	// MaxHistoryDays is the maximum number of days that can be requested for historical data
+	MaxHistoryDays = 365
+	// BitcoinGenesisDate is the date of the Bitcoin genesis block (January 3, 2009)
+	BitcoinGenesisDate = "2009-01-03"
 )
 
 type Server struct {
@@ -68,7 +76,7 @@ func main() {
 	c := cors.New(cors.Options{
 		// TODO: Replace with your actual frontend domain(s) in production.
 		AllowedOrigins: []string{"https://your-frontend-domain.com"},
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"*"},
 	})
 
@@ -96,6 +104,12 @@ func (s *Server) setupRoutes() {
 	// Lightning endpoints
 	api.HandleFunc("/lightning/fees", s.handleLightningFees).Methods("GET")
 	api.HandleFunc("/lightning/forwards", s.handleLightningForwards).Methods("GET")
+
+	// Onchain endpoints
+	api.HandleFunc("/onchain/addresses", s.handleGetOnchainAddresses).Methods("GET")
+	api.HandleFunc("/onchain/addresses", s.handleAddOnchainAddress).Methods("POST")
+	api.HandleFunc("/onchain/addresses/{id:[0-9]+}", s.handleDeleteOnchainAddress).Methods("DELETE")
+	api.HandleFunc("/onchain/history", s.handleOnchainHistory).Methods("GET")
 
 	// Health check
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
@@ -132,12 +146,13 @@ func (s *Server) handlePortfolioHistory(w http.ResponseWriter, r *http.Request) 
 	if daysStr == "all" {
 		// For "all" data, get from the earliest possible date
 		to = time.Now()
-		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
+		genesisDate, _ := time.Parse("2006-01-02", BitcoinGenesisDate)
+		from = genesisDate
 	} else if daysStr != "" {
-		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
 			return
 		}
 		// Calculate time range
@@ -168,12 +183,13 @@ func (s *Server) handleLightningFees(w http.ResponseWriter, r *http.Request) {
 	if daysStr == "all" {
 		// For "all" data, get from the earliest possible date
 		to = time.Now()
-		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
+		genesisDate, _ := time.Parse("2006-01-02", BitcoinGenesisDate)
+		from = genesisDate
 	} else if daysStr != "" {
-		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
 			return
 		}
 		// Calculate time range
@@ -242,12 +258,13 @@ func (s *Server) handleLightningForwards(w http.ResponseWriter, r *http.Request)
 	if daysStr == "all" {
 		// For "all" data, get from the earliest possible date
 		to = time.Now()
-		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
+		genesisDate, _ := time.Parse("2006-01-02", BitcoinGenesisDate)
+		from = genesisDate
 	} else if daysStr != "" {
-		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
 			return
 		}
 		// Calculate time range
@@ -343,4 +360,183 @@ func (s *Server) writeError(w http.ResponseWriter, status int, message string) {
 	}); err != nil {
 		log.Printf("Failed to encode error response (status %d, message %q): %v", status, message, err)
 	}
+}
+
+// AddOnchainAddressRequest represents the request body for adding a new onchain address
+type AddOnchainAddressRequest struct {
+	// Address is the required Bitcoin on-chain address or extended public key (xpub) to track.
+	// It must be a valid Bitcoin address or xpub string.
+	Address string `json:"address"`
+	// Label is an optional human-readable description for the address; it may be empty.
+	Label string `json:"label"`
+}
+
+// handleGetOnchainAddresses handles GET /api/onchain/addresses
+func (s *Server) handleGetOnchainAddresses(w http.ResponseWriter, r *http.Request) {
+	addresses, err := s.db.GetOnchainAddresses()
+	if err != nil {
+		log.Printf("handleGetOnchainAddresses: failed to get onchain addresses: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get tracked addresses")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{Success: true, Data: addresses})
+}
+
+// handleAddOnchainAddress handles POST /api/onchain/addresses
+func (s *Server) handleAddOnchainAddress(w http.ResponseWriter, r *http.Request) {
+	var req AddOnchainAddressRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid JSON request body")
+		return
+	}
+
+	// Validate required fields
+	if req.Address == "" {
+		s.writeError(w, http.StatusBadRequest, "Address is required")
+		return
+	}
+
+	// Validate Bitcoin address format
+	if !utils.ValidateBitcoinAddress(req.Address) && !utils.ValidateXPub(req.Address) {
+		s.writeError(w, http.StatusBadRequest, "Invalid Bitcoin address or xpub format")
+		return
+	}
+
+	// Add the address to database
+	address, err := s.db.InsertOnchainAddress(req.Address, req.Label)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			s.writeError(w, http.StatusConflict, "Address is already being tracked")
+			return
+		}
+		log.Printf("handleAddOnchainAddress: failed to insert address: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to add address")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data:    address,
+	})
+}
+
+// handleDeleteOnchainAddress handles DELETE /api/onchain/addresses/:id
+func (s *Server) handleDeleteOnchainAddress(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr, ok := vars["id"]
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "Address ID is required")
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid address ID")
+		return
+	}
+
+	// Check if address exists
+	address, err := s.db.GetOnchainAddressByID(id)
+	if err != nil {
+		log.Printf("handleDeleteOnchainAddress: failed to get address by ID: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to check address")
+		return
+	}
+	if address == nil {
+		s.writeError(w, http.StatusNotFound, "Address not found")
+		return
+	}
+
+	// Delete the address
+	err = s.db.DeleteOnchainAddress(id)
+	if err != nil {
+		log.Printf("handleDeleteOnchainAddress: failed to delete address: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to delete address")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data: map[string]interface{}{
+			"message": "Address deleted successfully",
+			"address": address.Address,
+		},
+	})
+}
+
+// handleOnchainHistory handles GET /api/onchain/history
+func (s *Server) handleOnchainHistory(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	address := r.URL.Query().Get("address")
+	if address == "" {
+		s.writeError(w, http.StatusBadRequest, "Address parameter is required")
+		return
+	}
+
+	daysStr := r.URL.Query().Get("days")
+	days := 30 // default
+	var from, to time.Time
+
+	if daysStr == "all" {
+		// For "all" data, get from the earliest possible date
+		to = time.Now()
+		genesisDate, _ := time.Parse("2006-01-02", BitcoinGenesisDate)
+		from = genesisDate
+	} else if daysStr != "" {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
+			days = d
+		} else {
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
+			return
+		}
+		// Calculate time range
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
+	} else {
+		// Default case
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
+	}
+
+	balances, err := s.db.GetAddressBalanceHistory(address, from, to)
+	if err != nil {
+		log.Printf("handleOnchainHistory: failed to get balance history for address %s: %v", address, err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get address balance history")
+		return
+	}
+
+	// Format data for Chart.js consumption
+	chartData := map[string]interface{}{
+		"labels": make([]string, 0, len(balances)),
+		"datasets": []map[string]interface{}{
+			{
+				"label":           fmt.Sprintf("Balance for %s", address),
+				"data":            make([]int64, 0, len(balances)),
+				"backgroundColor": "rgba(255, 159, 64, 0.2)",
+				"borderColor":     "rgba(255, 159, 64, 1)",
+				"borderWidth":     1,
+			},
+		},
+		"metadata": map[string]interface{}{
+			"address":        address,
+			"days_requested": days,
+			"days_with_data": len(balances),
+		},
+	}
+
+	// Populate chart data
+	labels := chartData["labels"].([]string)
+	data := chartData["datasets"].([]map[string]interface{})[0]["data"].([]int64)
+
+	for _, balance := range balances {
+		labels = append(labels, balance.Timestamp.Format("2006-01-02"))
+		data = append(data, balance.Balance)
+	}
+
+	// Update the slices in the map
+	chartData["labels"] = labels
+	chartData["datasets"].([]map[string]interface{})[0]["data"] = data
+
+	s.writeJSON(w, APIResponse{Success: true, Data: chartData})
 }

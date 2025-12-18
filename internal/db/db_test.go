@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
@@ -399,4 +400,283 @@ func TestTableNameGeneration(t *testing.T) {
 
 	testutils.AssertEqual(t, mockDB.GetTableName("balance_snapshots"), "balance_snapshots_mock")
 	testutils.AssertEqual(t, mockDB.GetTableName("forwarding_events"), "forwarding_events_mock")
+}
+
+func TestInsertAndGetOnchainAddress(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	// Insert a new onchain address
+	address, err := db.InsertOnchainAddress("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", "Test Wallet")
+	testutils.AssertNoError(t, err)
+
+	if address == nil {
+		t.Fatal("Expected address to be created, got nil")
+	}
+
+	// Verify returned address data
+	testutils.AssertEqual(t, address.Address, "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh")
+	testutils.AssertEqual(t, address.Label, "Test Wallet")
+	testutils.AssertEqual(t, address.Active, true)
+	if address.ID == 0 {
+		t.Error("Expected ID to be set")
+	}
+
+	// Retrieve the address by ID
+	retrieved, err := db.GetOnchainAddressByID(address.ID)
+	testutils.AssertNoError(t, err)
+
+	if retrieved == nil {
+		t.Fatal("Expected to retrieve address, got nil")
+	}
+
+	// Verify retrieved data matches
+	testutils.AssertEqual(t, retrieved.ID, address.ID)
+	testutils.AssertEqual(t, retrieved.Address, address.Address)
+	testutils.AssertEqual(t, retrieved.Label, address.Label)
+	testutils.AssertEqual(t, retrieved.Active, address.Active)
+}
+
+func TestInsertDuplicateOnchainAddress(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	address := "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
+
+	// Insert address first time
+	_, err := db.InsertOnchainAddress(address, "First")
+	testutils.AssertNoError(t, err)
+
+	// Try to insert same address again - should fail due to UNIQUE constraint
+	_, err = db.InsertOnchainAddress(address, "Second")
+	if err == nil {
+		t.Error("Expected error when inserting duplicate address, got nil")
+	}
+}
+
+func TestGetOnchainAddressByIDNotFound(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	// Try to get non-existent address
+	address, err := db.GetOnchainAddressByID(99999)
+	testutils.AssertNoError(t, err)
+
+	if address != nil {
+		t.Error("Expected nil for non-existent address, got address")
+	}
+}
+
+func TestGetOnchainAddresses(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	// Insert multiple addresses
+	addresses := []struct {
+		addr  string
+		label string
+	}{
+		{"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", "Wallet 1"},
+		{"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", "Genesis"},
+		{"3J98t1WpEZ73CNmYviecrnyiWrnqRhWNLy", "P2SH Address"},
+	}
+
+	for _, a := range addresses {
+		_, err := db.InsertOnchainAddress(a.addr, a.label)
+		testutils.AssertNoError(t, err)
+	}
+
+	// Get all addresses
+	retrieved, err := db.GetOnchainAddresses()
+	testutils.AssertNoError(t, err)
+
+	if len(retrieved) != 3 {
+		t.Errorf("Expected 3 addresses, got %d", len(retrieved))
+	}
+
+	// Verify ordering (should be by ID ASC)
+	for i := 1; i < len(retrieved); i++ {
+		if retrieved[i].ID <= retrieved[i-1].ID {
+			t.Error("Addresses should be ordered by ID ASC")
+		}
+	}
+
+	// Verify all addresses are active
+	for _, addr := range retrieved {
+		if !addr.Active {
+			t.Error("All newly inserted addresses should be active")
+		}
+	}
+}
+
+func TestDeleteOnchainAddress(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	// Insert an address
+	address, err := db.InsertOnchainAddress("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", "To Delete")
+	testutils.AssertNoError(t, err)
+
+	// Delete the address
+	err = db.DeleteOnchainAddress(address.ID)
+	testutils.AssertNoError(t, err)
+
+	// Verify it's deleted
+	retrieved, err := db.GetOnchainAddressByID(address.ID)
+	testutils.AssertNoError(t, err)
+	if retrieved != nil {
+		t.Error("Address should be deleted")
+	}
+}
+
+func TestDeleteNonExistentOnchainAddress(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	// Try to delete non-existent address
+	err := db.DeleteOnchainAddress(99999)
+	if err != sql.ErrNoRows {
+		t.Errorf("Expected sql.ErrNoRows when deleting non-existent address, got %v", err)
+	}
+}
+
+func TestInsertAndGetAddressBalance(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	// Insert an address first
+	address, err := db.InsertOnchainAddress("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", "Test")
+	testutils.AssertNoError(t, err)
+
+	// Insert balance record
+	balance := &AddressBalance{
+		AddressID: address.ID,
+		Timestamp: time.Now().Truncate(time.Second),
+		Balance:   1000000,
+		TxCount:   5,
+	}
+
+	err = db.InsertAddressBalance(balance)
+	testutils.AssertNoError(t, err)
+
+	// Verify we can retrieve it
+	from := time.Now().Add(-1 * time.Hour)
+	to := time.Now().Add(1 * time.Hour)
+
+	balances, err := db.GetAddressBalanceHistory(address.Address, from, to)
+	testutils.AssertNoError(t, err)
+
+	if len(balances) != 1 {
+		t.Fatalf("Expected 1 balance record, got %d", len(balances))
+	}
+
+	testutils.AssertEqual(t, balances[0].AddressID, address.ID)
+	testutils.AssertEqual(t, balances[0].Balance, int64(1000000))
+	testutils.AssertEqual(t, balances[0].TxCount, int64(5))
+}
+
+func TestInsertAddressBalanceMultiple(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	// Insert an address
+	address, err := db.InsertOnchainAddress("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", "Test")
+	testutils.AssertNoError(t, err)
+
+	timestamp := time.Now().Truncate(time.Second)
+
+	// Insert first balance
+	balance1 := &AddressBalance{
+		AddressID: address.ID,
+		Timestamp: timestamp,
+		Balance:   1000000,
+		TxCount:   5,
+	}
+	err = db.InsertAddressBalance(balance1)
+	testutils.AssertNoError(t, err)
+
+	// Insert another balance with different timestamp
+	balance2 := &AddressBalance{
+		AddressID: address.ID,
+		Timestamp: timestamp.Add(1 * time.Hour),
+		Balance:   2000000,
+		TxCount:   10,
+	}
+	err = db.InsertAddressBalance(balance2)
+	testutils.AssertNoError(t, err)
+
+	// Verify both records exist
+	from := time.Now().Add(-1 * time.Hour)
+	to := time.Now().Add(2 * time.Hour)
+
+	balances, err := db.GetAddressBalanceHistory(address.Address, from, to)
+	testutils.AssertNoError(t, err)
+
+	if len(balances) != 2 {
+		t.Fatalf("Expected 2 balance records, got %d", len(balances))
+	}
+}
+
+func TestGetAddressBalanceHistoryTimeRange(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	// Insert an address
+	address, err := db.InsertOnchainAddress("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", "Test")
+	testutils.AssertNoError(t, err)
+
+	// Insert balance records at different times
+	now := time.Now()
+	timestamps := []time.Time{
+		now.Add(-48 * time.Hour),
+		now.Add(-24 * time.Hour),
+		now.Add(-12 * time.Hour),
+		now.Add(-1 * time.Hour),
+	}
+
+	for i, ts := range timestamps {
+		balance := &AddressBalance{
+			AddressID: address.ID,
+			Timestamp: ts.Truncate(time.Second),
+			Balance:   int64((i + 1) * 100000),
+			TxCount:   int64(i + 1),
+		}
+		err = db.InsertAddressBalance(balance)
+		testutils.AssertNoError(t, err)
+	}
+
+	// Query for last 24 hours only
+	from := now.Add(-25 * time.Hour)
+	to := now.Add(1 * time.Hour)
+
+	balances, err := db.GetAddressBalanceHistory(address.Address, from, to)
+	testutils.AssertNoError(t, err)
+
+	// Should only get the last 3 records (within 25 hours)
+	if len(balances) != 3 {
+		t.Errorf("Expected 3 balance records in time range, got %d", len(balances))
+	}
+
+	// Verify ordering (should be ASC by timestamp)
+	for i := 1; i < len(balances); i++ {
+		if balances[i].Timestamp.Before(balances[i-1].Timestamp) {
+			t.Error("Balance history should be ordered by timestamp ASC")
+		}
+	}
+}
+
+func TestGetAddressBalanceHistoryEmptyResult(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	// Query for non-existent address
+	from := time.Now().Add(-24 * time.Hour)
+	to := time.Now()
+
+	balances, err := db.GetAddressBalanceHistory("nonexistent", from, to)
+	testutils.AssertNoError(t, err)
+
+	if len(balances) != 0 {
+		t.Errorf("Expected 0 balance records for non-existent address, got %d", len(balances))
+	}
 }
