@@ -16,12 +16,12 @@ cat > "$HOOK_FILE" << 'EOF'
 echo "🔍 Running pre-commit validation..."
 
 # Run the CI validation script
-if ./scripts/validate-ci.sh > /dev/null 2>&1; then
+if ./deployment/scripts/validate-ci.sh > /dev/null 2>&1; then
     echo "✅ Pre-commit validation passed"
     exit 0
 else
     echo "❌ Pre-commit validation failed"
-    echo "Run './scripts/validate-ci.sh' to see details"
+    echo "Run './deployment/scripts/validate-ci.sh' to see details"
     echo "Fix issues before committing"
     exit 1
 fi
@@ -32,7 +32,7 @@ chmod +x "$HOOK_FILE"
 
 echo "✅ Pre-commit hook installed successfully!"
 echo ""
-echo "The hook will run './scripts/validate-ci.sh' before each commit."
+echo "The hook will run './deployment/scripts/validate-ci.sh' before each commit."
 echo "To skip the hook for a specific commit, use: git commit --no-verify"
 echo ""
 echo "To remove the hook later, delete: $HOOK_FILE"

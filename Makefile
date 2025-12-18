@@ -4,37 +4,43 @@
 all: build
 
 # Build all tools
-build: channel-manager telegram-monitor dashboard-collector dashboard-api forwarding-collector
+build: channel-manager telegram-monitor dashboard-collector dashboard-api forwarding-collector webhook-deployer
 
 # Build channel-manager
 channel-manager:
 	@echo "Building channel-manager..."
 	@mkdir -p bin
-	go build -o bin/channel-manager ./cmd/channel-manager
+	go build -o bin/channel-manager ./tools/channel-manager
 
 # Build telegram-monitor
 telegram-monitor:
 	@echo "Building telegram-monitor..."
 	@mkdir -p bin
-	go build -o bin/telegram-monitor ./cmd/telegram-monitor
+	go build -o bin/telegram-monitor ./tools/monitoring
 
 # Build dashboard-collector
 dashboard-collector:
 	@echo "Building dashboard-collector..."
 	@mkdir -p bin
-	go build -o bin/dashboard-collector ./cmd/dashboard-collector
+	go build -o bin/dashboard-collector ./services/portfolio/collector
 
 # Build dashboard-api
 dashboard-api:
 	@echo "Building dashboard-api..."
 	@mkdir -p bin
-	go build -o bin/dashboard-api ./cmd/dashboard-api
+	go build -o bin/dashboard-api ./services/portfolio/api
 
 # Build forwarding-collector
 forwarding-collector:
 	@echo "Building forwarding-collector..."
 	@mkdir -p bin
-	go build -o bin/forwarding-collector ./cmd/forwarding-collector
+	go build -o bin/forwarding-collector ./services/lightning/forwarding-collector
+
+# Build webhook-deployer
+webhook-deployer:
+	@echo "Building webhook-deployer..."
+	@mkdir -p bin
+	go build -o bin/webhook-deployer ./services/deployment/webhook-deployer
 
 # Build and start complete dashboard (collector + api)
 dashboard: dashboard-collector dashboard-api
@@ -52,10 +58,10 @@ clean:
 # Install tools to GOPATH/bin (optional)
 install: build
 	@echo "Installing tools to GOPATH/bin..."
-	go install ./cmd/channel-manager
-	go install ./cmd/telegram-monitor
-	go install ./cmd/dashboard-collector
-	go install ./cmd/dashboard-api
+	go install ./tools/channel-manager
+	go install ./tools/monitoring
+	go install ./services/portfolio/collector
+	go install ./services/portfolio/api
 
 # Run tests
 test:
@@ -69,7 +75,7 @@ test-verbose:
 test-coverage:
 	@echo "Running tests with coverage..."
 	@# Only test packages that have test files
-	go test -v -coverprofile=coverage.out ./pkg/db ./cmd/dashboard-api ./cmd/dashboard-collector ./cmd/forwarding-collector
+	go test -v -coverprofile=coverage.out ./internal/db ./services/portfolio/api ./services/portfolio/collector ./services/lightning/forwarding-collector
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
@@ -89,19 +95,19 @@ test-integration:
 
 # Run specific package tests
 test-api:
-	go test -v ./cmd/dashboard-api/...
+	go test -v ./services/portfolio/api/...
 
 test-collector:
-	go test -v ./cmd/dashboard-collector/...
+	go test -v ./services/portfolio/collector/...
 
 test-forwarding:
-	go test -v ./cmd/forwarding-collector/...
+	go test -v ./services/lightning/forwarding-collector/...
 
 test-db:
-	go test -v ./pkg/db/...
+	go test -v ./internal/db/...
 
 test-utils:
-	go test -v ./pkg/testutils/...
+	go test -v ./internal/testutils/...
 
 # Run tests with race detection
 test-race:
@@ -123,20 +129,20 @@ lint:
 # Install/update systemd service files
 install-services:
 	@echo "Installing systemd service files..."
-	./scripts/install-services.sh
+	./deployment/scripts/install-services.sh
 
 # Deploy: stop services, build, restart services
 deploy:
 	@echo "Deploying services..."
-	./scripts/deploy.sh
+	./deployment/scripts/deploy.sh
 
 # Validate CI pipeline locally
 validate-ci:
-	./scripts/validate-ci.sh
+	./deployment/scripts/validate-ci.sh
 
 # Install pre-commit hook for CI validation
 install-pre-commit-hook:
-	./scripts/install-pre-commit-hook.sh
+	./deployment/scripts/install-pre-commit-hook.sh
 
 # Verify code is ready for CI
 ci-ready: fmt test test-race build

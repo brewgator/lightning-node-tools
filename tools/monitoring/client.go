@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/brewgator/lightning-node-tools/pkg/lnd"
+	"github.com/brewgator/lightning-node-tools/internal/lnd"
 )
 
 // getCurrentLightningState retrieves the current state of the Lightning node

@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/brewgator/lightning-node-tools/pkg/db"
-	"github.com/brewgator/lightning-node-tools/pkg/lnd"
+	"github.com/brewgator/lightning-node-tools/internal/db"
+	"github.com/brewgator/lightning-node-tools/internal/lnd"
 )
 
 type Config struct {

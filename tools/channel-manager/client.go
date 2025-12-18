@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/brewgator/lightning-node-tools/pkg/lnd"
+	"github.com/brewgator/lightning-node-tools/internal/lnd"
 )
 
 // getChannels retrieves all channels from LND using shared client

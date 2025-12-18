@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/brewgator/lightning-node-tools/pkg/utils"
+	"github.com/brewgator/lightning-node-tools/internal/utils"
 )
 
 // formatSats formats satoshi amounts using shared utility (compact format for tables)

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brewgator/lightning-node-tools/pkg/db"
+	"github.com/brewgator/lightning-node-tools/internal/db"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
