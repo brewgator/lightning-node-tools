@@ -54,7 +54,7 @@ jobs:
 
     - name: Generate test coverage
       if: matrix.go-version == '1.25'
-      run: ./scripts/test-coverage-ci.sh
+      run: ./deployment/scripts/test-coverage-ci.sh
 
     - name: Upload coverage to Codecov
       if: matrix.go-version == '1.25'

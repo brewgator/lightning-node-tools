@@ -7,7 +7,7 @@ set -e
 echo "🧪 Running test coverage for CI..."
 
 # Try the modern approach first (Go 1.22+)
-if go test -v -coverprofile=coverage.out ./pkg/db ./cmd/dashboard-api ./cmd/dashboard-collector ./cmd/forwarding-collector 2>/dev/null; then
+if go test -v -coverprofile=coverage.out ./internal/db ./services/portfolio/api ./services/portfolio/collector ./services/lightning/forwarding-collector 2>/dev/null; then
     echo "✅ Coverage generated using targeted packages"
 else
     echo "⚠️  Falling back to compatible coverage mode..."
