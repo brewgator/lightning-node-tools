@@ -606,8 +606,15 @@ func TestDeleteOnchainAddress(t *testing.T) {
 	err = json.Unmarshal(rr.Body.Bytes(), &addResponse)
 	testutils.AssertNoError(t, err)
 
-	dataMap := addResponse.Data.(map[string]interface{})
-	addressID := int64(dataMap["id"].(float64))
+	dataMap, ok := addResponse.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+	idFloat, ok := dataMap["id"].(float64)
+	if !ok {
+		t.Fatal("Expected id to be a number")
+	}
+	addressID := int64(idFloat)
 
 	// Delete the address
 	req, err = http.NewRequest("DELETE", fmt.Sprintf("/api/onchain/addresses/%d", addressID), nil)
@@ -804,11 +811,21 @@ func TestOnchainHistoryCustomDays(t *testing.T) {
 
 	testutils.AssertEqual(t, response.Success, true)
 
-	dataMap := response.Data.(map[string]interface{})
-	metadata := dataMap["metadata"].(map[string]interface{})
+	dataMap, ok := response.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+	metadata, ok := dataMap["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected metadata to be a map")
+	}
 
 	// days_requested should be 7
-	daysRequested := int(metadata["days_requested"].(float64))
+	daysRequestedFloat, ok := metadata["days_requested"].(float64)
+	if !ok {
+		t.Fatal("Expected days_requested to be a number")
+	}
+	daysRequested := int(daysRequestedFloat)
 	if daysRequested != 7 {
 		t.Errorf("Expected days_requested to be 7, got %d", daysRequested)
 	}
