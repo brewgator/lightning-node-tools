@@ -42,7 +42,9 @@ func FormatSatsCompact(amount int64) string {
 // Base58 alphabet used in Bitcoin addresses
 const base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-// ValidateBitcoinAddress validates a Bitcoin address (Legacy, SegWit, and Taproot)
+// ValidateBitcoinAddress validates a Bitcoin address (Legacy, SegWit, and Taproot).
+// Note: Bech32 (SegWit/Taproot) addresses only receive basic structural checks;
+// full Bech32 checksum validation is not implemented.
 func ValidateBitcoinAddress(address string) bool {
 	if len(address) == 0 {
 		return false
@@ -191,7 +193,9 @@ func base58Decode(input string) ([]byte, error) {
 	return result, nil
 }
 
-// ValidateXPub validates an extended public key (xpub, ypub, zpub)
+// ValidateXPub validates an extended public key (xpub, ypub, zpub).
+// It performs format checks (prefix, length, characters) and verifies
+// the Base58Check checksum.
 func ValidateXPub(xpub string) bool {
 	if len(xpub) == 0 {
 		return false
@@ -223,7 +227,29 @@ func ValidateXPub(xpub string) bool {
 		}
 	}
 
-	// Basic validation - more detailed checksum validation would require
-	// a more robust Base58Check implementation
+	// Decode Base58Check
+	decoded, err := base58Decode(xpub)
+	if err != nil {
+		return false
+	}
+
+	// Extended keys should be 78 bytes (74 payload + 4 checksum)
+	if len(decoded) != 78 {
+		return false
+	}
+
+	// Verify checksum
+	payload := decoded[:74]
+	checksum := decoded[74:]
+
+	hash1 := sha256.Sum256(payload)
+	hash2 := sha256.Sum256(hash1[:])
+
+	for i := 0; i < 4; i++ {
+		if checksum[i] != hash2[i] {
+			return false
+		}
+	}
+
 	return true
 }

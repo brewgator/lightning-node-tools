@@ -18,6 +18,13 @@ import (
 	"github.com/rs/cors"
 )
 
+const (
+	// MaxHistoryDays is the maximum number of days that can be requested for historical data
+	MaxHistoryDays = 365
+	// BitcoinGenesisDate is the date of the Bitcoin genesis block (January 3, 2009)
+	BitcoinGenesisDate = "2009-01-03"
+)
+
 type Server struct {
 	db     *db.Database
 	router *mux.Router
@@ -139,12 +146,13 @@ func (s *Server) handlePortfolioHistory(w http.ResponseWriter, r *http.Request) 
 	if daysStr == "all" {
 		// For "all" data, get from the earliest possible date
 		to = time.Now()
-		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
+		genesisDate, _ := time.Parse("2006-01-02", BitcoinGenesisDate)
+		from = genesisDate
 	} else if daysStr != "" {
-		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
 			return
 		}
 		// Calculate time range
@@ -175,12 +183,13 @@ func (s *Server) handleLightningFees(w http.ResponseWriter, r *http.Request) {
 	if daysStr == "all" {
 		// For "all" data, get from the earliest possible date
 		to = time.Now()
-		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
+		genesisDate, _ := time.Parse("2006-01-02", BitcoinGenesisDate)
+		from = genesisDate
 	} else if daysStr != "" {
-		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
 			return
 		}
 		// Calculate time range
@@ -249,12 +258,13 @@ func (s *Server) handleLightningForwards(w http.ResponseWriter, r *http.Request)
 	if daysStr == "all" {
 		// For "all" data, get from the earliest possible date
 		to = time.Now()
-		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
+		genesisDate, _ := time.Parse("2006-01-02", BitcoinGenesisDate)
+		from = genesisDate
 	} else if daysStr != "" {
-		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
 			return
 		}
 		// Calculate time range
@@ -354,8 +364,11 @@ func (s *Server) writeError(w http.ResponseWriter, status int, message string) {
 
 // AddOnchainAddressRequest represents the request body for adding a new onchain address
 type AddOnchainAddressRequest struct {
+	// Address is the required Bitcoin on-chain address or extended public key (xpub) to track.
+	// It must be a valid Bitcoin address or xpub string.
 	Address string `json:"address"`
-	Label   string `json:"label"`
+	// Label is an optional human-readable description for the address; it may be empty.
+	Label string `json:"label"`
 }
 
 // handleGetOnchainAddresses handles GET /api/onchain/addresses
@@ -468,12 +481,13 @@ func (s *Server) handleOnchainHistory(w http.ResponseWriter, r *http.Request) {
 	if daysStr == "all" {
 		// For "all" data, get from the earliest possible date
 		to = time.Now()
-		from = time.Date(2009, 1, 1, 0, 0, 0, 0, time.UTC) // Bitcoin genesis block date
+		genesisDate, _ := time.Parse("2006-01-02", BitcoinGenesisDate)
+		from = genesisDate
 	} else if daysStr != "" {
-		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 365 {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and 365, or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
 			return
 		}
 		// Calculate time range
