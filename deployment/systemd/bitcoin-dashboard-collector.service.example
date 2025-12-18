@@ -1,0 +1,31 @@
+# Copy-Paste Ready Dashboard Collector Service  
+# Usage:
+# 1. Copy this file: sudo cp deployment/systemd/bitcoin-dashboard-collector.service.example /etc/systemd/system/bitcoin-dashboard-collector.service
+# 2. Edit paths to match your setup: sudo nano /etc/systemd/system/bitcoin-dashboard-collector.service
+# 3. Reload and start: sudo systemctl daemon-reload && sudo systemctl start bitcoin-dashboard-collector
+
+[Unit]
+Description=Bitcoin Portfolio Data Collector
+After=network.target bitcoin-dashboard-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+Group=YOUR_USERNAME
+WorkingDirectory=$HOME/lightning-node-tools
+ExecStart=$HOME/lightning-node-tools/bin/dashboard-collector
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=$HOME/lightning-node-tools/data
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

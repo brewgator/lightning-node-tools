@@ -1,0 +1,30 @@
+# Copy-Paste Ready Forwarding Collector Service
+# Usage:
+# 1. Copy this file: sudo cp deployment/systemd/bitcoin-forwarding-collector.service.example /etc/systemd/system/bitcoin-forwarding-collector.service
+# 2. Edit paths to match your setup: sudo nano /etc/systemd/system/bitcoin-forwarding-collector.service
+# 3. Reload and start: sudo systemctl daemon-reload && sudo systemctl start bitcoin-forwarding-collector
+
+[Unit]
+Description=Bitcoin Lightning Forwarding Events Collector
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+Group=YOUR_USERNAME
+WorkingDirectory=$HOME/lightning-node-tools
+ExecStart=$HOME/lightning-node-tools/bin/forwarding-collector --interval=5m
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=$HOME/lightning-node-tools/data
+
+[Install]
+WantedBy=multi-user.target
