@@ -57,7 +57,10 @@ lightning-node-tools/
 ## 🚀 Quick Start
 
 ```bash
-# Build all tools
+# Quick installation (builds + installs services + crontab)
+make install-all
+
+# OR build manually
 make build
 
 # Start portfolio dashboard with sample data
@@ -191,17 +194,26 @@ sudo ./deployment/scripts/test-webhook.sh all
 ## 🛠️ Production Deployment
 
 ### Quick Deploy
-```bash
-# Install services
-make install-services
 
-# Install cron jobs  
+**🚀 One-Command Installation (Recommended):**
+```bash
+make install-all
+# This will: build binaries + install services + install crontab + start services
+```
+
+**📋 Step-by-Step Installation:**
+```bash
+# Option 1: Automated installers (recommended)
+make install-services-auto  # Install systemd services automatically
+make install-crontab       # Install cron jobs automatically  
+
+# Option 2: Manual installation
+make install-services       # Install services (requires manual editing)
 cp deployment/crontab.example /tmp/mycron
-# Edit paths to match your setup
-nano /tmp/mycron
+nano /tmp/mycron            # Edit paths to match your setup
 crontab /tmp/mycron
 
-# Deploy updates
+# Build and deploy
 make deploy
 ```
 
@@ -243,6 +255,9 @@ All tools support `--mock` flag for testing without live LND connection.
 ```bash
 make                        # Build all tools
 make dashboard             # Build dashboard components
+make install-all           # Complete installation (recommended)
+make install-services-auto # Install systemd services automatically
+make install-crontab      # Install cron jobs automatically
 make deploy                # Production deployment
 make clean                 # Clean build artifacts
 ```

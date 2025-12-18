@@ -1,0 +1,31 @@
+# Copy-Paste Ready Dashboard API Service
+# Usage:
+# 1. Copy this file: sudo cp deployment/systemd/bitcoin-dashboard-api.service.example /etc/systemd/system/bitcoin-dashboard-api.service
+# 2. Edit paths to match your setup: sudo nano /etc/systemd/system/bitcoin-dashboard-api.service  
+# 3. Reload and start: sudo systemctl daemon-reload && sudo systemctl start bitcoin-dashboard-api
+
+[Unit]
+Description=Bitcoin Portfolio Dashboard API
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+Group=YOUR_USERNAME
+WorkingDirectory=$HOME/lightning-node-tools
+ExecStart=$HOME/lightning-node-tools/bin/dashboard-api -port 8090 -host 0.0.0.0
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=$HOME/lightning-node-tools/data
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

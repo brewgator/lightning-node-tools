@@ -13,7 +13,7 @@ ExecStart=__REPO_PATH__/bin/webhook-deployer \
   --port=9000 \
   --repo=__REPO_PATH__ \
   --branch=main \
-  --script=./scripts/auto-deploy.sh
+  --script=./deployment/scripts/auto-deploy.sh
 
 # Environment variables
 Environment=WEBHOOK_SECRET_FILE=__REPO_PATH__/secrets/webhook.secret

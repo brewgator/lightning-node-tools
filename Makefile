@@ -131,6 +131,21 @@ install-services:
 	@echo "Installing systemd service files..."
 	./deployment/scripts/install-services.sh
 
+# Install systemd services automatically (recommended)
+install-services-auto:
+	@echo "Installing systemd services automatically..."
+	./deployment/scripts/install-services-auto.sh
+
+# Install crontab automatically 
+install-crontab:
+	@echo "Installing crontab jobs..."
+	./deployment/scripts/install-crontab-auto.sh
+
+# Complete installation: services + crontab + build + start
+install-all:
+	@echo "Running complete installation..."
+	./deployment/scripts/install-all.sh
+
 # Deploy: stop services, build, restart services
 deploy:
 	@echo "Deploying services..."
@@ -159,6 +174,9 @@ help:
 	@echo "  forwarding-collector - Build only forwarding-collector"
 	@echo "  dashboard           - Build complete dashboard"
 	@echo "  install-services    - Install/update systemd service files"
+	@echo "  install-services-auto - Install systemd services automatically (recommended)"
+	@echo "  install-crontab     - Install crontab jobs automatically"
+	@echo "  install-all         - Complete installation: services + crontab + build + start"
 	@echo "  deploy              - Stop services, build, restart services"
 	@echo "  clean              - Remove build artifacts"
 	@echo "  install            - Install tools to GOPATH/bin"
