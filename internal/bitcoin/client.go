@@ -12,8 +12,9 @@ type Client struct{}
 
 // NewClient creates a new Bitcoin Core client
 func NewClient() (*Client, error) {
-	// Test Bitcoin Core connectivity
-	_, err := RunBitcoinCLI("getblockchaininfo")
+	// Test Bitcoin Core connectivity (without wallet)
+	cmd := exec.Command("bitcoin-cli", "getblockchaininfo")
+	_, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Bitcoin Core: %w", err)
 	}
@@ -32,7 +33,7 @@ func NewClient() (*Client, error) {
 //   - Implementing allowlists for command names
 func RunBitcoinCLI(args ...string) ([]byte, error) {
 	// Add wallet parameter for our tracking wallet
-	fullArgs := []string{"-rpcwallet=tracker"}
+	fullArgs := []string{"-rpcwallet=tracker_watchonly"}
 	fullArgs = append(fullArgs, args...)
 
 	cmd := exec.Command("bitcoin-cli", fullArgs...)
@@ -90,31 +91,35 @@ func (c *Client) GetAddressBalance(address string) (int64, error) {
 	return balanceSatoshis, nil
 }
 
-// ImportAddress imports an address as watch-only
-// The parameters after the address map to Bitcoin Core's importaddress RPC:
-//   - label:  empty string (no label assigned to this address)
-//   - rescan: "false" (do not rescan the blockchain for historical transactions)
-//   - p2sh:   "false" (do not treat the address as a P2SH address)
+// ImportAddress imports an address as watch-only using descriptors
 func (c *Client) ImportAddress(address string) error {
-	const (
-		// importAddressLabel is left empty so the address is imported without a label
-		importAddressLabel = ""
-		// importAddressRescanDisabled controls whether Bitcoin Core rescans the blockchain
-		// for historical transactions involving this address. "false" means no rescan.
-		importAddressRescanDisabled = "false"
-		// importAddressP2SHDisabled controls whether the address is treated as a P2SH address.
-		// "false" means it is not treated as P2SH.
-		importAddressP2SHDisabled = "false"
-	)
+	// Get the descriptor with checksum for this address
+	descriptorInfo, err := c.GetDescriptorInfo(address)
+	if err != nil {
+		return fmt.Errorf("failed to get descriptor info: %w", err)
+	}
 
-	_, err := RunBitcoinCLI(
-		"importaddress",
-		address,
-		importAddressLabel,
-		importAddressRescanDisabled,
-		importAddressP2SHDisabled,
-	)
+	// Import using descriptors with full history (timestamp: 0 forces rescan from genesis)
+	descriptorJSON := fmt.Sprintf(`[{"desc":"%s","timestamp":0,"watchonly":true}]`, descriptorInfo.Descriptor)
+	_, err = RunBitcoinCLI("importdescriptors", descriptorJSON)
 	return err
+}
+
+// GetDescriptorInfo gets descriptor information for an address
+func (c *Client) GetDescriptorInfo(address string) (*DescriptorInfo, error) {
+	// Use non-wallet command to get descriptor info
+	cmd := exec.Command("bitcoin-cli", "getdescriptorinfo", fmt.Sprintf("addr(%s)", address))
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var info DescriptorInfo
+	if err := json.Unmarshal(output, &info); err != nil {
+		return nil, err
+	}
+
+	return &info, nil
 }
 
 // GetAddressUTXOs gets unspent transaction outputs for an address

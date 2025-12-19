@@ -99,3 +99,12 @@ type BalanceUpdate struct {
 	LastUpdated   time.Time `json:"last_updated"`
 	BlockHeight   int64     `json:"block_height"`
 }
+
+// DescriptorInfo represents the result of getdescriptorinfo
+type DescriptorInfo struct {
+	Descriptor     string `json:"descriptor"`
+	Checksum       string `json:"checksum"`
+	IsRange        bool   `json:"isrange"`
+	IsSolvable     bool   `json:"issolvable"`
+	HasPrivateKeys bool   `json:"hasprivatekeys"`
+}
