@@ -442,7 +442,7 @@ func (s *Server) handleAddOnchainAddress(w http.ResponseWriter, r *http.Request)
 
 	// If Bitcoin balance service is available, use it to import and track the address
 	if s.balanceService != nil {
-		err := s.balanceService.ImportAndTrackAddress(req.Address, req.Label)
+		newAddress, err := s.balanceService.ImportAndTrackAddress(req.Address, req.Label)
 		if err != nil {
 			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 				s.writeError(w, http.StatusConflict, "Address is already being tracked")
@@ -450,28 +450,6 @@ func (s *Server) handleAddOnchainAddress(w http.ResponseWriter, r *http.Request)
 			}
 			log.Printf("handleAddOnchainAddress: failed to import address via balance service: %v", err)
 			s.writeError(w, http.StatusInternalServerError, "Failed to add address")
-			return
-		}
-
-		// Get the newly inserted address to return
-		addresses, err := s.db.GetOnchainAddresses()
-		if err != nil {
-			log.Printf("handleAddOnchainAddress: failed to get addresses after insert: %v", err)
-			s.writeError(w, http.StatusInternalServerError, "Address added but failed to retrieve details")
-			return
-		}
-
-		// Find the address we just added
-		var newAddress *db.OnchainAddress
-		for _, addr := range addresses {
-			if addr.Address == req.Address {
-				newAddress = &addr
-				break
-			}
-		}
-
-		if newAddress == nil {
-			s.writeError(w, http.StatusInternalServerError, "Address added but not found")
 			return
 		}
 

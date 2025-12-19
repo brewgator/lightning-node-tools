@@ -143,7 +143,7 @@ func (c *Client) GetChainTips() (*ChainTips, error) {
 
 	return &ChainTips{
 		Height:    height,
-		Timestamp: time.Now(),
+		QueryTime: time.Now(),
 	}, nil
 }
 
@@ -162,9 +162,15 @@ func (c *Client) CalculateAddressBalance(address string) (int64, int64, error) {
 	return balance, int64(len(utxos)), nil
 }
 
-// ValidateAddress checks if an address is valid (basic check)
+// ValidateAddress checks if an address is valid by making a full GetAddressStats API call.
+//
+// Note: This method is inefficient as it fetches complete address statistics when only
+// validation is needed. For lightweight format validation without an API call, use
+// utils.ValidateBitcoinAddress() instead. This method should only be used when the
+// address stats are also needed, or when you need to confirm the address exists on the
+// blockchain with transaction history.
 func (c *Client) ValidateAddress(address string) bool {
-	// Basic validation - try to fetch address stats
+	// Validation via API call - fetches full address stats
 	_, err := c.GetAddressStats(address)
 	return err == nil
 }

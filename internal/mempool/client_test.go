@@ -59,9 +59,9 @@ func TestMempoolClient(t *testing.T) {
 			t.Errorf("Expected height > 0, got %d", tips.Height)
 		}
 
-		// Should be recent
-		if time.Since(tips.Timestamp) > time.Hour {
-			t.Errorf("Timestamp seems old: %v", tips.Timestamp)
+		// Should be recent (QueryTime reflects when we queried the API)
+		if time.Since(tips.QueryTime) > time.Hour {
+			t.Errorf("QueryTime seems old: %v", tips.QueryTime)
 		}
 
 		t.Logf("Chain height: %d", tips.Height)

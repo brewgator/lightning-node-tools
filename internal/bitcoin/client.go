@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
-	"strings"
 )
 
 // Client represents a Bitcoin Core RPC client
@@ -21,7 +20,16 @@ func NewClient() (*Client, error) {
 	return &Client{}, nil
 }
 
-// RunBitcoinCLI executes bitcoin-cli commands and returns the output
+// RunBitcoinCLI executes bitcoin-cli commands and returns the output.
+//
+// Security Note: While this function doesn't currently accept user input directly,
+// callers must ensure that any user-provided data (e.g., addresses, labels) is
+// properly validated before being passed to bitcoin-cli. The current codebase
+// validates addresses using ValidateAddress() before import, and all numeric
+// parameters are type-safe. For future enhancements, consider:
+//   - Using a structured RPC client library instead of command-line execution
+//   - Adding explicit sanitization for string parameters
+//   - Implementing allowlists for command names
 func RunBitcoinCLI(args ...string) ([]byte, error) {
 	cmd := exec.Command("bitcoin-cli", args...)
 	output, err := cmd.Output()
@@ -51,8 +59,8 @@ func (c *Client) GetBlockchainInfo() (*BlockchainInfo, error) {
 	return &info, nil
 }
 
-// GetAddressBalance gets the balance for a specific address
-// Note: This requires txindex=1 in bitcoin.conf
+// GetAddressBalance gets the current balance for a specific address by summing UTXOs
+// Note: This requires the address to be imported as watch-only
 func (c *Client) GetAddressBalance(address string) (int64, error) {
 	// Import address as watch-only if not already imported
 	err := c.ImportAddress(address)
@@ -61,16 +69,16 @@ func (c *Client) GetAddressBalance(address string) (int64, error) {
 		// We'll continue and try to get the balance anyway
 	}
 
-	// Get received amount for this address
-	output, err := RunBitcoinCLI("getreceivedbyaddress", address, "0")
+	// Get UTXOs to calculate actual spendable balance
+	utxos, err := c.GetAddressUTXOs(address)
 	if err != nil {
 		return 0, err
 	}
 
-	balanceStr := strings.TrimSpace(string(output))
-	balanceBTC, err := strconv.ParseFloat(balanceStr, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse balance: %v", err)
+	// Sum up UTXO values to get current balance (convert BTC to satoshis)
+	var balanceBTC float64
+	for _, utxo := range utxos {
+		balanceBTC += utxo.Amount
 	}
 
 	// Convert BTC to satoshis
@@ -79,8 +87,29 @@ func (c *Client) GetAddressBalance(address string) (int64, error) {
 }
 
 // ImportAddress imports an address as watch-only
+// The parameters after the address map to Bitcoin Core's importaddress RPC:
+//   - label:  empty string (no label assigned to this address)
+//   - rescan: "false" (do not rescan the blockchain for historical transactions)
+//   - p2sh:   "false" (do not treat the address as a P2SH address)
 func (c *Client) ImportAddress(address string) error {
-	_, err := RunBitcoinCLI("importaddress", address, "", "false", "false")
+	const (
+		// importAddressLabel is left empty so the address is imported without a label
+		importAddressLabel = ""
+		// importAddressRescanDisabled controls whether Bitcoin Core rescans the blockchain
+		// for historical transactions involving this address. "false" means no rescan.
+		importAddressRescanDisabled = "false"
+		// importAddressP2SHDisabled controls whether the address is treated as a P2SH address.
+		// "false" means it is not treated as P2SH.
+		importAddressP2SHDisabled = "false"
+	)
+
+	_, err := RunBitcoinCLI(
+		"importaddress",
+		address,
+		importAddressLabel,
+		importAddressRescanDisabled,
+		importAddressP2SHDisabled,
+	)
 	return err
 }
 

@@ -94,27 +94,25 @@ func (s *BalanceService) updateAllBalances() {
 
 // updateAddressBalance updates the balance for a specific address
 func (s *BalanceService) updateAddressBalance(address db.OnchainAddress) (int64, error) {
-	// Get current balance from Bitcoin Core
-	balance, err := s.client.GetAddressBalance(address.Address)
+	// Get UTXOs to derive both balance and transaction count
+	utxos, err := s.client.GetAddressUTXOs(address.Address)
 	if err != nil {
+		log.Printf("Failed to get UTXOs for %s: %v", address.Address, err)
 		return 0, err
 	}
 
-	// Get UTXOs to count transactions
-	utxos, err := s.client.GetAddressUTXOs(address.Address)
-	if err != nil {
-		log.Printf("Warning: Failed to get UTXOs for %s: %v", address.Address, err)
-		// Continue with balance update even if UTXO fetch fails
-	}
-
+	// Calculate spendable balance from UTXOs (convert BTC to satoshis)
+	// Note: We use UTXO count as a proxy for transaction count since counting
+	// unique TxIDs requires additional processing. This provides a reasonable
+	// approximation for tracking address activity.
 	txCount := int64(len(utxos))
-
-	// Get blockchain info for current block height
-	_, err = s.client.GetBlockchainInfo()
-	if err != nil {
-		log.Printf("Warning: Failed to get blockchain info: %v", err)
-		// Continue with balance update
+	var balanceBTC float64
+	for _, utxo := range utxos {
+		balanceBTC += utxo.Amount
 	}
+
+	// Convert BTC to satoshis
+	balance := int64(balanceBTC * 100000000)
 
 	// Insert new balance record
 	balanceRecord := &db.AddressBalance{
@@ -151,26 +149,26 @@ func (s *BalanceService) UpdateSingleAddress(addressID int64) error {
 
 // GetAddressCurrentBalance gets the most recent balance for an address
 func (s *BalanceService) GetAddressCurrentBalance(address string) (int64, error) {
-	// Try to get from database first (most recent record)
-	balances, err := s.database.GetAddressBalanceHistory(address, time.Now().AddDate(0, 0, -7), time.Now())
+	// Try to get from database first (most recent record from last 30 days)
+	balances, err := s.database.GetAddressBalanceHistory(address, time.Now().AddDate(0, 0, -30), time.Now())
 	if err == nil && len(balances) > 0 {
 		// Return the most recent balance
 		return balances[len(balances)-1].Balance, nil
 	}
 
-	// Fallback to querying Bitcoin Core directly
+	// Fallback to querying Bitcoin Core directly for fresh data
 	return s.client.GetAddressBalance(address)
 }
 
 // ImportAndTrackAddress imports an address and starts tracking it
-func (s *BalanceService) ImportAndTrackAddress(address, label string) error {
+func (s *BalanceService) ImportAndTrackAddress(address, label string) (*db.OnchainAddress, error) {
 	// First validate the address
 	validation, err := s.client.ValidateAddress(address)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !validation.IsValid {
-		return ErrInvalidAddress
+		return nil, ErrInvalidAddress
 	}
 
 	// Import address to Bitcoin Core as watch-only
@@ -183,7 +181,7 @@ func (s *BalanceService) ImportAndTrackAddress(address, label string) error {
 	// Add to database
 	dbAddress, err := s.database.InsertOnchainAddress(address, label)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Update balance immediately
@@ -193,5 +191,5 @@ func (s *BalanceService) ImportAndTrackAddress(address, label string) error {
 		// Don't fail the import due to balance update failure
 	}
 
-	return nil
+	return dbAddress, nil
 }
