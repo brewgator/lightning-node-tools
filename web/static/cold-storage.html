@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Offline Balances - Bitcoin Portfolio Dashboard</title>
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -465,11 +463,11 @@
     </div>
 
     <!-- Add Account Modal -->
-    <div id="addAccountModal" class="modal">
+    <div id="addAccountModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="addAccountModalTitle">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title">Add Cold Storage Account</h2>
-                <button class="modal-close" onclick="closeAddAccountModal()">&times;</button>
+                <h2 id="addAccountModalTitle" class="modal-title">Add Cold Storage Account</h2>
+                <button class="modal-close" onclick="closeAddAccountModal()" aria-label="Close modal">&times;</button>
             </div>
             <form id="addAccountForm">
                 <div class="form-group">
@@ -500,11 +498,11 @@
     </div>
 
     <!-- Update Balance Modal -->
-    <div id="updateBalanceModal" class="modal">
+    <div id="updateBalanceModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="updateBalanceModalTitle">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title">Update Balance</h2>
-                <button class="modal-close" onclick="closeUpdateBalanceModal()">&times;</button>
+                <h2 id="updateBalanceModalTitle" class="modal-title">Update Balance</h2>
+                <button class="modal-close" onclick="closeUpdateBalanceModal()" aria-label="Close modal">&times;</button>
             </div>
             <form id="updateBalanceForm">
                 <input type="hidden" id="updateAccountId">
@@ -586,7 +584,7 @@
 
         // Create account card HTML
         function createAccountCard(account) {
-            const days = account.days_since_update || daysSinceUpdate(account.last_updated);
+            const days = Number(account.days_since_update || daysSinceUpdate(account.last_updated));
             const needsWarningFlag = account.needs_warning !== undefined ? account.needs_warning : needsWarning(account.last_updated);
             const warningIcon = needsWarningFlag ?
                 `<span class="warning-icon tooltip" data-tooltip="Not verified in ${days} days">⚠️</span>` : '';
@@ -614,7 +612,7 @@
                         <button class="btn btn-secondary" onclick="openUpdateBalanceModal(${account.id})">
                             📝 Update Balance
                         </button>
-                        <button class="btn btn-danger" onclick="deleteAccount(${account.id}, '${escapeHtml(account.name)}')">
+                        <button class="btn btn-danger delete-btn" data-account-id="${account.id}" data-account-name="${escapeHtml(account.name)}">
                             🗑️ Delete
                         </button>
                     </div>
@@ -836,7 +834,7 @@
             }
 
             if (isNaN(formData.balance) || formData.balance < 0) {
-                showFormError('balanceError', 'Balance must be a positive number');
+                showFormError('balanceError', 'Balance cannot be negative');
                 return;
             }
 
@@ -867,7 +865,7 @@
             }
 
             if (isNaN(formData.balance) || formData.balance < 0) {
-                showFormError('updateBalanceError', 'Balance must be a positive number');
+                showFormError('updateBalanceError', 'Balance cannot be negative');
                 return;
             }
 
@@ -884,6 +882,16 @@
 
         // Add account button
         document.getElementById('addAccountBtn').addEventListener('click', openAddAccountModal);
+
+        // Event delegation for delete buttons
+        document.getElementById('accountsGrid').addEventListener('click', function(e) {
+            if (e.target.classList.contains('delete-btn') || e.target.closest('.delete-btn')) {
+                const btn = e.target.classList.contains('delete-btn') ? e.target : e.target.closest('.delete-btn');
+                const accountId = parseInt(btn.dataset.accountId);
+                const accountName = btn.dataset.accountName;
+                deleteAccount(accountId, accountName);
+            }
+        });
 
         // Close modals when clicking outside
         window.addEventListener('click', function(e) {

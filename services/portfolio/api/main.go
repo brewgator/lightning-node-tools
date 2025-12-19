@@ -592,15 +592,15 @@ func (s *Server) handleAddOfflineAccount(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Add the cold storage entry to database
+	// Add the offline account to database
 	entry, err := s.db.InsertColdStorageEntry(req.Name, req.Balance, req.Notes)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			s.writeError(w, http.StatusConflict, "An account with this name already exists")
 			return
 		}
-		log.Printf("handleAddColdStorageEntry: failed to insert entry: %v", err)
-		s.writeError(w, http.StatusInternalServerError, "Failed to add cold storage entry")
+		log.Printf("handleAddOfflineAccount: failed to insert entry: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to add offline account")
 		return
 	}
 
@@ -650,20 +650,24 @@ func (s *Server) handleUpdateOfflineAccountBalance(w http.ResponseWriter, r *htt
 	// Check if entry exists
 	existingEntry, err := s.db.GetColdStorageEntryByID(id)
 	if err != nil {
-		log.Printf("handleUpdateColdStorageEntry: failed to get entry by ID: %v", err)
-		s.writeError(w, http.StatusInternalServerError, "Failed to check entry")
+		log.Printf("handleUpdateOfflineAccountBalance: failed to get entry by ID: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to check offline account")
 		return
 	}
 	if existingEntry == nil {
-		s.writeError(w, http.StatusNotFound, "Cold storage entry not found")
+		s.writeError(w, http.StatusNotFound, "Offline account not found")
 		return
 	}
 
 	// Update the entry
 	updatedEntry, err := s.db.UpdateColdStorageEntry(id, req.Name, req.Balance, req.Notes)
 	if err != nil {
-		log.Printf("handleUpdateColdStorageEntry: failed to update entry: %v", err)
-		s.writeError(w, http.StatusInternalServerError, "Failed to update cold storage entry")
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			s.writeError(w, http.StatusConflict, "An account with this name already exists")
+			return
+		}
+		log.Printf("handleUpdateOfflineAccountBalance: failed to update entry: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to update offline account")
 		return
 	}
 
@@ -688,30 +692,30 @@ func (s *Server) handleDeleteOfflineAccount(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Check if entry exists
+	// Check if offline account exists
 	entry, err := s.db.GetColdStorageEntryByID(id)
 	if err != nil {
-		log.Printf("handleDeleteColdStorageEntry: failed to get entry by ID: %v", err)
-		s.writeError(w, http.StatusInternalServerError, "Failed to check entry")
+		log.Printf("handleDeleteOfflineAccount: failed to get offline account by ID: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to check offline account")
 		return
 	}
 	if entry == nil {
-		s.writeError(w, http.StatusNotFound, "Cold storage entry not found")
+		s.writeError(w, http.StatusNotFound, "Offline account not found")
 		return
 	}
 
-	// Delete the entry
+	// Delete the offline account
 	err = s.db.DeleteColdStorageEntry(id)
 	if err != nil {
-		log.Printf("handleDeleteColdStorageEntry: failed to delete entry: %v", err)
-		s.writeError(w, http.StatusInternalServerError, "Failed to delete cold storage entry")
+		log.Printf("handleDeleteOfflineAccount: failed to delete offline account: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to delete offline account")
 		return
 	}
 
 	s.writeJSON(w, APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
-			"message": "Cold storage entry deleted successfully",
+			"message": "Offline account deleted successfully",
 			"name":    entry.Name,
 		},
 	})

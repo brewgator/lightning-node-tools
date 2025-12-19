@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -700,7 +701,7 @@ func (db *Database) UpdateColdStorageEntry(id int64, name string, balance int64,
 
 		if err := db.InsertColdStorageHistory(historyEntry); err != nil {
 			// Log error but don't fail the update
-			fmt.Printf("Warning: failed to record balance history: %v\n", err)
+			log.Printf("Warning: failed to record balance history: %v\n", err)
 		}
 	}
 
