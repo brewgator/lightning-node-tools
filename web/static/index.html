@@ -1209,8 +1209,10 @@
             // Update active tab
             document.querySelectorAll('.nav-tab').forEach(tab => {
                 tab.classList.remove('active');
+                tab.setAttribute('aria-selected', 'false');
             });
             event.target.classList.add('active');
+            event.target.setAttribute('aria-selected', 'true');
 
             // Show appropriate content or redirect
             switch(sectionName) {
