@@ -36,7 +36,7 @@ type CollectorConfig struct {
 // NewOnchainCollector creates a new onchain balance collector
 func NewOnchainCollector(config CollectorConfig) *OnchainCollector {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Set defaults
 	if config.UpdateInterval == 0 {
 		config.UpdateInterval = 30 * time.Minute
@@ -47,7 +47,7 @@ func NewOnchainCollector(config CollectorConfig) *OnchainCollector {
 	if config.RetryDelay == 0 {
 		config.RetryDelay = 5 * time.Second
 	}
-	
+
 	collector := &OnchainCollector{
 		database:   config.Database,
 		interval:   config.UpdateInterval,
@@ -56,7 +56,7 @@ func NewOnchainCollector(config CollectorConfig) *OnchainCollector {
 		retryLimit: config.RetryLimit,
 		retryDelay: config.RetryDelay,
 	}
-	
+
 	// Try to initialize Bitcoin client
 	if config.BitcoinNodeFirst {
 		bitcoinClient, err := bitcoin.NewClient()
@@ -68,25 +68,25 @@ func NewOnchainCollector(config CollectorConfig) *OnchainCollector {
 			log.Printf("₿ Connected to Bitcoin Core node")
 		}
 	}
-	
+
 	// Initialize Mempool.space client
 	collector.mempoolClient = mempool.NewClient(config.MempoolBaseURL)
 	log.Printf("🌐 Mempool.space client initialized")
-	
+
 	return collector
 }
 
 // Start begins the periodic balance collection process
 func (c *OnchainCollector) Start() {
 	log.Printf("🚀 Starting onchain balance collector (interval: %v)", c.interval)
-	
+
 	// Run initial collection immediately
 	c.collectAllBalances()
-	
+
 	// Start periodic collection
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -107,36 +107,36 @@ func (c *OnchainCollector) Stop() {
 // collectAllBalances collects balances for all tracked addresses
 func (c *OnchainCollector) collectAllBalances() {
 	log.Println("📊 Collecting balances for tracked addresses...")
-	
+
 	// Get all tracked addresses
 	addresses, err := c.database.GetOnchainAddresses()
 	if err != nil {
 		log.Printf("❌ Failed to get tracked addresses: %v", err)
 		return
 	}
-	
+
 	if len(addresses) == 0 {
 		log.Println("📭 No addresses to update")
 		return
 	}
-	
+
 	successCount := 0
 	bitcoinNodeCount := 0
 	mempoolCount := 0
-	
+
 	for _, address := range addresses {
 		if !address.Active {
 			log.Printf("⏭️  Skipping inactive address %s", truncateAddress(address.Address))
 			continue
 		}
-		
+
 		balance, txCount, source, err := c.collectAddressBalance(address)
 		if err != nil {
-			log.Printf("❌ Failed to collect balance for %s: %v", 
+			log.Printf("❌ Failed to collect balance for %s: %v",
 				truncateAddress(address.Address), err)
 			continue
 		}
-		
+
 		// Store balance record
 		balanceRecord := &db.AddressBalance{
 			AddressID: address.ID,
@@ -144,17 +144,17 @@ func (c *OnchainCollector) collectAllBalances() {
 			Balance:   balance,
 			TxCount:   txCount,
 		}
-		
+
 		err = c.database.InsertAddressBalance(balanceRecord)
 		if err != nil {
-			log.Printf("❌ Failed to store balance for %s: %v", 
+			log.Printf("❌ Failed to store balance for %s: %v",
 				truncateAddress(address.Address), err)
 			continue
 		}
-		
+
 		// Log balance change detection
 		c.logBalanceChange(address, balance, source)
-		
+
 		successCount++
 		switch source {
 		case "bitcoin-node":
@@ -162,44 +162,44 @@ func (c *OnchainCollector) collectAllBalances() {
 		case "mempool":
 			mempoolCount++
 		}
-		
+
 		// Add delay between requests to be respectful
 		time.Sleep(1 * time.Second)
 	}
-	
-	log.Printf("✅ Successfully collected %d/%d addresses (%d Bitcoin node, %d Mempool.space)", 
+
+	log.Printf("✅ Successfully collected %d/%d addresses (%d Bitcoin node, %d Mempool.space)",
 		successCount, len(addresses), bitcoinNodeCount, mempoolCount)
 }
 
 // collectAddressBalance collects balance for a single address with fallback logic
 func (c *OnchainCollector) collectAddressBalance(address db.OnchainAddress) (int64, int64, string, error) {
 	var lastErr error
-	
+
 	// Try Bitcoin node first if available
 	if c.bitcoinClient != nil {
 		balance, txCount, err := c.collectFromBitcoinNode(address.Address)
 		if err == nil {
 			return balance, txCount, "bitcoin-node", nil
 		}
-		
-		log.Printf("⚠️  Bitcoin node failed for %s: %v, falling back to Mempool.space", 
+
+		log.Printf("⚠️  Bitcoin node failed for %s: %v, falling back to Mempool.space",
 			truncateAddress(address.Address), err)
 		lastErr = err
 	}
-	
+
 	// Fallback to Mempool.space API with retry logic
 	for attempt := 1; attempt <= c.retryLimit; attempt++ {
 		balance, txCount, err := c.collectFromMempool(address.Address)
 		if err == nil {
 			return balance, txCount, "mempool", nil
 		}
-		
+
 		lastErr = err
-		
+
 		if attempt < c.retryLimit {
-			log.Printf("⚠️  Mempool.space attempt %d failed for %s: %v, retrying in %v", 
+			log.Printf("⚠️  Mempool.space attempt %d failed for %s: %v, retrying in %v",
 				attempt, truncateAddress(address.Address), err, c.retryDelay)
-			
+
 			select {
 			case <-time.After(c.retryDelay):
 				continue
@@ -208,7 +208,7 @@ func (c *OnchainCollector) collectAddressBalance(address db.OnchainAddress) (int
 			}
 		}
 	}
-	
+
 	return 0, 0, "", fmt.Errorf("all sources failed, last error: %w", lastErr)
 }
 
@@ -218,7 +218,7 @@ func (c *OnchainCollector) collectFromBitcoinNode(address string) (int64, int64,
 	if err != nil {
 		return 0, 0, err
 	}
-	
+
 	// Get UTXOs for transaction count
 	utxos, err := c.bitcoinClient.GetAddressUTXOs(address)
 	if err != nil {
@@ -226,7 +226,7 @@ func (c *OnchainCollector) collectFromBitcoinNode(address string) (int64, int64,
 		// Continue with balance only
 		return balance, 0, nil
 	}
-	
+
 	return balance, int64(len(utxos)), nil
 }
 
@@ -236,7 +236,7 @@ func (c *OnchainCollector) collectFromMempool(address string) (int64, int64, err
 	if err != nil {
 		return 0, 0, err
 	}
-	
+
 	// Get address stats for transaction count
 	stats, err := c.mempoolClient.GetAddressStats(address)
 	if err != nil {
@@ -244,7 +244,7 @@ func (c *OnchainCollector) collectFromMempool(address string) (int64, int64, err
 		// Continue with balance and UTXO count only
 		return balance, utxoCount, nil
 	}
-	
+
 	totalTxCount := stats.ChainStats.TxCount + stats.MempoolStats.TxCount
 	return balance, totalTxCount, nil
 }
@@ -257,31 +257,31 @@ func (c *OnchainCollector) logBalanceChange(address db.OnchainAddress, newBalanc
 		time.Now().AddDate(0, 0, -1), // Last 24 hours
 		time.Now(),
 	)
-	
+
 	if err != nil || len(balances) == 0 {
 		log.Printf("📊 New balance for %s: %d sats [%s] (no previous data)",
 			truncateAddress(address.Address), newBalance, source)
 		return
 	}
-	
+
 	// Get the most recent balance (excluding current update)
 	if len(balances) == 1 {
 		log.Printf("📊 Balance for %s: %d sats [%s] (first update)",
 			truncateAddress(address.Address), newBalance, source)
 		return
 	}
-	
+
 	previousBalance := balances[len(balances)-2].Balance
-	
+
 	if newBalance != previousBalance {
 		change := newBalance - previousBalance
 		changeStr := "📈"
 		if change < 0 {
 			changeStr = "📉"
 		}
-		
+
 		log.Printf("%s Balance change for %s: %d → %d sats (Δ%+d) [%s]",
-			changeStr, truncateAddress(address.Address), 
+			changeStr, truncateAddress(address.Address),
 			previousBalance, newBalance, change, source)
 	} else {
 		log.Printf("📊 Balance unchanged for %s: %d sats [%s]",
@@ -298,12 +298,12 @@ func (c *OnchainCollector) CollectSingleAddress(addressID int64) error {
 	if address == nil {
 		return db.ErrNotFound
 	}
-	
+
 	balance, txCount, source, err := c.collectAddressBalance(*address)
 	if err != nil {
 		return err
 	}
-	
+
 	// Store balance record
 	balanceRecord := &db.AddressBalance{
 		AddressID: address.ID,
@@ -311,15 +311,15 @@ func (c *OnchainCollector) CollectSingleAddress(addressID int64) error {
 		Balance:   balance,
 		TxCount:   txCount,
 	}
-	
+
 	err = c.database.InsertAddressBalance(balanceRecord)
 	if err != nil {
 		return err
 	}
-	
+
 	// Log the update
 	c.logBalanceChange(*address, balance, source)
-	
+
 	return nil
 }
 
@@ -332,12 +332,12 @@ func (c *OnchainCollector) GetCollectorStats() map[string]interface{} {
 		"retry_limit":        c.retryLimit,
 		"retry_delay_seconds": c.retryDelay.Seconds(),
 	}
-	
+
 	if c.mempoolClient != nil {
 		// Rate limiter status
 		stats["mempool_rate_limited"] = true
 	}
-	
+
 	return stats
 }
 

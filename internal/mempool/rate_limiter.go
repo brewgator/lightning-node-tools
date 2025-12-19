@@ -26,16 +26,16 @@ func NewRateLimiter(maxRequests int, interval time.Duration) *RateLimiter {
 		maxTokens: maxRequests,
 		interval:  interval,
 	}
-	
+
 	// Fill initial tokens
 	for i := 0; i < maxRequests; i++ {
 		rl.tokens <- struct{}{}
 	}
-	
+
 	// Start token replenishment
 	rl.ticker = time.NewTicker(interval / time.Duration(maxRequests))
 	go rl.replenishTokens()
-	
+
 	return rl
 }
 
@@ -52,7 +52,7 @@ func (rl *RateLimiter) WaitWithContext(ctx context.Context) error {
 		return fmt.Errorf("rate limiter is stopped")
 	}
 	rl.mu.RUnlock()
-	
+
 	select {
 	case <-rl.tokens:
 		return nil
@@ -69,7 +69,7 @@ func (rl *RateLimiter) TryAcquire() bool {
 		return false
 	}
 	rl.mu.RUnlock()
-	
+
 	select {
 	case <-rl.tokens:
 		return true
@@ -82,7 +82,7 @@ func (rl *RateLimiter) TryAcquire() bool {
 func (rl *RateLimiter) Stop() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	
+
 	if !rl.stopped {
 		rl.stopped = true
 		rl.ticker.Stop()
@@ -96,11 +96,11 @@ func (rl *RateLimiter) replenishTokens() {
 		rl.mu.RLock()
 		stopped := rl.stopped
 		rl.mu.RUnlock()
-		
+
 		if stopped {
 			return
 		}
-		
+
 		select {
 		case rl.tokens <- struct{}{}:
 		default:
@@ -113,10 +113,10 @@ func (rl *RateLimiter) replenishTokens() {
 func (rl *RateLimiter) Available() int {
 	rl.mu.RLock()
 	defer rl.mu.RUnlock()
-	
+
 	if rl.stopped {
 		return 0
 	}
-	
+
 	return len(rl.tokens)
 }
