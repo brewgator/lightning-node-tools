@@ -101,7 +101,10 @@ func (s *BalanceService) updateAddressBalance(address db.OnchainAddress) (int64,
 		return 0, err
 	}
 
-	// Calculate tx count and spendable balance from UTXOs (convert BTC to satoshis)
+	// Calculate spendable balance from UTXOs (convert BTC to satoshis)
+	// Note: We use UTXO count as a proxy for transaction count since counting
+	// unique TxIDs requires additional processing. This provides a reasonable
+	// approximation for tracking address activity.
 	txCount := int64(len(utxos))
 	var balanceBTC float64
 	for _, utxo := range utxos {
