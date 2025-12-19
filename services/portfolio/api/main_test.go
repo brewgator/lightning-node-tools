@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -366,4 +368,465 @@ func TestNonExistentEndpoint(t *testing.T) {
 	server.router.ServeHTTP(rr, req)
 
 	testutils.AssertEqual(t, rr.Code, http.StatusNotFound)
+}
+
+func TestGetOnchainAddressesEmpty(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	req, err := http.NewRequest("GET", "/api/onchain/addresses", nil)
+	testutils.AssertNoError(t, err)
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusOK)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, true)
+
+	// When there are no addresses, Go's json.Unmarshal may treat the empty slice as nil
+	// Check if data is nil (empty) or an empty array
+	if response.Data == nil {
+		return // Empty is acceptable
+	}
+
+	dataArray, ok := response.Data.([]interface{})
+	if !ok {
+		t.Fatalf("Expected data to be an array or nil, got type %T", response.Data)
+	}
+	testutils.AssertEqual(t, len(dataArray), 0)
+}
+
+func TestAddOnchainAddress(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	// Test valid Bitcoin address
+	payload := `{"address": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", "label": "Test Wallet"}`
+	req, err := http.NewRequest("POST", "/api/onchain/addresses", strings.NewReader(payload))
+	testutils.AssertNoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusOK)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, true)
+
+	// Verify response structure
+	dataMap, ok := response.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+
+	testutils.AssertEqual(t, dataMap["address"], "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh")
+	testutils.AssertEqual(t, dataMap["label"], "Test Wallet")
+	testutils.AssertEqual(t, dataMap["active"], true)
+}
+
+func TestAddOnchainAddressInvalidJSON(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	// Test invalid JSON
+	payload := `{"address": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", "label": "Test Wallet"`
+	req, err := http.NewRequest("POST", "/api/onchain/addresses", strings.NewReader(payload))
+	testutils.AssertNoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusBadRequest)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, false)
+}
+
+func TestAddOnchainAddressEmpty(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	// Test missing address
+	payload := `{"label": "Test Wallet"}`
+	req, err := http.NewRequest("POST", "/api/onchain/addresses", strings.NewReader(payload))
+	testutils.AssertNoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusBadRequest)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, false)
+	if !strings.Contains(response.Error, "Address is required") {
+		t.Errorf("Expected error message about required address, got: %s", response.Error)
+	}
+}
+
+func TestAddOnchainAddressInvalidFormat(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	// Test invalid Bitcoin address
+	payload := `{"address": "notavalidaddress", "label": "Test"}`
+	req, err := http.NewRequest("POST", "/api/onchain/addresses", strings.NewReader(payload))
+	testutils.AssertNoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusBadRequest)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, false)
+	if !strings.Contains(response.Error, "Invalid Bitcoin address") {
+		t.Errorf("Expected error message about invalid address, got: %s", response.Error)
+	}
+}
+
+func TestAddOnchainAddressDuplicate(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	address := "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+
+	// Add address first time
+	payload := fmt.Sprintf(`{"address": "%s", "label": "First"}`, address)
+	req, err := http.NewRequest("POST", "/api/onchain/addresses", strings.NewReader(payload))
+	testutils.AssertNoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+	testutils.AssertEqual(t, rr.Code, http.StatusOK)
+
+	// Try to add same address again
+	payload = fmt.Sprintf(`{"address": "%s", "label": "Second"}`, address)
+	req, err = http.NewRequest("POST", "/api/onchain/addresses", strings.NewReader(payload))
+	testutils.AssertNoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	rr = httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusConflict)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, false)
+	if !strings.Contains(response.Error, "already being tracked") {
+		t.Errorf("Expected error message about duplicate address, got: %s", response.Error)
+	}
+}
+
+func TestGetOnchainAddressesWithData(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	// Add some addresses
+	addresses := []string{
+		"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+		"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+	}
+
+	for i, addr := range addresses {
+		payload := fmt.Sprintf(`{"address": "%s", "label": "Wallet %d"}`, addr, i+1)
+		req, err := http.NewRequest("POST", "/api/onchain/addresses", strings.NewReader(payload))
+		testutils.AssertNoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+
+		rr := httptest.NewRecorder()
+		server.router.ServeHTTP(rr, req)
+		testutils.AssertEqual(t, rr.Code, http.StatusOK)
+	}
+
+	// Get all addresses
+	req, err := http.NewRequest("GET", "/api/onchain/addresses", nil)
+	testutils.AssertNoError(t, err)
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusOK)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, true)
+
+	dataArray, ok := response.Data.([]interface{})
+	if !ok {
+		t.Fatal("Expected data to be an array")
+	}
+
+	if len(dataArray) != 2 {
+		t.Errorf("Expected 2 addresses, got %d", len(dataArray))
+	}
+}
+
+func TestDeleteOnchainAddress(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	// Add an address first
+	payload := `{"address": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", "label": "To Delete"}`
+	req, err := http.NewRequest("POST", "/api/onchain/addresses", strings.NewReader(payload))
+	testutils.AssertNoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+	testutils.AssertEqual(t, rr.Code, http.StatusOK)
+
+	var addResponse APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &addResponse)
+	testutils.AssertNoError(t, err)
+
+	dataMap, ok := addResponse.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+	idFloat, ok := dataMap["id"].(float64)
+	if !ok {
+		t.Fatal("Expected id to be a number")
+	}
+	addressID := int64(idFloat)
+
+	// Delete the address
+	req, err = http.NewRequest("DELETE", fmt.Sprintf("/api/onchain/addresses/%d", addressID), nil)
+	testutils.AssertNoError(t, err)
+
+	rr = httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusOK)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, true)
+}
+
+func TestDeleteOnchainAddressNotFound(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	// Try to delete non-existent address
+	req, err := http.NewRequest("DELETE", "/api/onchain/addresses/99999", nil)
+	testutils.AssertNoError(t, err)
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusNotFound)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, false)
+}
+
+func TestDeleteOnchainAddressInvalidID(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	// Try to delete with invalid ID (non-numeric)
+	req, err := http.NewRequest("DELETE", "/api/onchain/addresses/notanumber", nil)
+	testutils.AssertNoError(t, err)
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	// The router may not match the route with non-numeric ID and return 404,
+	// or it may match and return 400. Both are acceptable for invalid input.
+	if rr.Code != http.StatusBadRequest && rr.Code != http.StatusNotFound {
+		t.Errorf("Expected 400 or 404, got %d", rr.Code)
+	}
+}
+
+func TestOnchainHistoryMissingAddress(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	req, err := http.NewRequest("GET", "/api/onchain/history", nil)
+	testutils.AssertNoError(t, err)
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusBadRequest)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, false)
+	if !strings.Contains(response.Error, "Address parameter is required") {
+		t.Errorf("Expected error about missing address, got: %s", response.Error)
+	}
+}
+
+func TestOnchainHistoryInvalidDays(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	req, err := http.NewRequest("GET", "/api/onchain/history?address=bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh&days=1000", nil)
+	testutils.AssertNoError(t, err)
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusBadRequest)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, false)
+	if !strings.Contains(response.Error, "Invalid days parameter") {
+		t.Errorf("Expected error about invalid days, got: %s", response.Error)
+	}
+}
+
+func TestOnchainHistoryDefaultDays(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	req, err := http.NewRequest("GET", "/api/onchain/history?address=bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", nil)
+	testutils.AssertNoError(t, err)
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusOK)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, true)
+
+	// Verify Chart.js format
+	dataMap, ok := response.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+
+	// Check required Chart.js fields
+	requiredFields := []string{"labels", "datasets", "metadata"}
+	for _, field := range requiredFields {
+		if _, exists := dataMap[field]; !exists {
+			t.Errorf("Missing required Chart.js field: %s", field)
+		}
+	}
+
+	// Check metadata
+	metadata, ok := dataMap["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected metadata to be a map")
+	}
+
+	if _, exists := metadata["address"]; !exists {
+		t.Error("Missing address in metadata")
+	}
+}
+
+func TestOnchainHistoryAllDays(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	req, err := http.NewRequest("GET", "/api/onchain/history?address=bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh&days=all", nil)
+	testutils.AssertNoError(t, err)
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusOK)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, true)
+
+	// Verify response structure
+	dataMap, ok := response.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+
+	// Check that all required fields exist
+	if _, exists := dataMap["labels"]; !exists {
+		t.Error("Missing labels field")
+	}
+	if _, exists := dataMap["datasets"]; !exists {
+		t.Error("Missing datasets field")
+	}
+	if _, exists := dataMap["metadata"]; !exists {
+		t.Error("Missing metadata field")
+	}
+}
+
+func TestOnchainHistoryCustomDays(t *testing.T) {
+	server := setupTestServer(t)
+	defer server.db.Close()
+
+	req, err := http.NewRequest("GET", "/api/onchain/history?address=bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh&days=7", nil)
+	testutils.AssertNoError(t, err)
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	testutils.AssertEqual(t, rr.Code, http.StatusOK)
+
+	var response APIResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	testutils.AssertNoError(t, err)
+
+	testutils.AssertEqual(t, response.Success, true)
+
+	dataMap, ok := response.Data.(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected data to be a map")
+	}
+	metadata, ok := dataMap["metadata"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected metadata to be a map")
+	}
+
+	// days_requested should be 7
+	daysRequestedFloat, ok := metadata["days_requested"].(float64)
+	if !ok {
+		t.Fatal("Expected days_requested to be a number")
+	}
+	daysRequested := int(daysRequestedFloat)
+	if daysRequested != 7 {
+		t.Errorf("Expected days_requested to be 7, got %d", daysRequested)
+	}
 }

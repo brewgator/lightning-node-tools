@@ -13,9 +13,9 @@ SERVICES=(
 )
 
 BINARIES=(
-    "dashboard-api:cmd/dashboard-api"
-    "forwarding-collector:cmd/forwarding-collector"
-    "dashboard-collector:cmd/dashboard-collector"
+    "portfolio-api:services/portfolio/api"
+    "forwarding-collector:services/lightning/forwarding-collector"
+    "portfolio-collector:services/portfolio/collector"
 )
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
