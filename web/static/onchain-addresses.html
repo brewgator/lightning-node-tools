@@ -549,6 +549,18 @@
         // API Configuration - use current origin to match the server's port
         const API_BASE = window.location.origin + '/api';
 
+        // Utility function to escape HTML and prevent XSS attacks
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe
+                .toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
             loadAddresses();
@@ -922,9 +934,11 @@
             document.getElementById('deleteModal').classList.add('show');
 
             const info = document.getElementById('deleteAddressInfo');
+            const safeAddress = escapeHtml(address);
+            const safeLabel = label ? escapeHtml(label) : 'No label';
             info.innerHTML = `
-                <div style="font-family: monospace; color: #58a6ff; margin-bottom: 4px;">${address}</div>
-                <div style="color: #8b949e; font-size: 12px;">${label || 'No label'}</div>
+                <div style="font-family: monospace; color: #58a6ff; margin-bottom: 4px;">${safeAddress}</div>
+                <div style="color: #8b949e; font-size: 12px;">${safeLabel}</div>
             `;
         }
 
