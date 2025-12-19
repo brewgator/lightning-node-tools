@@ -189,7 +189,7 @@ func (s *Server) handlePortfolioHistory(w http.ResponseWriter, r *http.Request) 
 		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and "+strconv.Itoa(MaxHistoryDays)+", or 'all'")
 			return
 		}
 		// Calculate time range
@@ -226,7 +226,7 @@ func (s *Server) handleLightningFees(w http.ResponseWriter, r *http.Request) {
 		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and "+strconv.Itoa(MaxHistoryDays)+", or 'all'")
 			return
 		}
 		// Calculate time range
@@ -301,7 +301,7 @@ func (s *Server) handleLightningForwards(w http.ResponseWriter, r *http.Request)
 		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and "+strconv.Itoa(MaxHistoryDays)+", or 'all'")
 			return
 		}
 		// Calculate time range
@@ -543,7 +543,7 @@ func (s *Server) handleOnchainHistory(w http.ResponseWriter, r *http.Request) {
 		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and "+strconv.Itoa(MaxHistoryDays)+", or 'all'")
 			return
 		}
 		// Calculate time range
@@ -798,7 +798,7 @@ func (s *Server) handleOfflineHistory(w http.ResponseWriter, r *http.Request) {
 		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
 			days = d
 		} else {
-			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and "+strconv.Itoa(MaxHistoryDays)+", or 'all'")
 			return
 		}
 		// Calculate time range

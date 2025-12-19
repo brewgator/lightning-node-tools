@@ -36,66 +36,66 @@ type UTXO struct {
 
 // AddressTransaction represents a transaction involving an address
 type AddressTransaction struct {
-	Account         string    `json:"account,omitempty"`
-	Address         string    `json:"address"`
-	Category        string    `json:"category"` // "send", "receive", "generate", etc.
-	Amount          float64   `json:"amount"`
-	Label           string    `json:"label,omitempty"`
-	Vout            int       `json:"vout"`
-	Fee             float64   `json:"fee,omitempty"`
-	Confirmations   int64     `json:"confirmations"`
-	Blockhash       string    `json:"blockhash,omitempty"`
-	Blockindex      int       `json:"blockindex,omitempty"`
-	Blocktime       int64     `json:"blocktime,omitempty"`
-	TxID            string    `json:"txid"`
-	WalletConflicts []string  `json:"walletconflicts"`
-	Time            int64     `json:"time"`
-	TimeReceived    int64     `json:"timereceived"`
-	Comment         string    `json:"comment,omitempty"`
-	To              string    `json:"to,omitempty"`
-	OtherAccount    string    `json:"otheraccount,omitempty"`
-	Abandoned       bool      `json:"abandoned,omitempty"`
+	Account         string   `json:"account,omitempty"`
+	Address         string   `json:"address"`
+	Category        string   `json:"category"` // "send", "receive", "generate", etc.
+	Amount          float64  `json:"amount"`
+	Label           string   `json:"label,omitempty"`
+	Vout            int      `json:"vout"`
+	Fee             float64  `json:"fee,omitempty"`
+	Confirmations   int64    `json:"confirmations"`
+	Blockhash       string   `json:"blockhash,omitempty"`
+	Blockindex      int      `json:"blockindex,omitempty"`
+	Blocktime       int64    `json:"blocktime,omitempty"`
+	TxID            string   `json:"txid"`
+	WalletConflicts []string `json:"walletconflicts"`
+	Time            int64    `json:"time"`
+	TimeReceived    int64    `json:"timereceived"`
+	Comment         string   `json:"comment,omitempty"`
+	To              string   `json:"to,omitempty"`
+	OtherAccount    string   `json:"otheraccount,omitempty"`
+	Abandoned       bool     `json:"abandoned,omitempty"`
 }
 
 // AddressValidation represents the result of validateaddress
 type AddressValidation struct {
-	IsValid      bool   `json:"isvalid"`
-	Address      string `json:"address,omitempty"`
-	ScriptType   string `json:"scripttype,omitempty"`
-	IsScript     bool   `json:"isscript,omitempty"`
-	IsWitness    bool   `json:"iswitness,omitempty"`
-	WitnessVersion int  `json:"witness_version,omitempty"`
+	IsValid        bool   `json:"isvalid"`
+	Address        string `json:"address,omitempty"`
+	ScriptType     string `json:"scripttype,omitempty"`
+	IsScript       bool   `json:"isscript,omitempty"`
+	IsWitness      bool   `json:"iswitness,omitempty"`
+	WitnessVersion int    `json:"witness_version,omitempty"`
 	WitnessProgram string `json:"witness_program,omitempty"`
-	ErrorMessage string `json:"error,omitempty"`
+	ErrorMessage   string `json:"error,omitempty"`
 }
 
 // AddressInfo represents detailed address information (Bitcoin Core 0.17+)
 type AddressInfo struct {
-	Address        string   `json:"address"`
-	ScriptPubKey   string   `json:"scriptpubkey"`
-	IsWitness      bool     `json:"iswitness"`
-	WitnessVersion int      `json:"witness_version,omitempty"`
-	WitnessProgram string   `json:"witness_program,omitempty"`
-	IsScript       bool     `json:"isscript"`
-	IsChange       bool     `json:"ischange"`
-	IsMine         bool     `json:"ismine"`
-	IsWatchOnly    bool     `json:"iswatchonly"`
-	Solvable       bool     `json:"solvable"`
-	Desc           string   `json:"desc,omitempty"`
-	Parent         string   `json:"parent_desc,omitempty"`
-	Checksum       string   `json:"checksum,omitempty"`
-	HDKeyPath      string   `json:"hdkeypath,omitempty"`
-	HDSeedID       string   `json:"hdseedid,omitempty"`
-	HDMasterFingerprint string `json:"hdmasterfingerprint,omitempty"`
-	Labels         []string `json:"labels"`
+	Address             string   `json:"address"`
+	ScriptPubKey        string   `json:"scriptpubkey"`
+	IsWitness           bool     `json:"iswitness"`
+	WitnessVersion      int      `json:"witness_version,omitempty"`
+	WitnessProgram      string   `json:"witness_program,omitempty"`
+	IsScript            bool     `json:"isscript"`
+	IsChange            bool     `json:"ischange"`
+	IsMine              bool     `json:"ismine"`
+	IsWatchOnly         bool     `json:"iswatchonly"`
+	Solvable            bool     `json:"solvable"`
+	Desc                string   `json:"desc,omitempty"`
+	Parent              string   `json:"parent_desc,omitempty"`
+	Checksum            string   `json:"checksum,omitempty"`
+	HDKeyPath           string   `json:"hdkeypath,omitempty"`
+	HDSeedID            string   `json:"hdseedid,omitempty"`
+	HDMasterFingerprint string   `json:"hdmasterfingerprint,omitempty"`
+	Labels              []string `json:"labels"`
 }
 
 // BalanceUpdate represents a balance update for an address
 type BalanceUpdate struct {
 	Address       string    `json:"address"`
-	Balance       int64     `json:"balance"`        // Balance in satoshis
-	Confirmations int64     `json:"confirmations"`  // Number of confirmations
-	TxCount       int64     `json:"tx_count"`       // Number of transactions
+	Balance       int64     `json:"balance"`       // Balance in satoshis
+	Confirmations int64     `json:"confirmations"` // Number of confirmations
+	TxCount       int64     `json:"tx_count"`      // Number of transactions
 	LastUpdated   time.Time `json:"last_updated"`
 	BlockHeight   int64     `json:"block_height"`
 }

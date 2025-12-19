@@ -328,11 +328,11 @@ func (c *OnchainCollector) CollectSingleAddress(addressID int64) error {
 // GetCollectorStats returns statistics about the collector
 func (c *OnchainCollector) GetCollectorStats() map[string]interface{} {
 	return map[string]interface{}{
-		"interval_minutes":     c.interval.Minutes(),
-		"bitcoin_available":    c.bitcoinClient != nil,
-		"mempool_available":    c.mempoolClient != nil,
-		"retry_limit":          c.retryLimit,
-		"retry_delay_seconds":  c.retryDelay.Seconds(),
+		"interval_minutes":      c.interval.Minutes(),
+		"bitcoin_available":     c.bitcoinClient != nil,
+		"mempool_available":     c.mempoolClient != nil,
+		"retry_limit":           c.retryLimit,
+		"retry_delay_seconds":   c.retryDelay.Seconds(),
 		"request_delay_seconds": c.requestDelay.Seconds(),
 	}
 }

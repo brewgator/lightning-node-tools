@@ -51,37 +51,37 @@ type UTXO struct {
 
 // Transaction represents a transaction from Mempool.space
 type Transaction struct {
-	TxID     string  `json:"txid"`
-	Version  int     `json:"version"`
-	LockTime int64   `json:"locktime"`
-	Vin      []Input `json:"vin"`
+	TxID     string   `json:"txid"`
+	Version  int      `json:"version"`
+	LockTime int64    `json:"locktime"`
+	Vin      []Input  `json:"vin"`
 	Vout     []Output `json:"vout"`
-	Size     int     `json:"size"`
-	Weight   int     `json:"weight"`
-	Fee      int64   `json:"fee"`
-	Status   Status  `json:"status"`
+	Size     int      `json:"size"`
+	Weight   int      `json:"weight"`
+	Fee      int64    `json:"fee"`
+	Status   Status   `json:"status"`
 }
 
 // Input represents a transaction input
 type Input struct {
-	TxID           string      `json:"txid"`
-	Vout           int         `json:"vout"`
-	PrevOut        *Output     `json:"prevout,omitempty"`
-	ScriptSig      string      `json:"scriptsig"`
-	ScriptSigAsm   string      `json:"scriptsig_asm"`
-	Witness        []string    `json:"witness,omitempty"`
-	IsCoinbase     bool        `json:"is_coinbase"`
-	Sequence       int64       `json:"sequence"`
-	InnerWitnessScript string  `json:"inner_witnessscript_asm,omitempty"`
+	TxID               string   `json:"txid"`
+	Vout               int      `json:"vout"`
+	PrevOut            *Output  `json:"prevout,omitempty"`
+	ScriptSig          string   `json:"scriptsig"`
+	ScriptSigAsm       string   `json:"scriptsig_asm"`
+	Witness            []string `json:"witness,omitempty"`
+	IsCoinbase         bool     `json:"is_coinbase"`
+	Sequence           int64    `json:"sequence"`
+	InnerWitnessScript string   `json:"inner_witnessscript_asm,omitempty"`
 }
 
 // Output represents a transaction output
 type Output struct {
-	ScriptPubKey    string `json:"scriptpubkey"`
-	ScriptPubKeyAsm string `json:"scriptpubkey_asm"`
+	ScriptPubKey     string `json:"scriptpubkey"`
+	ScriptPubKeyAsm  string `json:"scriptpubkey_asm"`
 	ScriptPubKeyType string `json:"scriptpubkey_type"`
 	ScriptPubKeyAddr string `json:"scriptpubkey_address,omitempty"`
-	Value           int64  `json:"value"`
+	Value            int64  `json:"value"`
 }
 
 // Status represents transaction/block status
@@ -94,7 +94,7 @@ type Status struct {
 
 // ChainTips represents blockchain tip information
 type ChainTips struct {
-	Height    int64     `json:"height"`
+	Height int64 `json:"height"`
 	// QueryTime reflects when the API was queried, not when the block was mined.
 	// To get the actual block time, fetch block details separately.
 	QueryTime time.Time `json:"query_time"`
@@ -102,13 +102,13 @@ type ChainTips struct {
 
 // BalanceUpdate represents a balance update from Mempool.space
 type BalanceUpdate struct {
-	Address       string    `json:"address"`
-	Balance       int64     `json:"balance"`        // Balance in satoshis
-	TxCount       int64     `json:"tx_count"`       // Total number of transactions
-	UTXOCount     int64     `json:"utxo_count"`     // Number of UTXOs
-	LastUpdated   time.Time `json:"last_updated"`
-	BlockHeight   int64     `json:"block_height"`
-	Source        string    `json:"source"`         // "mempool" for this client
+	Address     string    `json:"address"`
+	Balance     int64     `json:"balance"`    // Balance in satoshis
+	TxCount     int64     `json:"tx_count"`   // Total number of transactions
+	UTXOCount   int64     `json:"utxo_count"` // Number of UTXOs
+	LastUpdated time.Time `json:"last_updated"`
+	BlockHeight int64     `json:"block_height"`
+	Source      string    `json:"source"` // "mempool" for this client
 }
 
 // RateLimitError represents a rate limit error

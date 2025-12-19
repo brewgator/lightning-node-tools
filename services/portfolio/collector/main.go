@@ -140,12 +140,12 @@ func main() {
 			}
 		case <-sigChan:
 			fmt.Println("Received shutdown signal, exiting...")
-			
+
 			// Stop onchain collector if running
 			if config.OnchainCollector != nil {
 				config.OnchainCollector.Stop()
 			}
-			
+
 			return
 		}
 	}
@@ -260,25 +260,25 @@ func (c *Collector) collectTrackedAddressesData() (int64, error) {
 	}
 
 	var totalBalance int64
-	
+
 	// For each address, get the most recent balance
 	for _, addr := range addresses {
 		if !addr.Active {
 			continue
 		}
-		
+
 		// Get recent balance history for this address (30 days to ensure we capture the most recent balance)
 		balances, err := c.db.GetAddressBalanceHistory(
 			addr.Address,
 			time.Now().AddDate(0, 0, -30), // Last 30 days
 			time.Now(),
 		)
-		
+
 		if err != nil {
 			log.Printf("Warning: Failed to get balance history for %s: %v", addr.Address, err)
 			continue
 		}
-		
+
 		if len(balances) > 0 {
 			// Use most recent balance
 			totalBalance += balances[len(balances)-1].Balance
