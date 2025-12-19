@@ -4,7 +4,7 @@
 all: build
 
 # Build all tools
-build: channel-manager telegram-monitor dashboard-collector dashboard-api forwarding-collector webhook-deployer
+build: channel-manager telegram-monitor portfolio-collector portfolio-api forwarding-collector webhook-deployer
 
 # Build channel-manager
 channel-manager:
@@ -18,17 +18,24 @@ telegram-monitor:
 	@mkdir -p bin
 	go build -o bin/telegram-monitor ./tools/monitoring
 
-# Build dashboard-collector
-dashboard-collector:
-	@echo "Building dashboard-collector..."
+# Build portfolio-collector
+portfolio-collector:
+	@echo "Building portfolio-collector..."
 	@mkdir -p bin
-	go build -o bin/dashboard-collector ./services/portfolio/collector
+	go build -o bin/portfolio-collector ./services/portfolio/collector
 
-# Build dashboard-api
-dashboard-api:
-	@echo "Building dashboard-api..."
+# Build portfolio-api
+portfolio-api:
+	@echo "Building portfolio-api..."
 	@mkdir -p bin
-	go build -o bin/dashboard-api ./services/portfolio/api
+	go build -o bin/portfolio-api ./services/portfolio/api
+
+# Legacy aliases for backward compatibility (portfolio services ARE the dashboard services)
+dashboard-collector: portfolio-collector
+	@echo "Note: dashboard-collector is an alias for portfolio-collector"
+
+dashboard-api: portfolio-api
+	@echo "Note: dashboard-api is an alias for portfolio-api"
 
 # Build forwarding-collector
 forwarding-collector:
@@ -42,13 +49,17 @@ webhook-deployer:
 	@mkdir -p bin
 	go build -o bin/webhook-deployer ./services/deployment/webhook-deployer
 
-# Build and start complete dashboard (collector + api)
-dashboard: dashboard-collector dashboard-api
-	@echo "Dashboard components built successfully!"
+# Build complete portfolio system (collector + api)
+portfolio: portfolio-collector portfolio-api
+	@echo "Portfolio components built successfully!"
 	@echo "To start:"
-	@echo "  1. ./bin/dashboard-collector --oneshot  # Test data collection"
-	@echo "  2. ./bin/dashboard-api                  # Start web API"
+	@echo "  1. ./bin/portfolio-collector --oneshot  # Test data collection"
+	@echo "  2. ./bin/portfolio-api                  # Start web API"
 	@echo "  3. Open http://localhost:8080           # View dashboard"
+
+# Build and start complete dashboard (collector + api) - alias for portfolio
+dashboard: portfolio
+	@echo "Note: dashboard is an alias for portfolio - they are the same services"
 
 # Clean build artifacts
 clean:
@@ -136,7 +147,7 @@ install-services-auto:
 	@echo "Installing systemd services automatically..."
 	./deployment/scripts/install-services-auto.sh
 
-# Install crontab automatically 
+# Install crontab automatically
 install-crontab:
 	@echo "Installing crontab jobs..."
 	./deployment/scripts/install-crontab-auto.sh
@@ -169,10 +180,13 @@ help:
 	@echo "  build (default)     - Build all tools"
 	@echo "  channel-manager     - Build only channel-manager"
 	@echo "  telegram-monitor    - Build only telegram-monitor"
+	@echo "  portfolio-collector - Build only portfolio-collector"
+	@echo "  portfolio-api       - Build only portfolio-api"
 	@echo "  dashboard-collector - Build only dashboard-collector"
 	@echo "  dashboard-api       - Build only dashboard-api"
 	@echo "  forwarding-collector - Build only forwarding-collector"
-	@echo "  dashboard           - Build complete dashboard"
+	@echo "  portfolio           - Build complete portfolio system"
+	@echo "  dashboard           - Build complete dashboard system"
 	@echo "  install-services    - Install/update systemd service files"
 	@echo "  install-services-auto - Install systemd services automatically (recommended)"
 	@echo "  install-crontab     - Install crontab jobs automatically"

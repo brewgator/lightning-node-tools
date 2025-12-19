@@ -31,7 +31,11 @@ func NewClient() (*Client, error) {
 //   - Adding explicit sanitization for string parameters
 //   - Implementing allowlists for command names
 func RunBitcoinCLI(args ...string) ([]byte, error) {
-	cmd := exec.Command("bitcoin-cli", args...)
+	// Add wallet parameter for our tracking wallet
+	fullArgs := []string{"-rpcwallet=tracker"}
+	fullArgs = append(fullArgs, args...)
+
+	cmd := exec.Command("bitcoin-cli", fullArgs...)
 	output, err := cmd.Output()
 	if err != nil {
 		// If there's an error, try to get stderr for more details
