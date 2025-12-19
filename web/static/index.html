@@ -341,7 +341,7 @@
             const portfolioVal = localStorage.getItem(STORAGE_KEYS.PORTFOLIO_RANGE);
             const feesVal = localStorage.getItem(STORAGE_KEYS.FEES_RANGE);
             const forwardsVal = localStorage.getItem(STORAGE_KEYS.FORWARDS_RANGE);
-            
+
             currentPortfolioRange = portfolioVal === 'all' ? 'all' : (parseInt(portfolioVal) || 30);
             currentFeesRange = feesVal === 'all' ? 'all' : (parseInt(feesVal) || 30);
             currentForwardsRange = forwardsVal === 'all' ? 'all' : (parseInt(forwardsVal) || 30);
