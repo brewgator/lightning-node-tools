@@ -1223,16 +1223,20 @@
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                     break;
                 case 'lightning':
-                    console.info('Lightning management page - would navigate to dedicated Lightning page');
+                    // TODO: Create dedicated Lightning management page
+                    alert('Lightning management page coming soon!');
                     break;
                 case 'onchain':
-                    console.info('On-chain management page - would navigate to onchain addresses page');
+                    // Redirect to existing on-chain addresses page
+                    window.location.href = '/onchain-addresses.html';
                     break;
                 case 'offline':
-                    console.info('Cold storage management page - would navigate to cold storage accounts page');
+                    // Redirect to existing cold storage page
+                    window.location.href = '/cold-storage.html';
                     break;
                 case 'analytics':
-                    console.info('Analytics page - would navigate to dedicated analytics page');
+                    // TODO: Create dedicated analytics page
+                    alert('Analytics page coming soon!');
                     break;
             }
         }
