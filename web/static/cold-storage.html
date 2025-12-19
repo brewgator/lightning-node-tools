@@ -466,7 +466,7 @@
     <div id="addAccountModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="addAccountModalTitle">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="addAccountModalTitle" class="modal-title">Add Cold Storage Account</h2>
+                <h2 id="addAccountModalTitle" class="modal-title">Add Offline Account</h2>
                 <button class="modal-close" onclick="closeAddAccountModal()" aria-label="Close modal">&times;</button>
             </div>
             <form id="addAccountForm">
@@ -576,7 +576,7 @@
         function showLoading() {
             const status = document.getElementById('status');
             status.className = 'status loading';
-            status.textContent = '⏳ Loading cold storage accounts...';
+            status.textContent = '⏳ Loading offline accounts...';
             status.style.display = 'block';
             document.getElementById('accountsContainer').style.display = 'none';
             document.getElementById('emptyState').style.display = 'none';
