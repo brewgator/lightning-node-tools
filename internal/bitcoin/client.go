@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
-	"strings"
 )
 
 // Client represents a Bitcoin Core RPC client
@@ -21,7 +20,16 @@ func NewClient() (*Client, error) {
 	return &Client{}, nil
 }
 
-// RunBitcoinCLI executes bitcoin-cli commands and returns the output
+// RunBitcoinCLI executes bitcoin-cli commands and returns the output.
+//
+// Security Note: While this function doesn't currently accept user input directly,
+// callers must ensure that any user-provided data (e.g., addresses, labels) is
+// properly validated before being passed to bitcoin-cli. The current codebase
+// validates addresses using ValidateAddress() before import, and all numeric
+// parameters are type-safe. For future enhancements, consider:
+//   - Using a structured RPC client library instead of command-line execution
+//   - Adding explicit sanitization for string parameters
+//   - Implementing allowlists for command names
 func RunBitcoinCLI(args ...string) ([]byte, error) {
 	cmd := exec.Command("bitcoin-cli", args...)
 	output, err := cmd.Output()
@@ -67,13 +75,15 @@ func (c *Client) GetAddressBalance(address string) (int64, error) {
 		return 0, err
 	}
 
-	// Sum up UTXO values to get current balance
-	var balance int64
+	// Sum up UTXO values to get current balance (convert BTC to satoshis)
+	var balanceBTC float64
 	for _, utxo := range utxos {
-		balance += utxo.Amount
+		balanceBTC += utxo.Amount
 	}
 
-	return balance, nil
+	// Convert BTC to satoshis
+	balanceSatoshis := int64(balanceBTC * 100000000)
+	return balanceSatoshis, nil
 }
 
 // ImportAddress imports an address as watch-only

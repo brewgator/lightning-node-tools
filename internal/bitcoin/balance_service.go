@@ -101,12 +101,15 @@ func (s *BalanceService) updateAddressBalance(address db.OnchainAddress) (int64,
 		return 0, err
 	}
 
-	// Calculate tx count and spendable balance from UTXOs
+	// Calculate tx count and spendable balance from UTXOs (convert BTC to satoshis)
 	txCount := int64(len(utxos))
-	var balance int64
+	var balanceBTC float64
 	for _, utxo := range utxos {
-		balance += utxo.Amount
+		balanceBTC += utxo.Amount
 	}
+
+	// Convert BTC to satoshis
+	balance := int64(balanceBTC * 100000000)
 
 	// Insert new balance record
 	balanceRecord := &db.AddressBalance{
