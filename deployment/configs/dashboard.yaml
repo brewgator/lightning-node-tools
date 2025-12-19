@@ -15,7 +15,7 @@ onchain:
 
 web:
   host: "127.0.0.1"
-  port: 8080
+  port: 8090
 
 # Cold storage tracking (manual entry support)
 cold_storage:

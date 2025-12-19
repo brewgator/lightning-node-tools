@@ -1,14 +1,12 @@
 [Unit]
-Description=Bitcoin Portfolio Dashboard API
+Description=Lightning Node Telegram Monitor
 After=network.target
 Wants=network-online.target
 
 [Service]
-Type=simple
+Type=oneshot
 WorkingDirectory={{WORKING_DIRECTORY}}
-ExecStart={{WORKING_DIRECTORY}}/bin/portfolio-api --port 8090 --host 0.0.0.0
-Restart=always
-RestartSec=5
+ExecStart={{WORKING_DIRECTORY}}/bin/telegram-monitor
 StandardOutput=journal
 StandardError=journal
 
@@ -20,4 +18,4 @@ ReadWritePaths={{WORKING_DIRECTORY}}/data
 ProtectHome=read-only
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

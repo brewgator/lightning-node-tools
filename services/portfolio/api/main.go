@@ -51,7 +51,7 @@ func getVersion() string {
 func main() {
 	var (
 		dbPath        = flag.String("db", "data/portfolio.db", "Path to SQLite database")
-		port          = flag.String("port", "8080", "Port to serve on")
+		port          = flag.String("port", "8090", "Port to serve on")
 		host          = flag.String("host", "127.0.0.1", "Host to serve on")
 		mockMode      = flag.Bool("mock", false, "Use mock data for testing without real data")
 		noBitcoinNode = flag.Bool("no-bitcoin", false, "Disable Bitcoin node integration")

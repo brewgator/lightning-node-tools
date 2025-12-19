@@ -15,14 +15,9 @@ Type=simple
 User=YOUR_USERNAME
 Group=YOUR_USERNAME
 WorkingDirectory=$HOME/lightning-node-tools
-ExecStart=$HOME/lightning-node-tools/bin/webhook-deployer \
-  --port=9000 \
-  --repo=$HOME/lightning-node-tools \
-  --branch=main \
-  --script=./deployment/scripts/auto-deploy.sh
+ExecStart=$HOME/lightning-node-tools/bin/webhook-deployer --port 9000
 
 # Environment variables
-Environment=WEBHOOK_SECRET_FILE=$HOME/lightning-node-tools/secrets/webhook.secret
 EnvironmentFile=-$HOME/lightning-node-tools/.env
 
 # Security settings
@@ -30,7 +25,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=$HOME/lightning-node-tools /var/log /tmp
+ReadWritePaths=$HOME/lightning-node-tools/data $HOME/lightning-node-tools/logs
 
 # Restart policy
 Restart=always

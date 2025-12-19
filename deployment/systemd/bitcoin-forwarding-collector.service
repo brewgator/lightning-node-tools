@@ -5,8 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User={{USER}}
-Group={{USER}}
 WorkingDirectory={{WORKING_DIRECTORY}}
 ExecStart={{WORKING_DIRECTORY}}/bin/forwarding-collector --interval=5m
 Restart=always

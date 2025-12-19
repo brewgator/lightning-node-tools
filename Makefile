@@ -30,12 +30,6 @@ portfolio-api:
 	@mkdir -p bin
 	go build -o bin/portfolio-api ./services/portfolio/api
 
-# Legacy aliases for backward compatibility (portfolio services ARE the dashboard services)
-dashboard-collector: portfolio-collector
-	@echo "Note: dashboard-collector is an alias for portfolio-collector"
-
-dashboard-api: portfolio-api
-	@echo "Note: dashboard-api is an alias for portfolio-api"
 
 # Build forwarding-collector
 forwarding-collector:
@@ -55,11 +49,8 @@ portfolio: portfolio-collector portfolio-api
 	@echo "To start:"
 	@echo "  1. ./bin/portfolio-collector --oneshot  # Test data collection"
 	@echo "  2. ./bin/portfolio-api                  # Start web API"
-	@echo "  3. Open http://localhost:8080           # View dashboard"
+	@echo "  3. Open http://localhost:8090           # View dashboard"
 
-# Build and start complete dashboard (collector + api) - alias for portfolio
-dashboard: portfolio
-	@echo "Note: dashboard is an alias for portfolio - they are the same services"
 
 # Clean build artifacts
 clean:
@@ -182,11 +173,8 @@ help:
 	@echo "  telegram-monitor    - Build only telegram-monitor"
 	@echo "  portfolio-collector - Build only portfolio-collector"
 	@echo "  portfolio-api       - Build only portfolio-api"
-	@echo "  dashboard-collector - Build only dashboard-collector"
-	@echo "  dashboard-api       - Build only dashboard-api"
 	@echo "  forwarding-collector - Build only forwarding-collector"
 	@echo "  portfolio           - Build complete portfolio system"
-	@echo "  dashboard           - Build complete dashboard system"
 	@echo "  install-services    - Install/update systemd service files"
 	@echo "  install-services-auto - Install systemd services automatically (recommended)"
 	@echo "  install-crontab     - Install crontab jobs automatically"

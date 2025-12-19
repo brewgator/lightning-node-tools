@@ -1,0 +1,19 @@
+# Copy-Paste Ready Telegram Monitor Timer
+# This runs the telegram monitor every 2 minutes using systemd timers (alternative to cron)
+# Usage:
+# 1. First install the service file: lightning-telegram-monitor.service
+# 2. Copy this file: sudo cp deployment/systemd/lightning-telegram-monitor.timer.example /etc/systemd/system/lightning-telegram-monitor.timer
+# 3. Reload systemd: sudo systemctl daemon-reload
+# 4. Enable and start: sudo systemctl enable lightning-telegram-monitor.timer && sudo systemctl start lightning-telegram-monitor.timer
+# 5. Check status: sudo systemctl status lightning-telegram-monitor.timer
+
+[Unit]
+Description=Run Lightning Telegram Monitor every 2 minutes
+Requires=lightning-telegram-monitor.service
+
+[Timer]
+OnCalendar=*:0/2
+Persistent=true
+
+[Install]
+WantedBy=timers.target
