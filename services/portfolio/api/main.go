@@ -76,7 +76,7 @@ func main() {
 	c := cors.New(cors.Options{
 		// TODO: Replace with your actual frontend domain(s) in production.
 		AllowedOrigins: []string{"https://your-frontend-domain.com"},
-		AllowedMethods: []string{"GET", "POST", "DELETE", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"*"},
 	})
 
@@ -110,6 +110,13 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/onchain/addresses", s.handleAddOnchainAddress).Methods("POST")
 	api.HandleFunc("/onchain/addresses/{id:[0-9]+}", s.handleDeleteOnchainAddress).Methods("DELETE")
 	api.HandleFunc("/onchain/history", s.handleOnchainHistory).Methods("GET")
+
+	// Offline/Cold storage endpoints (consolidated)
+	api.HandleFunc("/offline/accounts", s.handleGetOfflineAccounts).Methods("GET")
+	api.HandleFunc("/offline/accounts", s.handleAddOfflineAccount).Methods("POST")
+	api.HandleFunc("/offline/accounts/{id:[0-9]+}/balance", s.handleUpdateOfflineAccountBalance).Methods("PUT")
+	api.HandleFunc("/offline/accounts/{id:[0-9]+}", s.handleDeleteOfflineAccount).Methods("DELETE")
+	api.HandleFunc("/offline/history", s.handleOfflineHistory).Methods("GET")
 
 	// Health check
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
@@ -532,6 +539,259 @@ func (s *Server) handleOnchainHistory(w http.ResponseWriter, r *http.Request) {
 	for _, balance := range balances {
 		labels = append(labels, balance.Timestamp.Format("2006-01-02"))
 		data = append(data, balance.Balance)
+	}
+
+	// Update the slices in the map
+	chartData["labels"] = labels
+	chartData["datasets"].([]map[string]interface{})[0]["data"] = data
+
+	s.writeJSON(w, APIResponse{Success: true, Data: chartData})
+}
+
+// OfflineAccountRequest represents the request body for offline account operations
+type OfflineAccountRequest struct {
+	Name     string `json:"name"`
+	Balance  int64  `json:"balance"`
+	Notes    string `json:"notes"`
+	Verified bool   `json:"verified"`
+}
+
+// handleGetOfflineAccounts handles GET /api/offline/accounts
+func (s *Server) handleGetOfflineAccounts(w http.ResponseWriter, r *http.Request) {
+	entries, err := s.db.GetColdStorageEntriesWithWarnings()
+	if err != nil {
+		log.Printf("handleGetOfflineAccounts: failed to get offline accounts: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get offline accounts")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{Success: true, Data: entries})
+}
+
+// handleAddOfflineAccount handles POST /api/offline/accounts
+func (s *Server) handleAddOfflineAccount(w http.ResponseWriter, r *http.Request) {
+	var req OfflineAccountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid JSON request body")
+		return
+	}
+
+	// Validate required fields
+	if req.Name == "" {
+		s.writeError(w, http.StatusBadRequest, "Name is required")
+		return
+	}
+
+	if req.Balance < 0 {
+		s.writeError(w, http.StatusBadRequest, "Balance cannot be negative")
+		return
+	}
+
+	if !req.Verified {
+		s.writeError(w, http.StatusBadRequest, "You must verify the balance before adding")
+		return
+	}
+
+	// Add the cold storage entry to database
+	entry, err := s.db.InsertColdStorageEntry(req.Name, req.Balance, req.Notes)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			s.writeError(w, http.StatusConflict, "An account with this name already exists")
+			return
+		}
+		log.Printf("handleAddColdStorageEntry: failed to insert entry: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to add cold storage entry")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data:    entry,
+	})
+}
+
+// handleUpdateOfflineAccountBalance handles PUT /api/offline/accounts/{id}/balance
+func (s *Server) handleUpdateOfflineAccountBalance(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr, ok := vars["id"]
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "Entry ID is required")
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid entry ID")
+		return
+	}
+
+	var req OfflineAccountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid JSON request body")
+		return
+	}
+
+	// Validate required fields
+	if req.Name == "" {
+		s.writeError(w, http.StatusBadRequest, "Name is required")
+		return
+	}
+
+	if req.Balance < 0 {
+		s.writeError(w, http.StatusBadRequest, "Balance cannot be negative")
+		return
+	}
+
+	if !req.Verified {
+		s.writeError(w, http.StatusBadRequest, "You must verify the balance before updating")
+		return
+	}
+
+	// Check if entry exists
+	existingEntry, err := s.db.GetColdStorageEntryByID(id)
+	if err != nil {
+		log.Printf("handleUpdateColdStorageEntry: failed to get entry by ID: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to check entry")
+		return
+	}
+	if existingEntry == nil {
+		s.writeError(w, http.StatusNotFound, "Cold storage entry not found")
+		return
+	}
+
+	// Update the entry
+	updatedEntry, err := s.db.UpdateColdStorageEntry(id, req.Name, req.Balance, req.Notes)
+	if err != nil {
+		log.Printf("handleUpdateColdStorageEntry: failed to update entry: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to update cold storage entry")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data:    updatedEntry,
+	})
+}
+
+// handleDeleteOfflineAccount handles DELETE /api/offline/accounts/{id}
+func (s *Server) handleDeleteOfflineAccount(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr, ok := vars["id"]
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "Entry ID is required")
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid entry ID")
+		return
+	}
+
+	// Check if entry exists
+	entry, err := s.db.GetColdStorageEntryByID(id)
+	if err != nil {
+		log.Printf("handleDeleteColdStorageEntry: failed to get entry by ID: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to check entry")
+		return
+	}
+	if entry == nil {
+		s.writeError(w, http.StatusNotFound, "Cold storage entry not found")
+		return
+	}
+
+	// Delete the entry
+	err = s.db.DeleteColdStorageEntry(id)
+	if err != nil {
+		log.Printf("handleDeleteColdStorageEntry: failed to delete entry: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to delete cold storage entry")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data: map[string]interface{}{
+			"message": "Cold storage entry deleted successfully",
+			"name":    entry.Name,
+		},
+	})
+}
+
+// handleOfflineHistory handles GET /api/offline/history
+func (s *Server) handleOfflineHistory(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	accountIDStr := r.URL.Query().Get("account")
+	if accountIDStr == "" {
+		s.writeError(w, http.StatusBadRequest, "Account ID parameter is required")
+		return
+	}
+
+	accountID, err := strconv.ParseInt(accountIDStr, 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid account ID")
+		return
+	}
+
+	daysStr := r.URL.Query().Get("days")
+	days := 30 // default
+	var from, to time.Time
+
+	if daysStr == "all" {
+		// For "all" data, get from the earliest possible date
+		to = time.Now()
+		genesisDate, _ := time.Parse("2006-01-02", BitcoinGenesisDate)
+		from = genesisDate
+	} else if daysStr != "" {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
+			days = d
+		} else {
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and " + strconv.Itoa(MaxHistoryDays) + ", or 'all'")
+			return
+		}
+		// Calculate time range
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
+	} else {
+		// Default case
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
+	}
+
+	history, err := s.db.GetColdStorageHistory(accountID, from, to)
+	if err != nil {
+		log.Printf("handleOfflineHistory: failed to get history for account %d: %v", accountID, err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get account balance history")
+		return
+	}
+
+	// Format data for Chart.js consumption
+	chartData := map[string]interface{}{
+		"labels": make([]string, 0, len(history)),
+		"datasets": []map[string]interface{}{
+			{
+				"label":           fmt.Sprintf("Balance History"),
+				"data":            make([]int64, 0, len(history)),
+				"backgroundColor": "rgba(255, 159, 64, 0.2)",
+				"borderColor":     "rgba(255, 159, 64, 1)",
+				"borderWidth":     2,
+				"fill":            false,
+				"tension":         0.3,
+			},
+		},
+		"metadata": map[string]interface{}{
+			"account_id":     accountID,
+			"days_requested": days,
+			"days_with_data": len(history),
+		},
+	}
+
+	// Populate chart data
+	labels := chartData["labels"].([]string)
+	data := chartData["datasets"].([]map[string]interface{})[0]["data"].([]int64)
+
+	for _, entry := range history {
+		labels = append(labels, entry.Timestamp.Format("2006-01-02"))
+		data = append(data, entry.Balance)
 	}
 
 	// Update the slices in the map

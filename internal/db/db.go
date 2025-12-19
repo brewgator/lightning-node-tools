@@ -207,6 +207,35 @@ func (db *Database) initTables() error {
 			last_updated DATETIME NOT NULL,
 			notes TEXT
 		);`,
+
+		// Cold storage balance history tables
+		`CREATE TABLE IF NOT EXISTS cold_storage_history (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			account_id INTEGER NOT NULL,
+			timestamp DATETIME NOT NULL,
+			balance INTEGER NOT NULL,
+			previous_balance INTEGER NOT NULL DEFAULT 0,
+			is_verified BOOLEAN NOT NULL DEFAULT 1,
+			notes TEXT,
+			FOREIGN KEY(account_id) REFERENCES cold_storage_entries(id) ON DELETE CASCADE
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_cold_storage_history_timestamp ON cold_storage_history(timestamp);`,
+		`CREATE INDEX IF NOT EXISTS idx_cold_storage_history_account_id ON cold_storage_history(account_id);`,
+
+		`CREATE TABLE IF NOT EXISTS cold_storage_history_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			account_id INTEGER NOT NULL,
+			timestamp DATETIME NOT NULL,
+			balance INTEGER NOT NULL,
+			previous_balance INTEGER NOT NULL DEFAULT 0,
+			is_verified BOOLEAN NOT NULL DEFAULT 1,
+			notes TEXT,
+			FOREIGN KEY(account_id) REFERENCES cold_storage_entries_mock(id) ON DELETE CASCADE
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_cold_storage_history_mock_timestamp ON cold_storage_history_mock(timestamp);`,
+		`CREATE INDEX IF NOT EXISTS idx_cold_storage_history_mock_account_id ON cold_storage_history_mock(account_id);`,
 	}
 
 	for _, query := range queries {
@@ -546,4 +575,259 @@ func (db *Database) InsertAddressBalance(balance *AddressBalance) error {
 	)
 
 	return err
+}
+
+// GetColdStorageEntries retrieves all cold storage entries
+func (db *Database) GetColdStorageEntries() ([]ColdStorageEntry, error) {
+	tableName := db.getTableName("cold_storage_entries")
+	query := fmt.Sprintf(`
+		SELECT id, name, balance, last_updated, notes
+		FROM %s
+		ORDER BY id ASC
+	`, tableName)
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []ColdStorageEntry
+	for rows.Next() {
+		var entry ColdStorageEntry
+		err := rows.Scan(&entry.ID, &entry.Name, &entry.Balance, &entry.LastUpdated, &entry.Notes)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries, rows.Err()
+}
+
+// GetColdStorageEntryByID retrieves a specific cold storage entry by ID
+func (db *Database) GetColdStorageEntryByID(id int64) (*ColdStorageEntry, error) {
+	tableName := db.getTableName("cold_storage_entries")
+	query := fmt.Sprintf(`
+		SELECT id, name, balance, last_updated, notes
+		FROM %s
+		WHERE id = ?
+	`, tableName)
+
+	var entry ColdStorageEntry
+	err := db.conn.QueryRow(query, id).Scan(&entry.ID, &entry.Name, &entry.Balance, &entry.LastUpdated, &entry.Notes)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &entry, nil
+}
+
+// InsertColdStorageEntry adds a new cold storage entry
+func (db *Database) InsertColdStorageEntry(name string, balance int64, notes string) (*ColdStorageEntry, error) {
+	tableName := db.getTableName("cold_storage_entries")
+	query := fmt.Sprintf(`
+		INSERT INTO %s (name, balance, last_updated, notes)
+		VALUES (?, ?, ?, ?)
+	`, tableName)
+
+	now := time.Now()
+	result, err := db.conn.Exec(query, name, balance, now, notes)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	return &ColdStorageEntry{
+		ID:          id,
+		Name:        name,
+		Balance:     balance,
+		LastUpdated: now,
+		Notes:       notes,
+	}, nil
+}
+
+// UpdateColdStorageEntry updates an existing cold storage entry and records balance history
+func (db *Database) UpdateColdStorageEntry(id int64, name string, balance int64, notes string) (*ColdStorageEntry, error) {
+	// Get current entry to track previous balance
+	current, err := db.GetColdStorageEntryByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, sql.ErrNoRows
+	}
+
+	tableName := db.getTableName("cold_storage_entries")
+	query := fmt.Sprintf(`
+		UPDATE %s 
+		SET name = ?, balance = ?, last_updated = ?, notes = ?
+		WHERE id = ?
+	`, tableName)
+
+	now := time.Now()
+	result, err := db.conn.Exec(query, name, balance, now, notes, id)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+
+	if rowsAffected == 0 {
+		return nil, sql.ErrNoRows
+	}
+
+	// Record balance history if balance changed
+	if current.Balance != balance {
+		historyEntry := &ColdStorageBalanceHistory{
+			AccountID:       id,
+			Timestamp:       now,
+			Balance:         balance,
+			PreviousBalance: current.Balance,
+			IsVerified:      true, // Assume verified when manually updated
+			Notes:           notes,
+		}
+		
+		if err := db.InsertColdStorageHistory(historyEntry); err != nil {
+			// Log error but don't fail the update
+			fmt.Printf("Warning: failed to record balance history: %v\n", err)
+		}
+	}
+
+	return &ColdStorageEntry{
+		ID:          id,
+		Name:        name,
+		Balance:     balance,
+		LastUpdated: now,
+		Notes:       notes,
+	}, nil
+}
+
+// DeleteColdStorageEntry removes a cold storage entry
+func (db *Database) DeleteColdStorageEntry(id int64) error {
+	tableName := db.getTableName("cold_storage_entries")
+	query := fmt.Sprintf(`DELETE FROM %s WHERE id = ?`, tableName)
+
+	result, err := db.conn.Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+// InsertColdStorageHistory records a balance change in cold storage history
+func (db *Database) InsertColdStorageHistory(history *ColdStorageBalanceHistory) error {
+	tableName := db.getTableName("cold_storage_history")
+	query := fmt.Sprintf(`
+		INSERT INTO %s (account_id, timestamp, balance, previous_balance, is_verified, notes)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, tableName)
+
+	_, err := db.conn.Exec(query,
+		history.AccountID,
+		history.Timestamp,
+		history.Balance,
+		history.PreviousBalance,
+		history.IsVerified,
+		history.Notes,
+	)
+
+	return err
+}
+
+// GetColdStorageHistory retrieves balance history for a specific account
+func (db *Database) GetColdStorageHistory(accountID int64, from, to time.Time) ([]ColdStorageBalanceHistory, error) {
+	tableName := db.getTableName("cold_storage_history")
+	query := fmt.Sprintf(`
+		SELECT id, account_id, timestamp, balance, previous_balance, is_verified, notes
+		FROM %s
+		WHERE account_id = ? AND timestamp BETWEEN ? AND ?
+		ORDER BY timestamp ASC
+	`, tableName)
+
+	rows, err := db.conn.Query(query, accountID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []ColdStorageBalanceHistory
+	for rows.Next() {
+		var entry ColdStorageBalanceHistory
+		err := rows.Scan(
+			&entry.ID, &entry.AccountID, &entry.Timestamp,
+			&entry.Balance, &entry.PreviousBalance, &entry.IsVerified, &entry.Notes,
+		)
+		if err != nil {
+			return nil, err
+		}
+		history = append(history, entry)
+	}
+
+	return history, rows.Err()
+}
+
+// GetColdStorageEntriesWithWarnings retrieves all cold storage entries with warning status
+func (db *Database) GetColdStorageEntriesWithWarnings() ([]map[string]interface{}, error) {
+	tableName := db.getTableName("cold_storage_entries")
+	query := fmt.Sprintf(`
+		SELECT id, name, balance, last_updated, notes,
+		       (julianday('now') - julianday(last_updated)) as days_since_update
+		FROM %s
+		ORDER BY id ASC
+	`, tableName)
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []map[string]interface{}
+	for rows.Next() {
+		var id int64
+		var name, notes string
+		var balance int64
+		var lastUpdated time.Time
+		var daysSinceUpdate float64
+
+		err := rows.Scan(&id, &name, &balance, &lastUpdated, &notes, &daysSinceUpdate)
+		if err != nil {
+			return nil, err
+		}
+
+		entry := map[string]interface{}{
+			"id":                int64(id),
+			"name":              name,
+			"balance":           balance,
+			"last_updated":      lastUpdated,
+			"notes":             notes,
+			"days_since_update": int(daysSinceUpdate),
+			"needs_warning":     daysSinceUpdate > 90,
+		}
+
+		entries = append(entries, entry)
+	}
+
+	return entries, rows.Err()
 }

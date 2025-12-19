@@ -85,3 +85,14 @@ type DailyFeeData struct {
 	TotalFee     int64  `json:"total_fee" db:"total_fee"`
 	ForwardCount int64  `json:"forward_count" db:"forward_count"`
 }
+
+// ColdStorageBalanceHistory represents balance changes for cold storage accounts over time
+type ColdStorageBalanceHistory struct {
+	ID              int64     `json:"id" db:"id"`
+	AccountID       int64     `json:"account_id" db:"account_id"`
+	Timestamp       time.Time `json:"timestamp" db:"timestamp"`
+	Balance         int64     `json:"balance" db:"balance"`
+	PreviousBalance int64     `json:"previous_balance" db:"previous_balance"`
+	IsVerified      bool      `json:"is_verified" db:"is_verified"`
+	Notes           string    `json:"notes" db:"notes"`
+}
