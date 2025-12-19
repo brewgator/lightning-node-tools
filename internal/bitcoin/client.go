@@ -25,9 +25,10 @@ var allowedCommands = map[string]bool{
 	"rescanblockchain":    true,
 }
 
-// addressRegex matches valid Bitcoin addresses (simplified - matches common formats)
-// Bitcoin addresses can be P2PKH (1...), P2SH (3...), Bech32 (bc1...)
-var addressRegex = regexp.MustCompile(`^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[ac-hj-np-z02-9]{11,71}$`)
+// addressRegex matches valid Bitcoin addresses (common formats)
+// Supports P2PKH (1...), P2SH (3...), Bech32 (bc1q...), and Bech32m (bc1p...)
+// Note: We rely primarily on bitcoin-cli's validateaddress for comprehensive validation
+var addressRegex = regexp.MustCompile(`^[13][a-km-zA-HJ-NP-Z1-9]{25,62}$|^bc1[ac-hj-np-z02-9]{11,87}$`)
 
 // isValidCommand checks if a command is in the allowlist
 func isValidCommand(cmd string) bool {
@@ -35,21 +36,24 @@ func isValidCommand(cmd string) bool {
 }
 
 // sanitizeAddress validates and sanitizes a Bitcoin address
-// Returns an error if the address contains suspicious characters
+// Returns an error if the address contains suspicious characters or invalid format
 func sanitizeAddress(address string) error {
 	// Check for null bytes, shell metacharacters, and command injection attempts
 	if strings.ContainsAny(address, "\x00;|&$`\n\r<>(){}[]") {
 		return fmt.Errorf("address contains invalid characters")
 	}
 	
-	// Additional length check - Bitcoin addresses are typically 26-62 characters
-	if len(address) < 26 || len(address) > 62 {
+	// Length check - Bitcoin addresses can range from ~14 (short Bech32) to 90+ characters
+	// We use a generous range but still catch obviously malicious input
+	if len(address) < 14 || len(address) > 100 {
 		return fmt.Errorf("address length out of valid range")
 	}
 	
-	// Validate against Bitcoin address format regex
+	// Validate against Bitcoin address format regex for common formats
+	// Note: This is a preliminary check; bitcoin-cli's validateaddress provides
+	// the authoritative validation
 	if !addressRegex.MatchString(address) {
-		return fmt.Errorf("address does not match valid Bitcoin address format")
+		return fmt.Errorf("address does not match common Bitcoin address formats")
 	}
 	
 	return nil
@@ -68,6 +72,8 @@ func sanitizeString(s string) error {
 // NewClient creates a new Bitcoin Core client
 func NewClient() (*Client, error) {
 	// Test Bitcoin Core connectivity (without wallet)
+	// Note: This command doesn't involve user input and is safe to call directly
+	// getblockchaininfo is also in the allowlist for wallet-based operations
 	cmd := exec.Command("bitcoin-cli", "getblockchaininfo")
 	_, err := cmd.Output()
 	if err != nil {
@@ -195,7 +201,8 @@ func (c *Client) GetDescriptorInfo(address string) (*DescriptorInfo, error) {
 	}
 
 	// Use bitcoin-cli without wallet for getdescriptorinfo (it's a non-wallet command)
-	// We still use exec.Command with separate arguments (no shell) for security
+	// Security: The address is sanitized above, and we use exec.Command with separate
+	// arguments (no shell interpretation) to prevent command injection
 	descriptorArg := fmt.Sprintf("addr(%s)", address)
 	cmd := exec.Command("bitcoin-cli", "getdescriptorinfo", descriptorArg)
 	output, err := cmd.Output()
