@@ -18,6 +18,7 @@ type Config struct {
 	DatabasePath       string
 	CollectionInterval time.Duration
 	LNDClient          *lnd.Client
+	OnchainCollector   *OnchainCollector
 }
 
 type Collector struct {
@@ -28,10 +29,14 @@ type Collector struct {
 
 func main() {
 	var (
-		dbPath   = flag.String("db", "data/portfolio.db", "Path to SQLite database")
-		interval = flag.Duration("interval", 15*time.Minute, "Collection interval")
-		oneshot  = flag.Bool("oneshot", false, "Run once and exit (for testing)")
-		mockMode = flag.Bool("mock", false, "Use mock data for testing without LND")
+		dbPath          = flag.String("db", "data/portfolio.db", "Path to SQLite database")
+		interval        = flag.Duration("interval", 15*time.Minute, "Collection interval")
+		oneshot         = flag.Bool("oneshot", false, "Run once and exit (for testing)")
+		mockMode        = flag.Bool("mock", false, "Use mock data for testing without LND")
+		onchainInterval = flag.Duration("onchain-interval", 30*time.Minute, "Onchain balance collection interval")
+		mempoolURL      = flag.String("mempool-url", "https://mempool.space/api", "Mempool.space API base URL")
+		bitcoinFirst    = flag.Bool("bitcoin-first", true, "Try Bitcoin node first, fallback to Mempool.space")
+		skipOnchain     = flag.Bool("skip-onchain", false, "Skip onchain address balance collection")
 	)
 	flag.Parse()
 
@@ -65,10 +70,30 @@ func main() {
 		}
 	}
 
+	// Initialize onchain collector if not skipped
+	var onchainCollector *OnchainCollector
+	if !*skipOnchain && !*mockMode {
+		onchainConfig := CollectorConfig{
+			Database:         database,
+			UpdateInterval:   *onchainInterval,
+			MempoolBaseURL:   *mempoolURL,
+			RetryLimit:       3,
+			RetryDelay:       5 * time.Second,
+			BitcoinNodeFirst: *bitcoinFirst,
+		}
+		onchainCollector = NewOnchainCollector(onchainConfig)
+		log.Printf("✅ Onchain collector initialized (interval: %v)", *onchainInterval)
+	} else if *skipOnchain {
+		log.Printf("⏭️  Onchain address collection disabled")
+	} else if *mockMode {
+		log.Printf("📊 Mock mode: Using mock onchain data")
+	}
+
 	config := &Config{
 		DatabasePath:       *dbPath,
 		CollectionInterval: *interval,
 		LNDClient:          lndClient,
+		OnchainCollector:   onchainCollector,
 	}
 
 	collector := &Collector{
@@ -90,6 +115,12 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	// Start onchain collector if available
+	if config.OnchainCollector != nil {
+		go config.OnchainCollector.Start()
+		log.Printf("🚀 Onchain balance collector started")
+	}
+
 	// Start collection loop
 	ticker := time.NewTicker(config.CollectionInterval)
 	defer ticker.Stop()
@@ -109,6 +140,12 @@ func main() {
 			}
 		case <-sigChan:
 			fmt.Println("Received shutdown signal, exiting...")
+			
+			// Stop onchain collector if running
+			if config.OnchainCollector != nil {
+				config.OnchainCollector.Stop()
+			}
+			
 			return
 		}
 	}
@@ -132,8 +169,12 @@ func (c *Collector) collectData() error {
 		// Don't fail completely, just log the warning
 	}
 
-	// TODO: Collect tracked addresses data (Mempool.space API)
-	trackedAddresses := int64(0)
+	// Collect tracked addresses data
+	trackedAddresses, err := c.collectTrackedAddressesData()
+	if err != nil {
+		log.Printf("Warning: Failed to collect tracked addresses data: %v", err)
+		trackedAddresses = 0
+	}
 
 	// TODO: Collect cold storage data (from config)
 	coldStorage := int64(0)
@@ -200,4 +241,50 @@ func (c *Collector) collectOnchainData() (confirmed, unconfirmed int64, err erro
 	}
 
 	return balance.ConfirmedBalance, balance.UnconfirmedBalance, nil
+}
+
+func (c *Collector) collectTrackedAddressesData() (int64, error) {
+	if c.mockMode {
+		// Return mock tracked addresses data
+		return 1500000, nil // 1.5M sats
+	}
+
+	// Get all tracked addresses and their most recent balances
+	addresses, err := c.db.GetOnchainAddresses()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get tracked addresses: %w", err)
+	}
+
+	if len(addresses) == 0 {
+		return 0, nil
+	}
+
+	var totalBalance int64
+	
+	// For each address, get the most recent balance
+	for _, addr := range addresses {
+		if !addr.Active {
+			continue
+		}
+		
+		// Get recent balance history for this address (30 days to ensure we capture the most recent balance)
+		balances, err := c.db.GetAddressBalanceHistory(
+			addr.Address,
+			time.Now().AddDate(0, 0, -30), // Last 30 days
+			time.Now(),
+		)
+		
+		if err != nil {
+			log.Printf("Warning: Failed to get balance history for %s: %v", addr.Address, err)
+			continue
+		}
+		
+		if len(balances) > 0 {
+			// Use most recent balance
+			totalBalance += balances[len(balances)-1].Balance
+		}
+		// If no balance records exist yet, address contributes 0 to total (expected for new addresses)
+	}
+
+	return totalBalance, nil
 }

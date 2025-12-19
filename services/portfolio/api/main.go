@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/brewgator/lightning-node-tools/internal/bitcoin"
 	"github.com/brewgator/lightning-node-tools/internal/db"
 	"github.com/brewgator/lightning-node-tools/internal/utils"
 
@@ -26,8 +27,10 @@ const (
 )
 
 type Server struct {
-	db     *db.Database
-	router *mux.Router
+	db             *db.Database
+	router         *mux.Router
+	balanceService *bitcoin.BalanceService
+	mockMode       bool
 }
 
 type APIResponse struct {
@@ -47,10 +50,11 @@ func getVersion() string {
 
 func main() {
 	var (
-		dbPath   = flag.String("db", "data/portfolio.db", "Path to SQLite database")
-		port     = flag.String("port", "8080", "Port to serve on")
-		host     = flag.String("host", "127.0.0.1", "Host to serve on")
-		mockMode = flag.Bool("mock", false, "Use mock data for testing without real data")
+		dbPath        = flag.String("db", "data/portfolio.db", "Path to SQLite database")
+		port          = flag.String("port", "8080", "Port to serve on")
+		host          = flag.String("host", "127.0.0.1", "Host to serve on")
+		mockMode      = flag.Bool("mock", false, "Use mock data for testing without real data")
+		noBitcoinNode = flag.Bool("no-bitcoin", false, "Disable Bitcoin node integration")
 	)
 	flag.Parse()
 
@@ -65,9 +69,28 @@ func main() {
 		fmt.Println("📊 API running in mock mode (using mock database tables)")
 	}
 
+	var balanceService *bitcoin.BalanceService
+
+	// Initialize Bitcoin balance service if not disabled
+	if !*noBitcoinNode && !*mockMode {
+		bitcoinClient, err := bitcoin.NewClient()
+		if err != nil {
+			log.Printf("⚠️  Warning: Failed to connect to Bitcoin node: %v", err)
+			log.Printf("💡 Balance updates will be disabled. Ensure bitcoin-cli is available and Bitcoin Core is running.")
+		} else {
+			fmt.Println("₿ Connected to Bitcoin Core node")
+			balanceService = bitcoin.NewBalanceService(bitcoinClient, database, 30*time.Minute)
+
+			// Start balance service in background
+			go balanceService.Start()
+		}
+	}
+
 	server := &Server{
-		db:     database,
-		router: mux.NewRouter(),
+		db:             database,
+		router:         mux.NewRouter(),
+		balanceService: balanceService,
+		mockMode:       *mockMode,
 	}
 
 	server.setupRoutes()
@@ -89,6 +112,13 @@ func main() {
 		fmt.Printf(" (mock mode)")
 	}
 	fmt.Printf("\n")
+
+	// Cleanup function
+	defer func() {
+		if balanceService != nil {
+			balanceService.Stop()
+		}
+	}()
 
 	log.Fatal(http.ListenAndServe(addr, handler))
 }
@@ -410,22 +440,41 @@ func (s *Server) handleAddOnchainAddress(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Add the address to database
-	address, err := s.db.InsertOnchainAddress(req.Address, req.Label)
-	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
-			s.writeError(w, http.StatusConflict, "Address is already being tracked")
+	// If Bitcoin balance service is available, use it to import and track the address
+	if s.balanceService != nil {
+		newAddress, err := s.balanceService.ImportAndTrackAddress(req.Address, req.Label)
+		if err != nil {
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				s.writeError(w, http.StatusConflict, "Address is already being tracked")
+				return
+			}
+			log.Printf("handleAddOnchainAddress: failed to import address via balance service: %v", err)
+			s.writeError(w, http.StatusInternalServerError, "Failed to add address")
 			return
 		}
-		log.Printf("handleAddOnchainAddress: failed to insert address: %v", err)
-		s.writeError(w, http.StatusInternalServerError, "Failed to add address")
-		return
-	}
 
-	s.writeJSON(w, APIResponse{
-		Success: true,
-		Data:    address,
-	})
+		s.writeJSON(w, APIResponse{
+			Success: true,
+			Data:    newAddress,
+		})
+	} else {
+		// Fallback to basic database insertion if no balance service
+		address, err := s.db.InsertOnchainAddress(req.Address, req.Label)
+		if err != nil {
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				s.writeError(w, http.StatusConflict, "Address is already being tracked")
+				return
+			}
+			log.Printf("handleAddOnchainAddress: failed to insert address: %v", err)
+			s.writeError(w, http.StatusInternalServerError, "Failed to add address")
+			return
+		}
+
+		s.writeJSON(w, APIResponse{
+			Success: true,
+			Data:    address,
+		})
+	}
 }
 
 // handleDeleteOnchainAddress handles DELETE /api/onchain/addresses/:id

@@ -2,11 +2,17 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+)
+
+var (
+	// ErrNotFound indicates that a requested resource was not found
+	ErrNotFound = errors.New("resource not found")
 )
 
 type Database struct {
