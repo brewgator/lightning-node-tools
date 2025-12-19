@@ -21,6 +21,7 @@ type OnchainCollector struct {
 	cancel        context.CancelFunc
 	retryLimit    int
 	retryDelay    time.Duration
+	requestDelay  time.Duration
 }
 
 // CollectorConfig represents configuration for the onchain collector
@@ -30,6 +31,7 @@ type CollectorConfig struct {
 	MempoolBaseURL   string
 	RetryLimit       int
 	RetryDelay       time.Duration
+	RequestDelay     time.Duration // Delay between address update requests
 	BitcoinNodeFirst bool
 }
 
@@ -47,14 +49,18 @@ func NewOnchainCollector(config CollectorConfig) *OnchainCollector {
 	if config.RetryDelay == 0 {
 		config.RetryDelay = 5 * time.Second
 	}
+	if config.RequestDelay == 0 {
+		config.RequestDelay = 1 * time.Second
+	}
 
 	collector := &OnchainCollector{
-		database:   config.Database,
-		interval:   config.UpdateInterval,
-		ctx:        ctx,
-		cancel:     cancel,
-		retryLimit: config.RetryLimit,
-		retryDelay: config.RetryDelay,
+		database:     config.Database,
+		interval:     config.UpdateInterval,
+		ctx:          ctx,
+		cancel:       cancel,
+		retryLimit:   config.RetryLimit,
+		retryDelay:   config.RetryDelay,
+		requestDelay: config.RequestDelay,
 	}
 
 	// Try to initialize Bitcoin client
@@ -163,8 +169,8 @@ func (c *OnchainCollector) collectAllBalances() {
 			mempoolCount++
 		}
 
-		// Add delay between requests to be respectful
-		time.Sleep(1 * time.Second)
+		// Add delay between requests to be respectful (configurable via RequestDelay)
+		time.Sleep(c.requestDelay)
 	}
 
 	log.Printf("✅ Successfully collected %d/%d addresses (%d Bitcoin node, %d Mempool.space)",
@@ -251,11 +257,13 @@ func (c *OnchainCollector) collectFromMempool(address string) (int64, int64, err
 
 // logBalanceChange logs balance changes for monitoring
 func (c *OnchainCollector) logBalanceChange(address db.OnchainAddress, newBalance int64, source string) {
-	// Get previous balance
+	// Get previous balance (query for balances before the current update)
+	// Use a timestamp slightly in the past to avoid including the just-inserted record
+	endTime := time.Now().Add(-2 * time.Second)
 	balances, err := c.database.GetAddressBalanceHistory(
 		address.Address,
-		time.Now().AddDate(0, 0, -1), // Last 24 hours
-		time.Now(),
+		endTime.AddDate(0, 0, -1), // Last 24 hours
+		endTime,
 	)
 
 	if err != nil || len(balances) == 0 {
@@ -264,14 +272,8 @@ func (c *OnchainCollector) logBalanceChange(address db.OnchainAddress, newBalanc
 		return
 	}
 
-	// Get the most recent balance (excluding current update)
-	if len(balances) == 1 {
-		log.Printf("📊 Balance for %s: %d sats [%s] (first update)",
-			truncateAddress(address.Address), newBalance, source)
-		return
-	}
-
-	previousBalance := balances[len(balances)-2].Balance
+	// Get the most recent balance from history
+	previousBalance := balances[len(balances)-1].Balance
 
 	if newBalance != previousBalance {
 		change := newBalance - previousBalance
@@ -325,20 +327,14 @@ func (c *OnchainCollector) CollectSingleAddress(addressID int64) error {
 
 // GetCollectorStats returns statistics about the collector
 func (c *OnchainCollector) GetCollectorStats() map[string]interface{} {
-	stats := map[string]interface{}{
-		"interval_minutes":   c.interval.Minutes(),
-		"bitcoin_available":  c.bitcoinClient != nil,
-		"mempool_available":  c.mempoolClient != nil,
-		"retry_limit":        c.retryLimit,
-		"retry_delay_seconds": c.retryDelay.Seconds(),
+	return map[string]interface{}{
+		"interval_minutes":     c.interval.Minutes(),
+		"bitcoin_available":    c.bitcoinClient != nil,
+		"mempool_available":    c.mempoolClient != nil,
+		"retry_limit":          c.retryLimit,
+		"retry_delay_seconds":  c.retryDelay.Seconds(),
+		"request_delay_seconds": c.requestDelay.Seconds(),
 	}
-
-	if c.mempoolClient != nil {
-		// Rate limiter status
-		stats["mempool_rate_limited"] = true
-	}
-
-	return stats
 }
 
 // truncateAddress truncates Bitcoin address for logging

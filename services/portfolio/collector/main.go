@@ -267,10 +267,10 @@ func (c *Collector) collectTrackedAddressesData() (int64, error) {
 			continue
 		}
 		
-		// Get recent balance history for this address
+		// Get recent balance history for this address (30 days to ensure we capture the most recent balance)
 		balances, err := c.db.GetAddressBalanceHistory(
 			addr.Address,
-			time.Now().AddDate(0, 0, -1), // Last 24 hours
+			time.Now().AddDate(0, 0, -30), // Last 30 days
 			time.Now(),
 		)
 		
@@ -283,6 +283,7 @@ func (c *Collector) collectTrackedAddressesData() (int64, error) {
 			// Use most recent balance
 			totalBalance += balances[len(balances)-1].Balance
 		}
+		// If no balance records exist yet, address contributes 0 to total (expected for new addresses)
 	}
 
 	return totalBalance, nil
