@@ -43,8 +43,13 @@ func sanitizeAddress(address string) error {
 	}
 	
 	// Additional length check - Bitcoin addresses are typically 26-62 characters
-	if len(address) < 26 || len(address) > 90 {
+	if len(address) < 26 || len(address) > 62 {
 		return fmt.Errorf("address length out of valid range")
+	}
+	
+	// Validate against Bitcoin address format regex
+	if !addressRegex.MatchString(address) {
+		return fmt.Errorf("address does not match valid Bitcoin address format")
 	}
 	
 	return nil
@@ -189,11 +194,16 @@ func (c *Client) GetDescriptorInfo(address string) (*DescriptorInfo, error) {
 		return nil, fmt.Errorf("invalid address format: %w", err)
 	}
 
-	// Use non-wallet command to get descriptor info
-	cmd := exec.Command("bitcoin-cli", "getdescriptorinfo", fmt.Sprintf("addr(%s)", address))
+	// Use bitcoin-cli without wallet for getdescriptorinfo (it's a non-wallet command)
+	// We still use exec.Command with separate arguments (no shell) for security
+	descriptorArg := fmt.Sprintf("addr(%s)", address)
+	cmd := exec.Command("bitcoin-cli", "getdescriptorinfo", descriptorArg)
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		if exitError, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("bitcoin-cli getdescriptorinfo failed: %v, stderr: %s", err, string(exitError.Stderr))
+		}
+		return nil, fmt.Errorf("bitcoin-cli getdescriptorinfo failed: %v", err)
 	}
 
 	var info DescriptorInfo
