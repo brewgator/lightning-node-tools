@@ -24,6 +24,9 @@ type RateLimiter struct {
 	interval  time.Duration
 	mu        sync.RWMutex
 	stopped   bool
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
 }
 
 // NewRateLimiter creates a new rate limiter with burst support.
@@ -34,10 +37,13 @@ type RateLimiter struct {
 // The bucket starts full, allowing immediate burst of maxRequests. After that,
 // tokens replenish at a rate of interval/maxRequests, supporting sustained throughput.
 func NewRateLimiter(maxRequests int, interval time.Duration) *RateLimiter {
+	ctx, cancel := context.WithCancel(context.Background())
 	rl := &RateLimiter{
 		tokens:    make(chan struct{}, maxRequests),
 		maxTokens: maxRequests,
 		interval:  interval,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 
 	// Fill initial tokens
@@ -47,6 +53,7 @@ func NewRateLimiter(maxRequests int, interval time.Duration) *RateLimiter {
 
 	// Start token replenishment
 	rl.ticker = time.NewTicker(interval / time.Duration(maxRequests))
+	rl.wg.Add(1)
 	go rl.replenishTokens()
 
 	return rl
@@ -98,26 +105,28 @@ func (rl *RateLimiter) Stop() {
 
 	if !rl.stopped {
 		rl.stopped = true
+		rl.cancel() // Cancel context first to stop goroutine
 		rl.ticker.Stop()
+		rl.wg.Wait() // Wait for goroutine to finish before closing channel
 		close(rl.tokens)
 	}
 }
 
 // replenishTokens adds tokens back to the bucket periodically
 func (rl *RateLimiter) replenishTokens() {
-	for range rl.ticker.C {
-		rl.mu.RLock()
-		stopped := rl.stopped
-		rl.mu.RUnlock()
-
-		if stopped {
-			return
-		}
-
+	defer rl.wg.Done()
+	for {
 		select {
-		case rl.tokens <- struct{}{}:
-		default:
-			// Bucket is full, ignore
+		case <-rl.ctx.Done():
+			return
+		case <-rl.ticker.C:
+			select {
+			case <-rl.ctx.Done():
+				return
+			case rl.tokens <- struct{}{}:
+			default:
+				// Bucket is full, ignore
+			}
 		}
 	}
 }
