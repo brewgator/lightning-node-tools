@@ -275,12 +275,52 @@
             <h1>⚡ Bitcoin Portfolio Dashboard</h1>
             <p class="subtitle">Real-time Lightning & On-chain Balance Tracking</p>
 
-            <div class="nav-tabs">
-                <a href="#" class="nav-tab active" onclick="showSection('dashboard')">📊 Portfolio Overview</a>
-                <a href="#" class="nav-tab" onclick="showSection('lightning')">⚡ Lightning Details</a>
-                <a href="#" class="nav-tab" onclick="showSection('onchain')">🔗 On-chain Management</a>
-                <a href="#" class="nav-tab" onclick="showSection('offline')">🧊 Cold Storage</a>
-                <a href="#" class="nav-tab" onclick="showSection('analytics')">📈 Analytics</a>
+            <div class="nav-tabs" role="tablist">
+                <button type="button"
+                        id="tab-dashboard"
+                        class="nav-tab active"
+                        role="tab"
+                        aria-selected="true"
+                        aria-controls="dashboard"
+                        onclick="showSection('dashboard', event)">
+                    📊 Portfolio Overview
+                </button>
+                <button type="button"
+                        id="tab-lightning"
+                        class="nav-tab"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="lightning"
+                        onclick="showSection('lightning', event)">
+                    ⚡ Lightning Details
+                </button>
+                <button type="button"
+                        id="tab-onchain"
+                        class="nav-tab"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="onchain"
+                        onclick="showSection('onchain', event)">
+                    🔗 On-chain Management
+                </button>
+                <button type="button"
+                        id="tab-offline"
+                        class="nav-tab"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="offline"
+                        onclick="showSection('offline', event)">
+                    🧊 Cold Storage
+                </button>
+                <button type="button"
+                        id="tab-analytics"
+                        class="nav-tab"
+                        role="tab"
+                        aria-selected="false"
+                        aria-controls="analytics"
+                        onclick="showSection('analytics', event)">
+                    📈 Analytics
+                </button>
             </div>
         </header>
 
@@ -467,6 +507,16 @@
             return new Date(timestamp).toLocaleString();
         }
 
+        // Calculate portfolio components based on our portfolio rules
+        // Note: lightning_remote is NOT part of our portfolio, only lightning_local counts
+        function calculatePortfolioComponents(data) {
+            return {
+                lightning: data.lightning_local, // Only local balance belongs to us
+                onchain: data.onchain_confirmed + data.onchain_unconfirmed + data.tracked_addresses,
+                cold: data.cold_storage
+            };
+        }
+
         function showError(message) {
             const status = document.getElementById('status');
             status.className = 'status error';
@@ -486,14 +536,14 @@
             const total = data.total_portfolio;
 
             // Calculate percentages for each source (based on actual portfolio calculation)
-            // Note: lightning_remote is NOT part of our portfolio, only lightning_local counts
-            const lightningTotal = data.lightning_local; // Only local balance belongs to us
-            const onchainTotal = data.onchain_confirmed + data.onchain_unconfirmed + data.tracked_addresses;
-            const offlineTotal = data.cold_storage;
+            const components = calculatePortfolioComponents(data);
+            const lightningTotal = components.lightning;
+            const onchainTotal = components.onchain;
+            const coldTotal = components.cold;
 
             const lightningPercent = total > 0 ? ((lightningTotal / total) * 100).toFixed(1) : 0;
             const onchainPercent = total > 0 ? ((onchainTotal / total) * 100).toFixed(1) : 0;
-            const offlinePercent = total > 0 ? ((offlineTotal / total) * 100).toFixed(1) : 0;
+            const coldPercent = total > 0 ? ((coldTotal / total) * 100).toFixed(1) : 0;
 
             container.innerHTML = `
                 <div class="balance-item">
@@ -509,8 +559,8 @@
                     <span class="balance-value">${formatSats(onchainTotal)}</span>
                 </div>
                 <div class="balance-item">
-                    <span class="balance-label">🧊 Cold Storage (${offlinePercent}%):</span>
-                    <span class="balance-value">${formatSats(offlineTotal)}</span>
+                    <span class="balance-label">🧊 Cold Storage (${coldPercent}%):</span>
+                    <span class="balance-value">${formatSats(coldTotal)}</span>
                 </div>
                 <div class="balance-item">
                     <span class="balance-label">💧 Liquid (No Cold):</span>
@@ -644,9 +694,9 @@
                 const labels = result.data.map(item => new Date(item.timestamp).toLocaleDateString());
                 const portfolioData = result.data.map(item => item.total_portfolio);
                 const liquidData = result.data.map(item => item.total_liquid);
-                const lightningData = result.data.map(item => item.lightning_local); // Only local balance counts
-                const onchainData = result.data.map(item => item.onchain_confirmed + item.onchain_unconfirmed + item.tracked_addresses);
-                const coldData = result.data.map(item => item.cold_storage);
+                const lightningData = result.data.map(item => calculatePortfolioComponents(item).lightning);
+                const onchainData = result.data.map(item => calculatePortfolioComponents(item).onchain);
+                const coldData = result.data.map(item => calculatePortfolioComponents(item).cold);
 
                 // Destroy existing chart
                 if (portfolioChart) {
@@ -1155,29 +1205,34 @@
         loadVersion();
 
         // Navigation function
-        function showSection(sectionName) {
+        function showSection(sectionName, event) {
             // Update active tab
             document.querySelectorAll('.nav-tab').forEach(tab => {
                 tab.classList.remove('active');
+                tab.setAttribute('aria-selected', 'false');
             });
-            event.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+                event.target.setAttribute('aria-selected', 'true');
+            }
 
             // Show appropriate content or redirect
             switch(sectionName) {
                 case 'dashboard':
-                    // Already on dashboard - just refresh if needed
+                    // Already on dashboard - scroll to top to provide feedback
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                     break;
                 case 'lightning':
-                    alert('Lightning management page - would navigate to dedicated Lightning page');
+                    console.info('Lightning management page - would navigate to dedicated Lightning page');
                     break;
                 case 'onchain':
-                    alert('On-chain management page - would navigate to onchain addresses page');
+                    console.info('On-chain management page - would navigate to onchain addresses page');
                     break;
                 case 'offline':
-                    alert('Cold storage management page - would navigate to cold storage accounts page');
+                    console.info('Cold storage management page - would navigate to cold storage accounts page');
                     break;
                 case 'analytics':
-                    alert('Analytics page - would navigate to dedicated analytics page');
+                    console.info('Analytics page - would navigate to dedicated analytics page');
                     break;
             }
         }
