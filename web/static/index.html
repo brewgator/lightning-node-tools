@@ -1211,8 +1211,10 @@
                 tab.classList.remove('active');
                 tab.setAttribute('aria-selected', 'false');
             });
-            event.target.classList.add('active');
-            event.target.setAttribute('aria-selected', 'true');
+            if (event && event.target) {
+                event.target.classList.add('active');
+                event.target.setAttribute('aria-selected', 'true');
+            }
 
             // Show appropriate content or redirect
             switch(sectionName) {
