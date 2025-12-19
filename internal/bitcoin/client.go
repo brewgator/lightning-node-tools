@@ -15,14 +15,14 @@ type Client struct{}
 // allowedCommands is a whitelist of permitted bitcoin-cli commands
 // This prevents command injection attacks by only allowing known-safe commands
 var allowedCommands = map[string]bool{
-	"getblockchaininfo":   true,
-	"getdescriptorinfo":   true,
-	"importdescriptors":   true,
-	"listunspent":         true,
-	"listtransactions":    true,
-	"validateaddress":     true,
-	"getaddressinfo":      true,
-	"rescanblockchain":    true,
+	"getblockchaininfo": true,
+	"getdescriptorinfo": true,
+	"importdescriptors": true,
+	"listunspent":       true,
+	"listtransactions":  true,
+	"validateaddress":   true,
+	"getaddressinfo":    true,
+	"rescanblockchain":  true,
 }
 
 // addressRegex matches valid Bitcoin addresses (common formats)
@@ -42,20 +42,20 @@ func sanitizeAddress(address string) error {
 	if strings.ContainsAny(address, "\x00;|&$`\n\r<>(){}[]") {
 		return fmt.Errorf("address contains invalid characters")
 	}
-	
+
 	// Length check - Bitcoin addresses can range from ~14 (short Bech32) to 90+ characters
 	// We use a generous range but still catch obviously malicious input
 	if len(address) < 14 || len(address) > 100 {
 		return fmt.Errorf("address length out of valid range")
 	}
-	
+
 	// Validate against Bitcoin address format regex for common formats
 	// Note: This is a preliminary check; bitcoin-cli's validateaddress provides
 	// the authoritative validation
 	if !addressRegex.MatchString(address) {
 		return fmt.Errorf("address does not match common Bitcoin address formats")
 	}
-	
+
 	return nil
 }
 
