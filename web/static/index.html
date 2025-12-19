@@ -40,11 +40,49 @@
             color: #8b949e;
         }
 
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .nav-tab {
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.95em;
+            transition: all 0.2s ease;
+        }
+
+        .nav-tab:hover {
+            background: #30363d;
+            border-color: #484f58;
+            color: #f0f6fc;
+        }
+
+        .nav-tab.active {
+            background: #f0883e;
+            color: #0d1117;
+            border-color: #f0883e;
+        }
+
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 20px;
             margin-bottom: 40px;
+        }
+
+        @media (min-width: 1200px) {
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         .card {
@@ -236,6 +274,14 @@
         <header>
             <h1>⚡ Bitcoin Portfolio Dashboard</h1>
             <p class="subtitle">Real-time Lightning & On-chain Balance Tracking</p>
+
+            <div class="nav-tabs">
+                <a href="#" class="nav-tab active" onclick="showSection('dashboard')">📊 Portfolio Overview</a>
+                <a href="#" class="nav-tab" onclick="showSection('lightning')">⚡ Lightning Details</a>
+                <a href="#" class="nav-tab" onclick="showSection('onchain')">🔗 On-chain Management</a>
+                <a href="#" class="nav-tab" onclick="showSection('offline')">🧊 Cold Storage</a>
+                <a href="#" class="nav-tab" onclick="showSection('analytics')">📈 Analytics</a>
+            </div>
         </header>
 
         <div id="status" class="status loading">Loading portfolio data...</div>
@@ -259,6 +305,13 @@
                 <div class="card">
                     <h2>🔗 On-chain</h2>
                     <div id="onchain-details">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>🧊 Cold Storage</h2>
+                    <div id="cold-storage-details">
                         <!-- Populated by JavaScript -->
                     </div>
                 </div>
@@ -430,18 +483,38 @@
 
         function updateCurrentBalances(data) {
             const container = document.getElementById('current-balances');
+            const total = data.total_portfolio;
+
+            // Calculate percentages for each source (based on actual portfolio calculation)
+            // Note: lightning_remote is NOT part of our portfolio, only lightning_local counts
+            const lightningTotal = data.lightning_local; // Only local balance belongs to us
+            const onchainTotal = data.onchain_confirmed + data.onchain_unconfirmed + data.tracked_addresses;
+            const offlineTotal = data.cold_storage;
+
+            const lightningPercent = total > 0 ? ((lightningTotal / total) * 100).toFixed(1) : 0;
+            const onchainPercent = total > 0 ? ((onchainTotal / total) * 100).toFixed(1) : 0;
+            const offlinePercent = total > 0 ? ((offlineTotal / total) * 100).toFixed(1) : 0;
+
             container.innerHTML = `
                 <div class="balance-item">
                     <span class="balance-label">Total Portfolio:</span>
-                    <span class="balance-value total">${formatSats(data.total_portfolio)}</span>
+                    <span class="balance-value total">${formatSats(total)}</span>
                 </div>
                 <div class="balance-item">
-                    <span class="balance-label">Total Liquid:</span>
+                    <span class="balance-label">⚡ Lightning (${lightningPercent}%):</span>
+                    <span class="balance-value">${formatSats(lightningTotal)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">🔗 On-chain (${onchainPercent}%):</span>
+                    <span class="balance-value">${formatSats(onchainTotal)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">🧊 Cold Storage (${offlinePercent}%):</span>
+                    <span class="balance-value">${formatSats(offlineTotal)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">💧 Liquid (No Cold):</span>
                     <span class="balance-value">${formatSats(data.total_liquid)}</span>
-                </div>
-                <div class="balance-item">
-                    <span class="balance-label">Cold Storage:</span>
-                    <span class="balance-value">${formatSats(data.cold_storage)}</span>
                 </div>
                 <div class="balance-item">
                     <span class="balance-label">Last Updated:</span>
@@ -454,6 +527,7 @@
             const container = document.getElementById('lightning-details');
             const total = data.lightning_local + data.lightning_remote;
             const localPercent = total > 0 ? ((data.lightning_local / total) * 100).toFixed(1) : 0;
+            const remotePercent = total > 0 ? ((data.lightning_remote / total) * 100).toFixed(1) : 0;
 
             container.innerHTML = `
                 <div class="balance-item">
@@ -461,12 +535,16 @@
                     <span class="balance-value">${formatSats(total)}</span>
                 </div>
                 <div class="balance-item">
-                    <span class="balance-label">Local Balance:</span>
-                    <span class="balance-value">${formatSats(data.lightning_local)} (${localPercent}%)</span>
+                    <span class="balance-label">💧 My Balance (${localPercent}%):</span>
+                    <span class="balance-value">${formatSats(data.lightning_local)}</span>
                 </div>
                 <div class="balance-item">
-                    <span class="balance-label">Remote Balance:</span>
-                    <span class="balance-value">${formatSats(data.lightning_remote)}</span>
+                    <span class="balance-label">🔒 Remote Balance (${remotePercent}%):</span>
+                    <span class="balance-value" style="color: #8b949e;">${formatSats(data.lightning_remote)} (not mine)</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Portfolio %:</span>
+                    <span class="balance-value">${data.total_portfolio > 0 ? ((data.lightning_local / data.total_portfolio) * 100).toFixed(1) : 0}% of total</span>
                 </div>
             `;
         }
@@ -474,6 +552,9 @@
         function updateOnchainDetails(data) {
             const container = document.getElementById('onchain-details');
             const total = data.onchain_confirmed + data.onchain_unconfirmed + data.tracked_addresses;
+            const confirmedPercent = total > 0 ? ((data.onchain_confirmed / total) * 100).toFixed(1) : 0;
+            const unconfirmedPercent = total > 0 ? ((data.onchain_unconfirmed / total) * 100).toFixed(1) : 0;
+            const trackedPercent = total > 0 ? ((data.tracked_addresses / total) * 100).toFixed(1) : 0;
 
             container.innerHTML = `
                 <div class="balance-item">
@@ -481,16 +562,45 @@
                     <span class="balance-value">${formatSats(total)}</span>
                 </div>
                 <div class="balance-item">
-                    <span class="balance-label">Confirmed:</span>
+                    <span class="balance-label">✅ Confirmed (${confirmedPercent}%):</span>
                     <span class="balance-value">${formatSats(data.onchain_confirmed)}</span>
                 </div>
                 <div class="balance-item">
-                    <span class="balance-label">Unconfirmed:</span>
+                    <span class="balance-label">⏳ Unconfirmed (${unconfirmedPercent}%):</span>
                     <span class="balance-value">${formatSats(data.onchain_unconfirmed)}</span>
                 </div>
                 <div class="balance-item">
-                    <span class="balance-label">Tracked Addresses:</span>
+                    <span class="balance-label">👁️ Tracked Addresses (${trackedPercent}%):</span>
                     <span class="balance-value">${formatSats(data.tracked_addresses)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Portfolio %:</span>
+                    <span class="balance-value">${data.total_portfolio > 0 ? ((total / data.total_portfolio) * 100).toFixed(1) : 0}% of total</span>
+                </div>
+            `;
+        }
+
+        function updateColdStorageDetails(data) {
+            const container = document.getElementById('cold-storage-details');
+            const coldTotal = data.cold_storage;
+            const portfolioPercent = data.total_portfolio > 0 ? ((coldTotal / data.total_portfolio) * 100).toFixed(1) : 0;
+
+            container.innerHTML = `
+                <div class="balance-item">
+                    <span class="balance-label">❄️ Total Cold Storage:</span>
+                    <span class="balance-value">${formatSats(coldTotal)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Portfolio %:</span>
+                    <span class="balance-value">${portfolioPercent}% of total</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Security Status:</span>
+                    <span class="balance-value" style="color: #238636;">🔒 Cold (Offline)</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">Liquidity:</span>
+                    <span class="balance-value" style="color: #d29922;">⚠️ Manual verification required</span>
                 </div>
             `;
         }
@@ -534,6 +644,9 @@
                 const labels = result.data.map(item => new Date(item.timestamp).toLocaleDateString());
                 const portfolioData = result.data.map(item => item.total_portfolio);
                 const liquidData = result.data.map(item => item.total_liquid);
+                const lightningData = result.data.map(item => item.lightning_local); // Only local balance counts
+                const onchainData = result.data.map(item => item.onchain_confirmed + item.onchain_unconfirmed + item.tracked_addresses);
+                const coldData = result.data.map(item => item.cold_storage);
 
                 // Destroy existing chart
                 if (portfolioChart) {
@@ -549,15 +662,40 @@
                             data: portfolioData,
                             borderColor: darkTheme.accentColor,
                             backgroundColor: darkTheme.accentColor + '20',
-                            borderWidth: 2,
+                            borderWidth: 3,
                             fill: true,
                             tension: 0.3,
                         }, {
-                            label: 'Liquid (No Cold Storage)',
+                            label: '⚡ Lightning',
+                            data: lightningData,
+                            borderColor: '#FFD700',
+                            backgroundColor: '#FFD70020',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                        }, {
+                            label: '🔗 On-chain',
+                            data: onchainData,
+                            borderColor: '#FF6B35',
+                            backgroundColor: '#FF6B3520',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                        }, {
+                            label: '🧊 Cold Storage',
+                            data: coldData,
+                            borderColor: '#87CEEB',
+                            backgroundColor: '#87CEEB20',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                        }, {
+                            label: '💧 Liquid (No Cold)',
                             data: liquidData,
                             borderColor: darkTheme.successColor,
                             backgroundColor: darkTheme.successColor + '20',
-                            borderWidth: 2,
+                            borderWidth: 1,
+                            borderDash: [5, 5],
                             fill: false,
                             tension: 0.3,
                         }]
@@ -899,6 +1037,7 @@
                 updateCurrentBalances(data);
                 updateLightningDetails(data);
                 updateOnchainDetails(data);
+                updateColdStorageDetails(data);
 
                 // Load charts
                 await Promise.all([
@@ -1014,6 +1153,34 @@
 
         // Load version on page load
         loadVersion();
+
+        // Navigation function
+        function showSection(sectionName) {
+            // Update active tab
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Show appropriate content or redirect
+            switch(sectionName) {
+                case 'dashboard':
+                    // Already on dashboard - just refresh if needed
+                    break;
+                case 'lightning':
+                    alert('Lightning management page - would navigate to dedicated Lightning page');
+                    break;
+                case 'onchain':
+                    alert('On-chain management page - would navigate to onchain addresses page');
+                    break;
+                case 'offline':
+                    alert('Cold storage management page - would navigate to cold storage accounts page');
+                    break;
+                case 'analytics':
+                    alert('Analytics page - would navigate to dedicated analytics page');
+                    break;
+            }
+        }
     </script>
 
     <!-- Version Footer -->
