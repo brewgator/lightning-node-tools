@@ -79,7 +79,7 @@ func main() {
 			log.Printf("💡 Balance updates will be disabled. Ensure bitcoin-cli is available and Bitcoin Core is running.")
 		} else {
 			fmt.Println("₿ Connected to Bitcoin Core node")
-			balanceService = bitcoin.NewBalanceService(bitcoinClient, database, 5*time.Minute)
+			balanceService = bitcoin.NewBalanceService(bitcoinClient, database, 30*time.Minute)
 
 			// Start balance service in background
 			go balanceService.Start()
