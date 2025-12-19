@@ -32,14 +32,14 @@ func NewBalanceService(client *Client, database *db.Database, interval time.Dura
 // Start begins the periodic balance update process
 func (s *BalanceService) Start() {
 	log.Println("Starting Bitcoin balance service...")
-	
+
 	// Run initial update immediately
 	s.updateAllBalances()
-	
+
 	// Start periodic updates
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -60,35 +60,35 @@ func (s *BalanceService) Stop() {
 // updateAllBalances updates balances for all tracked addresses
 func (s *BalanceService) updateAllBalances() {
 	log.Println("Updating Bitcoin address balances...")
-	
+
 	// Get all tracked addresses
 	addresses, err := s.database.GetOnchainAddresses()
 	if err != nil {
 		log.Printf("Failed to get tracked addresses: %v", err)
 		return
 	}
-	
+
 	if len(addresses) == 0 {
 		log.Println("No addresses to update")
 		return
 	}
-	
+
 	successCount := 0
 	for _, address := range addresses {
 		if !address.Active {
 			continue // Skip inactive addresses
 		}
-		
+
 		balance, err := s.updateAddressBalance(address)
 		if err != nil {
 			log.Printf("Failed to update balance for %s: %v", address.Address, err)
 			continue
 		}
-		
+
 		log.Printf("Updated balance for %s: %d satoshis", address.Address, balance)
 		successCount++
 	}
-	
+
 	log.Printf("Successfully updated %d/%d addresses", successCount, len(addresses))
 }
 
@@ -99,23 +99,23 @@ func (s *BalanceService) updateAddressBalance(address db.OnchainAddress) (int64,
 	if err != nil {
 		return 0, err
 	}
-	
+
 	// Get UTXOs to count transactions
 	utxos, err := s.client.GetAddressUTXOs(address.Address)
 	if err != nil {
 		log.Printf("Warning: Failed to get UTXOs for %s: %v", address.Address, err)
 		// Continue with balance update even if UTXO fetch fails
 	}
-	
+
 	txCount := int64(len(utxos))
-	
+
 	// Get blockchain info for current block height
 	_, err = s.client.GetBlockchainInfo()
 	if err != nil {
 		log.Printf("Warning: Failed to get blockchain info: %v", err)
 		// Continue with balance update
 	}
-	
+
 	// Insert new balance record
 	balanceRecord := &db.AddressBalance{
 		AddressID: address.ID,
@@ -123,15 +123,15 @@ func (s *BalanceService) updateAddressBalance(address db.OnchainAddress) (int64,
 		Balance:   balance,
 		TxCount:   txCount,
 	}
-	
+
 	err = s.database.InsertAddressBalance(balanceRecord)
 	if err != nil {
 		return 0, err
 	}
-	
-	log.Printf("Inserted balance record for %s: %d satoshis (%d txs)", 
+
+	log.Printf("Inserted balance record for %s: %d satoshis (%d txs)",
 		address.Address, balance, txCount)
-	
+
 	return balance, nil
 }
 
@@ -144,7 +144,7 @@ func (s *BalanceService) UpdateSingleAddress(addressID int64) error {
 	if address == nil {
 		return db.ErrNotFound
 	}
-	
+
 	_, err = s.updateAddressBalance(*address)
 	return err
 }
@@ -157,7 +157,7 @@ func (s *BalanceService) GetAddressCurrentBalance(address string) (int64, error)
 		// Return the most recent balance
 		return balances[len(balances)-1].Balance, nil
 	}
-	
+
 	// Fallback to querying Bitcoin Core directly
 	return s.client.GetAddressBalance(address)
 }
@@ -172,26 +172,26 @@ func (s *BalanceService) ImportAndTrackAddress(address, label string) error {
 	if !validation.IsValid {
 		return ErrInvalidAddress
 	}
-	
+
 	// Import address to Bitcoin Core as watch-only
 	err = s.client.ImportAddress(address)
 	if err != nil {
 		log.Printf("Warning: Failed to import address %s: %v", address, err)
 		// Continue anyway - address might already be imported
 	}
-	
+
 	// Add to database
 	dbAddress, err := s.database.InsertOnchainAddress(address, label)
 	if err != nil {
 		return err
 	}
-	
+
 	// Update balance immediately
 	_, err = s.updateAddressBalance(*dbAddress)
 	if err != nil {
 		log.Printf("Warning: Failed to update initial balance for %s: %v", address, err)
 		// Don't fail the import due to balance update failure
 	}
-	
+
 	return nil
 }

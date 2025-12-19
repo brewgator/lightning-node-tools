@@ -70,7 +70,7 @@ func main() {
 	}
 
 	var balanceService *bitcoin.BalanceService
-	
+
 	// Initialize Bitcoin balance service if not disabled
 	if !*noBitcoinNode && !*mockMode {
 		bitcoinClient, err := bitcoin.NewClient()
@@ -80,7 +80,7 @@ func main() {
 		} else {
 			fmt.Println("₿ Connected to Bitcoin Core node")
 			balanceService = bitcoin.NewBalanceService(bitcoinClient, database, 5*time.Minute)
-			
+
 			// Start balance service in background
 			go balanceService.Start()
 		}
@@ -452,7 +452,7 @@ func (s *Server) handleAddOnchainAddress(w http.ResponseWriter, r *http.Request)
 			s.writeError(w, http.StatusInternalServerError, "Failed to add address")
 			return
 		}
-		
+
 		// Get the newly inserted address to return
 		addresses, err := s.db.GetOnchainAddresses()
 		if err != nil {
@@ -460,7 +460,7 @@ func (s *Server) handleAddOnchainAddress(w http.ResponseWriter, r *http.Request)
 			s.writeError(w, http.StatusInternalServerError, "Address added but failed to retrieve details")
 			return
 		}
-		
+
 		// Find the address we just added
 		var newAddress *db.OnchainAddress
 		for _, addr := range addresses {
@@ -469,12 +469,12 @@ func (s *Server) handleAddOnchainAddress(w http.ResponseWriter, r *http.Request)
 				break
 			}
 		}
-		
+
 		if newAddress == nil {
 			s.writeError(w, http.StatusInternalServerError, "Address added but not found")
 			return
 		}
-		
+
 		s.writeJSON(w, APIResponse{
 			Success: true,
 			Data:    newAddress,

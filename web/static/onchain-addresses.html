@@ -492,10 +492,10 @@
                 <form id="addAddressForm">
                     <div class="form-group">
                         <label class="form-label" for="addressInput">Bitcoin Address or xPub *</label>
-                        <input 
-                            type="text" 
-                            class="form-control" 
-                            id="addressInput" 
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="addressInput"
                             placeholder="bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
                             required
                         >
@@ -503,10 +503,10 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="labelInput">Label</label>
-                        <input 
-                            type="text" 
-                            class="form-control" 
-                            id="labelInput" 
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="labelInput"
                             placeholder="My Savings Wallet"
                         >
                         <div class="form-help">Optional description to help identify this address</div>
@@ -554,7 +554,7 @@
             loadAddresses();
             setupSearch();
             setupSorting();
-            
+
             // Auto-refresh every 30 seconds
             setInterval(loadAddresses, 30000);
         });
@@ -564,10 +564,10 @@
             try {
                 const response = await fetch(`${API_BASE}/onchain/addresses`);
                 if (!response.ok) throw new Error('Failed to fetch addresses');
-                
+
                 const data = await response.json();
                 addresses = data.data || [];
-                
+
                 // Fetch current balance for each address
                 await Promise.all(addresses.map(async (address) => {
                     try {
@@ -585,7 +585,7 @@
                         address.currentBalance = 0;
                     }
                 }));
-                
+
                 renderAddresses();
             } catch (error) {
                 console.error('Error loading addresses:', error);
@@ -597,22 +597,22 @@
         function renderAddresses() {
             const tbody = document.getElementById('addressesBody');
             const emptyState = document.getElementById('emptyState');
-            
+
             if (addresses.length === 0) {
                 tbody.innerHTML = '';
                 emptyState.style.display = 'block';
                 document.querySelector('.addresses-table').style.display = 'none';
                 return;
             }
-            
+
             emptyState.style.display = 'none';
             document.querySelector('.addresses-table').style.display = 'block';
-            
+
             // Sort addresses if needed
             if (currentSort.field) {
                 sortAddresses();
             }
-            
+
             tbody.innerHTML = addresses.map(address => `
                 <tr>
                     <td class="address-cell">
@@ -637,7 +637,7 @@
                     </td>
                 </tr>
             `).join('');
-            
+
             // Create mini charts after rendering (async)
             addresses.forEach(address => {
                 createMiniChart(address.id);
@@ -680,16 +680,16 @@
             const now = new Date();
             const diffMs = now - d;
             const diffMins = Math.floor(diffMs / 60000);
-            
+
             if (diffMins < 1) return 'Just now';
             if (diffMins < 60) return `${diffMins}m ago`;
-            
+
             const diffHours = Math.floor(diffMins / 60);
             if (diffHours < 24) return `${diffHours}h ago`;
-            
+
             const diffDays = Math.floor(diffHours / 24);
             if (diffDays < 7) return `${diffDays}d ago`;
-            
+
             return d.toLocaleDateString();
         }
 
@@ -697,28 +697,28 @@
         async function createMiniChart(addressId) {
             const container = document.getElementById(`chart-${addressId}`);
             if (!container) return;
-            
+
             const address = addresses.find(a => a.id === addressId);
             if (!address) return;
-            
+
             try {
                 // Fetch 7 days of balance history
                 const response = await fetch(`${API_BASE}/onchain/history?address=${encodeURIComponent(address.address)}&days=7`);
                 let data = [];
-                
+
                 if (response.ok) {
                     const balanceData = await response.json();
                     if (balanceData.success && balanceData.data && balanceData.data.datasets && balanceData.data.datasets[0]) {
                         const labels = balanceData.data.labels || [];
                         const balances = balanceData.data.datasets[0].data || [];
-                        
+
                         data = labels.map((label, i) => ({
                             x: new Date(label),
                             y: balances[i] || 0
                         }));
                     }
                 }
-                
+
                 // Fallback to generated data if no real data available
                 if (data.length === 0) {
                     const currentBalance = address.currentBalance || 0;
@@ -727,10 +727,10 @@
                         y: currentBalance + (Math.random() - 0.5) * (currentBalance * 0.1) // Small random variations
                     }));
                 }
-                
+
                 const canvas = document.createElement('canvas');
                 container.appendChild(canvas);
-                
+
                 new Chart(canvas, {
                     type: 'line',
                     data: {
@@ -751,7 +751,7 @@
                             tooltip: { enabled: false }
                         },
                         scales: {
-                            x: { 
+                            x: {
                                 display: false,
                                 type: 'time'
                             },
@@ -771,12 +771,12 @@
             const searchInput = document.getElementById('searchInput');
             searchInput.addEventListener('input', function(e) {
                 const query = e.target.value.toLowerCase();
-                
-                const filteredAddresses = addresses.filter(address => 
+
+                const filteredAddresses = addresses.filter(address =>
                     address.address.toLowerCase().includes(query) ||
                     (address.label && address.label.toLowerCase().includes(query))
                 );
-                
+
                 // Temporarily replace addresses array for rendering
                 const originalAddresses = addresses;
                 addresses = filteredAddresses;
@@ -790,21 +790,21 @@
             document.querySelectorAll('th.sortable').forEach(th => {
                 th.addEventListener('click', function() {
                     const field = this.dataset.sort;
-                    
+
                     if (currentSort.field === field) {
                         currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
                     } else {
                         currentSort.field = field;
                         currentSort.direction = 'asc';
                     }
-                    
+
                     // Update sort indicators
                     document.querySelectorAll('th.sortable').forEach(header => {
                         header.classList.remove('sort-asc', 'sort-desc');
                     });
-                    
+
                     this.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
-                    
+
                     renderAddresses();
                 });
             });
@@ -814,10 +814,10 @@
         function sortAddresses() {
             const field = currentSort.field;
             const direction = currentSort.direction === 'asc' ? 1 : -1;
-            
+
             addresses.sort((a, b) => {
                 let aVal, bVal;
-                
+
                 switch (field) {
                     case 'address':
                         aVal = a.address.toLowerCase();
@@ -838,7 +838,7 @@
                     default:
                         return 0;
                 }
-                
+
                 if (aVal < bVal) return -1 * direction;
                 if (aVal > bVal) return 1 * direction;
                 return 0;
@@ -859,7 +859,7 @@
         function openDeleteModal(id, address, label) {
             deleteAddressId = id;
             document.getElementById('deleteModal').classList.add('show');
-            
+
             const info = document.getElementById('deleteAddressInfo');
             info.innerHTML = `
                 <div style="font-family: monospace; color: #58a6ff; margin-bottom: 4px;">${address}</div>
@@ -877,18 +877,18 @@
             const addressInput = document.getElementById('addressInput');
             const labelInput = document.getElementById('labelInput');
             const addBtn = document.getElementById('addBtn');
-            
+
             const address = addressInput.value.trim();
             const label = labelInput.value.trim();
-            
+
             if (!address) {
                 showToast('Address is required', 'error');
                 return;
             }
-            
+
             addBtn.disabled = true;
             addBtn.textContent = 'Adding...';
-            
+
             try {
                 const response = await fetch(`${API_BASE}/onchain/addresses`, {
                     method: 'POST',
@@ -897,17 +897,17 @@
                     },
                     body: JSON.stringify({ address, label })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (!response.ok) {
                     throw new Error(data.error || 'Failed to add address');
                 }
-                
+
                 showToast('Address added successfully', 'success');
                 closeAddModal();
                 loadAddresses();
-                
+
             } catch (error) {
                 console.error('Error adding address:', error);
                 showToast(error.message, 'error');
@@ -920,26 +920,26 @@
         // Delete address
         async function confirmDelete() {
             if (!deleteAddressId) return;
-            
+
             const deleteBtn = document.getElementById('deleteBtn');
             deleteBtn.disabled = true;
             deleteBtn.textContent = 'Deleting...';
-            
+
             try {
                 const response = await fetch(`${API_BASE}/onchain/addresses/${deleteAddressId}`, {
                     method: 'DELETE'
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (!response.ok) {
                     throw new Error(data.error || 'Failed to delete address');
                 }
-                
+
                 showToast('Address deleted successfully', 'success');
                 closeDeleteModal();
                 loadAddresses();
-                
+
             } catch (error) {
                 console.error('Error deleting address:', error);
                 showToast(error.message, 'error');
@@ -962,12 +962,12 @@
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.textContent = message;
-            
+
             document.body.appendChild(toast);
-            
+
             // Trigger animation
             setTimeout(() => toast.classList.add('show'), 100);
-            
+
             // Remove toast after 3 seconds
             setTimeout(() => {
                 toast.classList.remove('show');
