@@ -588,10 +588,10 @@
         function createAccountCard(account) {
             const days = account.days_since_update || daysSinceUpdate(account.last_updated);
             const needsWarningFlag = account.needs_warning !== undefined ? account.needs_warning : needsWarning(account.last_updated);
-            const warningIcon = needsWarningFlag ? 
+            const warningIcon = needsWarningFlag ?
                 `<span class="warning-icon tooltip" data-tooltip="Not verified in ${days} days">⚠️</span>` : '';
-            
-            const notes = account.notes ? 
+
+            const notes = account.notes ?
                 `<div class="notes">${escapeHtml(account.notes)}</div>` : '';
 
             return `
@@ -633,8 +633,8 @@
         function renderAccounts() {
             const grid = document.getElementById('accountsGrid');
             const searchTerm = document.getElementById('searchBox').value.toLowerCase();
-            
-            const filteredAccounts = coldStorageAccounts.filter(account => 
+
+            const filteredAccounts = coldStorageAccounts.filter(account =>
                 account.name.toLowerCase().includes(searchTerm) ||
                 (account.notes && account.notes.toLowerCase().includes(searchTerm))
             );
@@ -661,7 +661,7 @@
             });
 
             grid.innerHTML = filteredAccounts.map(createAccountCard).join('');
-            
+
             document.getElementById('status').style.display = 'none';
             document.getElementById('emptyState').style.display = 'none';
             document.getElementById('accountsContainer').style.display = 'block';
@@ -670,7 +670,7 @@
         // Load cold storage accounts from API
         async function loadAccounts() {
             showLoading();
-            
+
             try {
                 const response = await fetch('/api/offline/accounts');
                 const result = await response.json();
@@ -889,7 +889,7 @@
         window.addEventListener('click', function(e) {
             const addModal = document.getElementById('addAccountModal');
             const updateModal = document.getElementById('updateBalanceModal');
-            
+
             if (e.target === addModal) {
                 closeAddAccountModal();
             } else if (e.target === updateModal) {

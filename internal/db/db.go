@@ -667,7 +667,7 @@ func (db *Database) UpdateColdStorageEntry(id int64, name string, balance int64,
 
 	tableName := db.getTableName("cold_storage_entries")
 	query := fmt.Sprintf(`
-		UPDATE %s 
+		UPDATE %s
 		SET name = ?, balance = ?, last_updated = ?, notes = ?
 		WHERE id = ?
 	`, tableName)
@@ -697,7 +697,7 @@ func (db *Database) UpdateColdStorageEntry(id int64, name string, balance int64,
 			IsVerified:      true, // Assume verified when manually updated
 			Notes:           notes,
 		}
-		
+
 		if err := db.InsertColdStorageHistory(historyEntry); err != nil {
 			// Log error but don't fail the update
 			fmt.Printf("Warning: failed to record balance history: %v\n", err)
