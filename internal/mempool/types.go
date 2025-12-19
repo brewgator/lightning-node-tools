@@ -2,14 +2,34 @@ package mempool
 
 import "time"
 
-// AddressStats represents comprehensive address statistics from Mempool.space
+// AddressStats represents comprehensive address statistics from Mempool.space.
+//
+// Fields tagged with JSON names (e.g. Address, ChainStats, MempoolStats) are
+// populated directly from the Mempool.space API response. The TotalReceived,
+// TotalSent, and Balance fields are derived values that are not returned by
+// the API and therefore use json:"-" to exclude them from (un)marshalling.
+// These calculated fields are expected to be populated by higher-level
+// application logic after fetching and decoding the raw statistics, typically
+// based on the values in ChainStats and MempoolStats.
 type AddressStats struct {
-	Address                 string `json:"address"`
-	ChainStats              Stats  `json:"chain_stats"`
-	MempoolStats            Stats  `json:"mempool_stats"`
-	TotalReceived          int64  `json:"-"` // Calculated field
-	TotalSent              int64  `json:"-"` // Calculated field
-	Balance                int64  `json:"-"` // Calculated field
+	Address      string `json:"address"`
+	ChainStats   Stats  `json:"chain_stats"`
+	MempoolStats Stats  `json:"mempool_stats"`
+	// TotalReceived is the total amount of value ever received by this address.
+	// It is a derived field and is not included in the Mempool.space JSON
+	// response; callers should compute and populate it from the underlying
+	// statistics (for example, using ChainStats.FundedTxoSum).
+	TotalReceived int64 `json:"-"`
+	// TotalSent is the total amount of value ever sent from this address.
+	// It is a derived field and is not included in the Mempool.space JSON
+	// response; callers should compute and populate it from the underlying
+	// statistics (for example, using ChainStats.SpentTxoSum).
+	TotalSent int64 `json:"-"`
+	// Balance is the current balance for this address, typically computed as
+	// TotalReceived minus TotalSent or from the underlying statistics. It is
+	// not returned by the Mempool.space API and must be populated by the
+	// caller after decoding the JSON response.
+	Balance int64 `json:"-"`
 }
 
 // Stats represents transaction and balance statistics
@@ -75,7 +95,9 @@ type Status struct {
 // ChainTips represents blockchain tip information
 type ChainTips struct {
 	Height    int64     `json:"height"`
-	Timestamp time.Time `json:"timestamp"`
+	// QueryTime reflects when the API was queried, not when the block was mined.
+	// To get the actual block time, fetch block details separately.
+	QueryTime time.Time `json:"query_time"`
 }
 
 // BalanceUpdate represents a balance update from Mempool.space

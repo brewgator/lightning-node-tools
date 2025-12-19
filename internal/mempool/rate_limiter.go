@@ -7,7 +7,16 @@ import (
 	"time"
 )
 
-// RateLimiter implements a token bucket rate limiter
+// RateLimiter implements a token bucket rate limiter with burst support.
+//
+// The rate limiter starts with a full bucket of tokens (maxRequests), allowing
+// immediate burst usage. Tokens are replenished one at a time at regular intervals,
+// calculated as interval/maxRequests. For example, with maxRequests=10 and interval=1min,
+// tokens are replenished every 6 seconds.
+//
+// This implementation allows burst traffic (all tokens can be consumed immediately),
+// followed by sustained rate-limited access as tokens replenish. If you need strict
+// sliding window rate limiting without burst support, consider a different approach.
 type RateLimiter struct {
 	tokens    chan struct{}
 	ticker    *time.Ticker
@@ -17,9 +26,13 @@ type RateLimiter struct {
 	stopped   bool
 }
 
-// NewRateLimiter creates a new rate limiter
-// maxRequests: maximum number of requests allowed
-// interval: time window for the requests (e.g., per minute)
+// NewRateLimiter creates a new rate limiter with burst support.
+//
+// maxRequests: maximum number of tokens in the bucket (burst capacity)
+// interval: time window for token replenishment (e.g., 1 minute for "10 requests per minute")
+//
+// The bucket starts full, allowing immediate burst of maxRequests. After that,
+// tokens replenish at a rate of interval/maxRequests, supporting sustained throughput.
 func NewRateLimiter(maxRequests int, interval time.Duration) *RateLimiter {
 	rl := &RateLimiter{
 		tokens:    make(chan struct{}, maxRequests),
