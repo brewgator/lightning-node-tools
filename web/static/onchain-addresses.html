@@ -546,8 +546,8 @@
         let currentSort = { field: null, direction: 'asc' };
         let deleteAddressId = null;
 
-        // API Configuration
-        const API_BASE = 'http://localhost:8085/api';
+        // API Configuration - use current origin to match the server's port
+        const API_BASE = window.location.origin + '/api';
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
@@ -574,8 +574,8 @@
                         const balanceResponse = await fetch(`${API_BASE}/onchain/history?address=${encodeURIComponent(address.address)}&days=1`);
                         if (balanceResponse.ok) {
                             const balanceData = await balanceResponse.json();
-                            if (balanceData.success && balanceData.data && balanceData.data.datasets && balanceData.data.datasets[0] && balanceData.data.datasets[0].data && balanceData.data.datasets[0].data.length > 0) {
-                                const balances = balanceData.data.datasets[0].data;
+                            const balances = balanceData?.data?.datasets?.[0]?.data;
+                            if (Array.isArray(balances) && balances.length > 0) {
                                 address.currentBalance = balances[balances.length - 1]; // Latest balance
                                 address.last_updated = new Date(); // Mark as recently updated
                             }
@@ -613,30 +613,82 @@
                 sortAddresses();
             }
 
-            tbody.innerHTML = addresses.map(address => `
-                <tr>
-                    <td class="address-cell">
-                        <span class="address-text">${truncateAddress(address.address)}</span>
-                        <button class="copy-btn" onclick="copyAddress('${address.address}')" title="Copy address">
-                            📋
-                        </button>
-                    </td>
-                    <td>${address.label || '—'}</td>
-                    <td class="balance-cell">${formatBalance(getAddressBalance(address.id))}</td>
-                    <td class="last-updated">${formatDate(address.last_updated || new Date())}</td>
-                    <td>
-                        <div class="chart-container" id="chart-${address.id}"></div>
-                    </td>
-                    <td class="actions-cell">
-                        <button class="btn btn-secondary btn-sm" onclick="viewDetails(${address.id})">
-                            📊 Details
-                        </button>
-                        <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${address.id}, '${address.address}', '${address.label || ''}')">
-                            🗑️ Delete
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
+            // Clear existing rows
+            tbody.innerHTML = '';
+
+            // Safely build table rows using DOM APIs
+            addresses.forEach(address => {
+                const tr = document.createElement('tr');
+
+                // Address cell
+                const addressTd = document.createElement('td');
+                addressTd.className = 'address-cell';
+
+                const addressSpan = document.createElement('span');
+                addressSpan.className = 'address-text';
+                addressSpan.textContent = truncateAddress(address.address);
+                addressTd.appendChild(addressSpan);
+
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.title = 'Copy address';
+                copyBtn.textContent = '📋';
+                copyBtn.addEventListener('click', function () {
+                    copyAddress(address.address);
+                });
+                addressTd.appendChild(copyBtn);
+
+                tr.appendChild(addressTd);
+
+                // Label cell
+                const labelTd = document.createElement('td');
+                labelTd.textContent = address.label || '—';
+                tr.appendChild(labelTd);
+
+                // Balance cell
+                const balanceTd = document.createElement('td');
+                balanceTd.className = 'balance-cell';
+                balanceTd.textContent = formatBalance(getAddressBalance(address.id));
+                tr.appendChild(balanceTd);
+
+                // Last updated cell
+                const updatedTd = document.createElement('td');
+                updatedTd.className = 'last-updated';
+                updatedTd.textContent = formatDate(address.last_updated || new Date());
+                tr.appendChild(updatedTd);
+
+                // Chart cell
+                const chartTd = document.createElement('td');
+                const chartDiv = document.createElement('div');
+                chartDiv.className = 'chart-container';
+                chartDiv.id = 'chart-' + address.id;
+                chartTd.appendChild(chartDiv);
+                tr.appendChild(chartTd);
+
+                // Actions cell
+                const actionsTd = document.createElement('td');
+                actionsTd.className = 'actions-cell';
+
+                const detailsBtn = document.createElement('button');
+                detailsBtn.className = 'btn btn-secondary btn-sm';
+                detailsBtn.textContent = '📊 Details';
+                detailsBtn.addEventListener('click', function () {
+                    viewDetails(address.id);
+                });
+                actionsTd.appendChild(detailsBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-danger btn-sm';
+                deleteBtn.textContent = '🗑️ Delete';
+                deleteBtn.addEventListener('click', function () {
+                    openDeleteModal(address.id, address.address, address.label || '');
+                });
+                actionsTd.appendChild(deleteBtn);
+
+                tr.appendChild(actionsTd);
+
+                tbody.appendChild(tr);
+            });
 
             // Create mini charts after rendering (async)
             addresses.forEach(address => {
@@ -708,14 +760,23 @@
 
                 if (response.ok) {
                     const balanceData = await response.json();
-                    if (balanceData.success && balanceData.data && balanceData.data.datasets && balanceData.data.datasets[0]) {
-                        const labels = balanceData.data.labels || [];
-                        const balances = balanceData.data.datasets[0].data || [];
+                    const rawData = balanceData?.data;
 
-                        data = labels.map((label, i) => ({
-                            x: new Date(label),
-                            y: balances[i] || 0
-                        }));
+                    if (balanceData?.success && rawData) {
+                        const labels = Array.isArray(rawData.labels) ? rawData.labels : [];
+                        const datasets = Array.isArray(rawData.datasets) ? rawData.datasets : [];
+                        const balances = (datasets.length > 0 &&
+                                          datasets[0] &&
+                                          Array.isArray(datasets[0].data))
+                            ? datasets[0].data
+                            : [];
+
+                        if (labels.length > 0 && balances.length > 0) {
+                            data = labels.map((label, i) => ({
+                                x: new Date(label),
+                                y: balances[i] != null ? balances[i] : 0
+                            }));
+                        }
                     }
                 }
 
