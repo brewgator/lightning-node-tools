@@ -218,8 +218,8 @@ func (ms *MultisigService) DeriveAddress(wallet *db.MultisigWallet, addressIndex
 		// and we derive using the path: 0/addressIndex (receive addresses) or 1/addressIndex (change addresses)
 		// The BIP32Path field in the config documents the original derivation path of the xpub,
 		// but we derive relative to that base path here.
-		// 
-		// Future enhancement: Parse BIP32Path to determine if we should use path 0 (receive) 
+		//
+		// Future enhancement: Parse BIP32Path to determine if we should use path 0 (receive)
 		// or path 1 (change), or support custom derivation paths.
 		childKey, err := masterKey.Derive(0) // Receive address path
 		if err != nil {

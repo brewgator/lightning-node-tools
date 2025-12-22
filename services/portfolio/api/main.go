@@ -108,6 +108,8 @@ func main() {
 	server.setupRoutes()
 
 	// Setup CORS with environment-based configuration
+	// Security Note: Using localhost origins in production exposes the API to CSRF attacks
+	// from any application running on the user's machine. Always set ALLOWED_ORIGINS in production.
 	allowedOrigins := []string{"http://localhost:8090", "http://127.0.0.1:8090"}
 	
 	// Check for production origins from environment variable
