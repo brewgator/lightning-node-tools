@@ -950,7 +950,7 @@ func (db *Database) InsertMultisigWallet(wallet *MultisigWallet) (*MultisigWalle
 
 	// Insert wallet
 	walletQuery := fmt.Sprintf(`
-		INSERT INTO %s (name, uuid, address_type, network, required_signers, total_signers, 
+		INSERT INTO %s (name, uuid, address_type, network, required_signers, total_signers,
 		                starting_address_index, next_address_index, active, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, walletTableName)
@@ -1156,10 +1156,20 @@ func (db *Database) GetMultisigWalletByUUID(uuid string) (*MultisigWallet, error
 	return db.GetMultisigWalletByID(id)
 }
 
-// DeleteMultisigWallet marks a multisig wallet as inactive
+// DeleteMultisigWallet marks a multisig wallet as inactive and removes associated addresses from tracking
 func (db *Database) DeleteMultisigWallet(id int64) error {
-	tableName := db.getTableName("multisig_wallets")
-	query := fmt.Sprintf(`UPDATE %s SET active = 0 WHERE id = ?`, tableName)
+	// First get the wallet to construct the label pattern
+	wallet, err := db.GetMultisigWalletByID(id)
+	if err != nil {
+		return fmt.Errorf("failed to get wallet for deletion: %w", err)
+	}
+	if wallet == nil {
+		return sql.ErrNoRows
+	}
+
+	// Mark wallet as inactive
+	walletTableName := db.getTableName("multisig_wallets")
+	query := fmt.Sprintf(`UPDATE %s SET active = 0 WHERE id = ?`, walletTableName)
 
 	result, err := db.conn.Exec(query, id)
 	if err != nil {
@@ -1173,6 +1183,17 @@ func (db *Database) DeleteMultisigWallet(id int64) error {
 
 	if rowsAffected == 0 {
 		return sql.ErrNoRows
+	}
+
+	// Remove associated addresses from onchain tracking
+	onchainTableName := db.getTableName("onchain_addresses")
+	labelPattern := fmt.Sprintf("%s [%d/%d] -%%", wallet.Name, wallet.RequiredSigners, wallet.TotalSigners)
+	deleteQuery := fmt.Sprintf(`DELETE FROM %s WHERE label LIKE ?`, onchainTableName)
+
+	_, err = db.conn.Exec(deleteQuery, labelPattern)
+	if err != nil {
+		// Log but don't fail - the wallet deletion should succeed even if onchain cleanup fails
+		fmt.Printf("Warning: failed to remove multisig addresses from onchain tracking: %v\n", err)
 	}
 
 	return nil
@@ -1252,5 +1273,26 @@ func (db *Database) UpdateMultisigWalletNextAddressIndex(id int64, nextIndex int
 	query := fmt.Sprintf(`UPDATE %s SET next_address_index = ? WHERE id = ?`, tableName)
 
 	_, err := db.conn.Exec(query, nextIndex, id)
+	return err
+}
+
+// InsertAddressBalanceHistory inserts a balance record for an address at a specific timestamp
+func (db *Database) InsertAddressBalanceHistory(address string, balance int64, timestamp time.Time) error {
+	// First get the address ID
+	addressTableName := db.getTableName("onchain_addresses")
+	var addressID int64
+	err := db.conn.QueryRow(fmt.Sprintf(`SELECT id FROM %s WHERE address = ?`, addressTableName), address).Scan(&addressID)
+	if err != nil {
+		return fmt.Errorf("address not found in tracking: %w", err)
+	}
+
+	// Insert the balance history
+	balanceTableName := db.getTableName("address_balances")
+	query := fmt.Sprintf(`
+		INSERT OR REPLACE INTO %s (address_id, timestamp, balance, tx_count)
+		VALUES (?, ?, ?, 0)
+	`, balanceTableName)
+
+	_, err = db.conn.Exec(query, addressID, timestamp, balance)
 	return err
 }

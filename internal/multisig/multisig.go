@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/brewgator/lightning-node-tools/internal/db"
@@ -382,6 +383,16 @@ func (ms *MultisigService) GenerateAddresses(walletID int64, count int) ([]db.Mu
 			insertedAddr, err := ms.db.InsertMultisigAddress(addr)
 			if err != nil {
 				return nil, fmt.Errorf("failed to insert address: %w", err)
+			}
+
+			// Also add to onchain address tracking for balance collection
+			label := fmt.Sprintf("%s [%d/%d] - Index %d", wallet.Name, wallet.RequiredSigners, wallet.TotalSigners, addressIndex)
+			_, err = ms.db.InsertOnchainAddress(addr.Address, label)
+			if err != nil {
+				// Log but don't fail if address already exists in tracking
+				if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
+					return nil, fmt.Errorf("failed to add address to tracking: %w", err)
+				}
 			}
 
 			addresses = append(addresses, *insertedAddr)

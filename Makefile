@@ -4,7 +4,7 @@
 all: build
 
 # Build all tools
-build: channel-manager telegram-monitor portfolio-collector portfolio-api forwarding-collector webhook-deployer
+build: channel-manager telegram-monitor portfolio-collector portfolio-api forwarding-collector webhook-deployer historical-backfill
 
 # Build channel-manager
 channel-manager:
@@ -42,6 +42,12 @@ webhook-deployer:
 	@echo "Building webhook-deployer..."
 	@mkdir -p bin
 	go build -o bin/webhook-deployer ./services/deployment/webhook-deployer
+
+# Build historical-backfill
+historical-backfill:
+	@echo "Building historical-backfill..."
+	@mkdir -p bin
+	go build -o bin/historical-backfill ./tools/historical-backfill
 
 # Build complete portfolio system (collector + api)
 portfolio: portfolio-collector portfolio-api
