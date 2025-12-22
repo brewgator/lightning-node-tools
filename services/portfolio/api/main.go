@@ -648,6 +648,7 @@ func (s *Server) handleTransactionHistory(w http.ResponseWriter, r *http.Request
 	}
 
 	// We need access to the Bitcoin client - let's create one directly
+	// Note: The Bitcoin client is stateless and doesn't hold resources, so no cleanup is needed
 	bitcoinClient, err := bitcoin.NewClient()
 	if err != nil {
 		log.Printf("handleTransactionHistory: failed to create Bitcoin client: %v", err)
