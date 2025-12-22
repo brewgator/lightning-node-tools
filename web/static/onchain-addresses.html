@@ -547,6 +547,27 @@
             color: #8b949e;
             font-style: italic;
         }
+
+        .multisig-section {
+            margin-bottom: 20px;
+        }
+
+        .multisig-section h2 {
+            color: #f0883e;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .multisig-address-count {
+            color: #8b949e;
+            font-size: 12px;
+        }
+
+        .multisig-loading-addresses,
+        .multisig-no-addresses {
+            color: #8b949e;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -567,15 +588,15 @@
                 <button class="btn btn-primary" onclick="openAddModal()">
                     <span>+</span> Add Address
                 </button>
-                <button class="btn btn-secondary" onclick="openMultisigModal()">
+                <button class="btn btn-secondary" onclick="openMultisigModal()" aria-label="Import multisig wallet">
                     <span>🔐</span> Import Multisig
                 </button>
             </div>
         </div>
 
         <!-- Multisig Wallets Section -->
-        <div class="multisig-section" style="margin-bottom: 20px;">
-            <h2 style="color: #f0883e; margin-bottom: 10px; font-size: 18px;">📊 Multisig Wallets</h2>
+        <div class="multisig-section">
+            <h2>📊 Multisig Wallets</h2>
             <div class="multisig-wallets" id="multisigWallets">
                 <!-- Multisig wallets will be loaded here -->
             </div>
@@ -672,9 +693,9 @@
 
     <!-- Import Multisig Wallet Modal -->
     <div id="multisigModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="multisigModalTitle">
             <div class="modal-header">
-                <h3 class="modal-title">Import Multisig Wallet</h3>
+                <h3 class="modal-title" id="multisigModalTitle">Import Multisig Wallet</h3>
                 <button class="close" onclick="closeMultisigModal()">&times;</button>
             </div>
             <div class="modal-body">
@@ -714,6 +735,9 @@
 
         // API Configuration - use current origin to match the server's port
         const API_BASE = window.location.origin + '/api';
+        
+        // Constants
+        const DEFAULT_ADDRESS_GENERATION_COUNT = 5;
 
         // Utility function to escape HTML and prevent XSS attacks
         function escapeHtml(unsafe) {
@@ -1283,7 +1307,7 @@
                             <button class="btn btn-secondary btn-sm" onclick="generateAddresses(${wallet.id})">
                                 + Generate
                             </button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteMultisigWallet(${wallet.id}, '${escapeHtml(wallet.name)}')">
+                            <button class="btn btn-danger btn-sm" aria-label="Delete wallet" onclick="deleteMultisigWallet(${wallet.id}, '${escapeHtml(wallet.name)}')">
                                 🗑️
                             </button>
                         </div>
@@ -1310,10 +1334,10 @@
                         <div class="multisig-addresses">
                             <div class="multisig-addresses-header">
                                 <span class="multisig-addresses-title">Generated Addresses</span>
-                                <span style="color: #8b949e; font-size: 12px;" id="addressCount-${wallet.id}">Loading...</span>
+                                <span class="multisig-address-count" id="addressCount-${wallet.id}">Loading...</span>
                             </div>
                             <div class="multisig-address-list" id="addresses-${wallet.id}">
-                                <div style="color: #8b949e; font-style: italic;">Loading addresses...</div>
+                                <div class="multisig-loading-addresses">Loading addresses...</div>
                             </div>
                         </div>
                     </div>
@@ -1333,26 +1357,26 @@
                 if (!response.ok) throw new Error('Failed to fetch wallet addresses');
 
                 const data = await response.json();
-                const addresses = data.data || [];
+                const walletAddresses = data.data || [];
 
                 const addressesContainer = document.getElementById(`addresses-${walletId}`);
                 const countContainer = document.getElementById(`addressCount-${walletId}`);
 
-                countContainer.textContent = `${addresses.length} addresses`;
+                countContainer.textContent = `${walletAddresses.length} addresses`;
 
-                if (addresses.length === 0) {
-                    addressesContainer.innerHTML = '<div style="color: #8b949e; font-style: italic;">No addresses generated yet</div>';
+                if (walletAddresses.length === 0) {
+                    addressesContainer.innerHTML = '<div class="multisig-no-addresses">No addresses generated yet</div>';
                     return;
                 }
 
                 addressesContainer.innerHTML = '';
-                addresses.forEach(address => {
+                walletAddresses.forEach(address => {
                     const addressDiv = document.createElement('div');
                     addressDiv.className = 'multisig-address';
                     
                     addressDiv.innerHTML = `
                         <span class="multisig-address-text" title="${escapeHtml(address.address)}">${truncateAddress(address.address)}</span>
-                        <button class="copy-btn" onclick="copyAddress('${address.address}')" title="Copy address">📋</button>
+                        <button class="copy-btn" onclick="copyAddress('${address.address}')" title="Copy address" aria-label="Copy address to clipboard">📋</button>
                     `;
                     
                     addressesContainer.appendChild(addressDiv);
@@ -1477,7 +1501,7 @@
         }
 
         // Generate addresses for a wallet
-        async function generateAddresses(walletId, count = 5) {
+        async function generateAddresses(walletId, count = DEFAULT_ADDRESS_GENERATION_COUNT) {
             try {
                 const response = await fetch(`${API_BASE}/multisig/wallets/${walletId}/addresses/generate`, {
                     method: 'POST',
@@ -1502,9 +1526,70 @@
             }
         }
 
+        // Show confirmation modal for deleting a multisig wallet
+        function showMultisigDeleteConfirmation(walletName) {
+            return new Promise((resolve) => {
+                const overlay = document.createElement('div');
+                overlay.setAttribute('role', 'dialog');
+                overlay.setAttribute('aria-modal', 'true');
+                overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;';
+
+                const modal = document.createElement('div');
+                modal.style.cssText = 'background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 24px; max-width: 420px; width: 90%; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);';
+
+                const title = document.createElement('h2');
+                title.textContent = 'Delete multisig wallet';
+                title.style.cssText = 'margin-bottom: 8px; font-size: 18px; font-weight: 600; color: #f0f6fc;';
+
+                const message = document.createElement('p');
+                message.textContent = `Are you sure you want to delete the multisig wallet "${walletName}"? This action cannot be undone.`;
+                message.style.cssText = 'margin-bottom: 20px; font-size: 14px; line-height: 1.4; color: #c9d1d9;';
+
+                const buttonRow = document.createElement('div');
+                buttonRow.style.cssText = 'display: flex; justify-content: flex-end; gap: 8px;';
+
+                const cancelButton = document.createElement('button');
+                cancelButton.textContent = 'Cancel';
+                cancelButton.type = 'button';
+                cancelButton.style.cssText = 'padding: 8px 14px; border-radius: 6px; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; cursor: pointer; font-size: 14px;';
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete wallet';
+                deleteButton.type = 'button';
+                deleteButton.style.cssText = 'padding: 8px 14px; border-radius: 6px; border: none; background: #da3633; color: #ffffff; cursor: pointer; font-size: 14px; font-weight: 500;';
+
+                function cleanup(result) {
+                    document.body.removeChild(overlay);
+                    document.removeEventListener('keydown', onKeyDown);
+                    resolve(result);
+                }
+
+                function onKeyDown(e) {
+                    if (e.key === 'Escape') {
+                        cleanup(false);
+                    }
+                }
+
+                cancelButton.addEventListener('click', () => cleanup(false));
+                deleteButton.addEventListener('click', () => cleanup(true));
+                document.addEventListener('keydown', onKeyDown);
+
+                buttonRow.appendChild(cancelButton);
+                buttonRow.appendChild(deleteButton);
+
+                modal.appendChild(title);
+                modal.appendChild(message);
+                modal.appendChild(buttonRow);
+
+                overlay.appendChild(modal);
+                document.body.appendChild(overlay);
+            });
+        }
+
         // Delete multisig wallet
         async function deleteMultisigWallet(walletId, walletName) {
-            if (!confirm(`Are you sure you want to delete the multisig wallet "${walletName}"?`)) {
+            const confirmed = await showMultisigDeleteConfirmation(walletName);
+            if (!confirmed) {
                 return;
             }
 

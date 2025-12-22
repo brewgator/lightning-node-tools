@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -26,6 +28,9 @@ const (
 	MaxHistoryDays = 365
 	// BitcoinGenesisDate is the date of the Bitcoin genesis block (January 3, 2009)
 	BitcoinGenesisDate = "2009-01-03"
+	// MaxAddressGenerationBatch is the maximum number of addresses that can be generated in a single request
+	// This limit prevents database overload and API timeouts for large batch operations
+	MaxAddressGenerationBatch = 100
 )
 
 type Server struct {
@@ -102,10 +107,23 @@ func main() {
 
 	server.setupRoutes()
 
-	// Setup CORS
+	// Setup CORS with environment-based configuration
+	// Security Note: Using localhost origins in production exposes the API to CSRF attacks
+	// from any application running on the user's machine. Always set ALLOWED_ORIGINS in production.
+	allowedOrigins := []string{"http://localhost:8090", "http://127.0.0.1:8090"}
+	
+	// Check for production origins from environment variable
+	if envOrigins := os.Getenv("ALLOWED_ORIGINS"); envOrigins != "" {
+		allowedOrigins = strings.Split(envOrigins, ",")
+		log.Printf("🔒 Using CORS origins from environment: %v", allowedOrigins)
+	} else {
+		// WARNING: Using localhost origins - NOT suitable for production!
+		log.Printf("⚠️  WARNING: Using default localhost CORS origins. Set ALLOWED_ORIGINS environment variable for production!")
+		log.Printf("⚠️  Example: export ALLOWED_ORIGINS='https://yourdomain.com,https://app.yourdomain.com'")
+	}
+
 	c := cors.New(cors.Options{
-		// Allow localhost for development. In production, replace with your actual frontend domain(s).
-		AllowedOrigins: []string{"http://localhost:8090", "http://127.0.0.1:8090"},
+		AllowedOrigins: allowedOrigins,
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"*"},
 	})
@@ -908,7 +926,17 @@ func (s *Server) handleImportMultisigWallet(w http.ResponseWriter, r *http.Reque
 	addresses, err := s.multisigService.GenerateAddresses(wallet.ID, 5)
 	if err != nil {
 		log.Printf("handleImportMultisigWallet: failed to generate initial addresses: %v", err)
-		// Don't fail the import, just log the error
+		// Don't fail the import, but include a warning in the response
+		response := map[string]interface{}{
+			"wallet":    wallet,
+			"addresses": []db.MultisigAddress{},
+			"warning":   "Initial address generation failed. You may need to generate addresses manually.",
+		}
+		s.writeJSON(w, APIResponse{
+			Success: true,
+			Data:    response,
+		})
+		return
 	}
 
 	response := map[string]interface{}{
@@ -990,7 +1018,7 @@ func (s *Server) handleDeleteMultisigWallet(w http.ResponseWriter, r *http.Reque
 		Success: true,
 		Data: map[string]interface{}{
 			"message": "Wallet deleted successfully",
-			"name":    wallet.Name,
+			"name":    html.EscapeString(wallet.Name),
 		},
 	})
 }
@@ -1047,8 +1075,20 @@ func (s *Server) handleGenerateMultisigAddresses(w http.ResponseWriter, r *http.
 	}
 
 	// Validate count
-	if req.Count <= 0 || req.Count > 100 {
-		s.writeError(w, http.StatusBadRequest, "Count must be between 1 and 100")
+	if req.Count <= 0 || req.Count > MaxAddressGenerationBatch {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("Count must be between 1 and %d", MaxAddressGenerationBatch))
+		return
+	}
+
+	// Validate wallet exists first
+	wallet, err := s.multisigService.GetWalletByID(id)
+	if err != nil {
+		log.Printf("handleGenerateMultisigAddresses: failed to get wallet: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to check wallet")
+		return
+	}
+	if wallet == nil {
+		s.writeError(w, http.StatusNotFound, "Wallet not found")
 		return
 	}
 
@@ -1067,9 +1107,9 @@ func (s *Server) handleGenerateMultisigAddresses(w http.ResponseWriter, r *http.
 	s.writeJSON(w, APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
-			"addresses":     addresses,
-			"count":         len(addresses),
-			"generated_new": req.Count,
+			"addresses":       addresses,
+			"count":           len(addresses),
+			"requested_count": req.Count,
 		},
 	})
 }

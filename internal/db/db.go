@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -943,7 +944,7 @@ func (db *Database) InsertMultisigWallet(wallet *MultisigWallet) (*MultisigWalle
 	// Start transaction
 	tx, err := db.conn.Begin()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -961,12 +962,16 @@ func (db *Database) InsertMultisigWallet(wallet *MultisigWallet) (*MultisigWalle
 		wallet.NextAddressIndex, wallet.Active, now,
 	)
 	if err != nil {
-		return nil, err
+		// Check for constraint violations (e.g., duplicate UUID)
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return nil, fmt.Errorf("wallet with this UUID already exists: %w", err)
+		}
+		return nil, fmt.Errorf("failed to insert wallet: %w", err)
 	}
 
 	walletID, err := result.LastInsertId()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get wallet ID: %w", err)
 	}
 
 	// Insert extended public keys
@@ -980,12 +985,16 @@ func (db *Database) InsertMultisigWallet(wallet *MultisigWallet) (*MultisigWalle
 			walletID, key.Name, key.XPub, key.BIP32Path, key.Fingerprint, i,
 		)
 		if err != nil {
-			return nil, err
+			// Check for constraint violations (e.g., duplicate UUID)
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				return nil, fmt.Errorf("extended public key %d: duplicate entry detected: %w", i, err)
+			}
+			return nil, fmt.Errorf("failed to insert extended public key %d: %w", i, err)
 		}
 	}
 
 	if err = tx.Commit(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	wallet.ID = walletID
