@@ -648,6 +648,7 @@ func (s *Server) handleTransactionHistory(w http.ResponseWriter, r *http.Request
 	}
 
 	// We need access to the Bitcoin client - let's create one directly
+	// Note: The Bitcoin client is stateless and doesn't hold resources, so no cleanup is needed
 	bitcoinClient, err := bitcoin.NewClient()
 	if err != nil {
 		log.Printf("handleTransactionHistory: failed to create Bitcoin client: %v", err)
@@ -686,8 +687,26 @@ func (s *Server) handleTransactionHistory(w http.ResponseWriter, r *http.Request
 	}
 
 	// Populate chart data with transaction-based points
-	labels := chartData["labels"].([]string)
-	dataPoints := chartData["datasets"].([]map[string]interface{})[0]["data"].([]map[string]interface{})
+	labels, ok := chartData["labels"].([]string)
+	if !ok {
+		log.Printf("handleTransactionHistory: failed to assert labels as []string")
+		s.writeError(w, http.StatusInternalServerError, "Failed to build chart data structure")
+		return
+	}
+	
+	datasets, ok := chartData["datasets"].([]map[string]interface{})
+	if !ok || len(datasets) == 0 {
+		log.Printf("handleTransactionHistory: failed to assert datasets as []map[string]interface{}")
+		s.writeError(w, http.StatusInternalServerError, "Failed to build chart data structure")
+		return
+	}
+	
+	dataPoints, ok := datasets[0]["data"].([]map[string]interface{})
+	if !ok {
+		log.Printf("handleTransactionHistory: failed to assert data as []map[string]interface{}")
+		s.writeError(w, http.StatusInternalServerError, "Failed to build chart data structure")
+		return
+	}
 
 	for _, point := range history {
 		labels = append(labels, point.Timestamp.Format("2006-01-02T15:04:05Z"))
@@ -709,7 +728,10 @@ func (s *Server) handleTransactionHistory(w http.ResponseWriter, r *http.Request
 
 	// Update the slices in the map
 	chartData["labels"] = labels
-	chartData["datasets"].([]map[string]interface{})[0]["data"] = dataPoints
+	datasets, ok = chartData["datasets"].([]map[string]interface{})
+	if ok && len(datasets) > 0 {
+		datasets[0]["data"] = dataPoints
+	}
 
 	s.writeJSON(w, APIResponse{Success: true, Data: chartData})
 }

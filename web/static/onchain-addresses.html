@@ -969,6 +969,45 @@
             return d.toLocaleDateString();
         }
 
+        // Helper function to fetch address balance with fallback strategy
+        // Returns an object with { balance, success } where success indicates if the request succeeded
+        async function fetchAddressBalance(address) {
+            let currentBalance = 0;
+            let fetchSucceeded = false;
+            
+            try {
+                // Try transaction-based balance first
+                const txResponse = await fetch(`${API_BASE}/onchain/tx-history?address=${encodeURIComponent(address)}`);
+                
+                if (txResponse.ok) {
+                    const txHistoryData = await txResponse.json();
+                    const dataPoints = txHistoryData?.data?.datasets?.[0]?.data;
+                    if (Array.isArray(dataPoints) && dataPoints.length > 0) {
+                        // Get the latest balance from transaction history
+                        currentBalance = dataPoints[dataPoints.length - 1]?.y || 0;
+                        fetchSucceeded = true;
+                    }
+                }
+                
+                // Fallback to polling-based balance only if tx-history request failed (not just empty)
+                if (!fetchSucceeded) {
+                    const balanceResponse = await fetch(`${API_BASE}/onchain/history?address=${encodeURIComponent(address)}&days=1`);
+                    if (balanceResponse.ok) {
+                        const balanceData = await balanceResponse.json();
+                        const balances = balanceData?.data?.datasets?.[0]?.data;
+                        if (Array.isArray(balances) && balances.length > 0) {
+                            currentBalance = balances[balances.length - 1] || 0;
+                            fetchSucceeded = true;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn(`Failed to fetch balance for ${address}:`, error);
+            }
+            
+            return { balance: currentBalance, success: fetchSucceeded };
+        }
+
         // Create mini balance chart
         async function createMiniChart(addressId) {
             const container = document.getElementById(`chart-${addressId}`);
@@ -1671,41 +1710,15 @@
                 const data = await response.json();
                 const walletAddresses = data.data || [];
                 
-                let totalBalance = 0;
+                // Fetch balances for all addresses in parallel to avoid N+1 query pattern
+                const balancePromises = walletAddresses.map(address => 
+                    fetchAddressBalance(address.address)
+                );
                 
-                // Get balance for each address
-                for (const address of walletAddresses) {
-                    try {
-                        // Try transaction-based balance first
-                        let balanceResponse = await fetch(`${API_BASE}/onchain/tx-history?address=${encodeURIComponent(address.address)}`);
-                        let currentBalance = 0;
-                        
-                        if (balanceResponse.ok) {
-                            const txHistoryData = await balanceResponse.json();
-                            const dataPoints = txHistoryData?.data?.datasets?.[0]?.data;
-                            if (Array.isArray(dataPoints) && dataPoints.length > 0) {
-                                // Get the latest balance from transaction history
-                                currentBalance = dataPoints[dataPoints.length - 1]?.y || 0;
-                            }
-                        }
-                        
-                        // Fallback to polling-based balance if tx-history fails or empty
-                        if (currentBalance === 0) {
-                            balanceResponse = await fetch(`${API_BASE}/onchain/history?address=${encodeURIComponent(address.address)}&days=1`);
-                            if (balanceResponse.ok) {
-                                const balanceData = await balanceResponse.json();
-                                const balances = balanceData?.data?.datasets?.[0]?.data;
-                                if (Array.isArray(balances) && balances.length > 0) {
-                                    currentBalance = balances[balances.length - 1] || 0;
-                                }
-                            }
-                        }
-                        
-                        totalBalance += currentBalance;
-                    } catch (error) {
-                        console.warn(`Failed to fetch balance for ${address.address}:`, error);
-                    }
-                }
+                const balanceResults = await Promise.all(balancePromises);
+                
+                // Sum up all balances
+                const totalBalance = balanceResults.reduce((sum, result) => sum + result.balance, 0);
                 
                 // Update balance display
                 const balanceElement = document.getElementById(`balance-${walletId}`);
@@ -1758,7 +1771,7 @@
                         <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #f0f6fc;">
                             Wallet Details - ${escapeHtml(wallet.name)}
                         </h3>
-                        <button onclick="this.closest('div').remove()" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; width: 24px; height: 24px;">×</button>
+                        <button class="modal-close-btn" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; width: 24px; height: 24px;">×</button>
                     </div>
                     <div style="padding: 20px 24px;">
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 24px;">
@@ -1819,18 +1832,31 @@
                 overlay.appendChild(modal);
                 document.body.appendChild(overlay);
 
+                // Function to close overlay and clean up listeners
+                const closeOverlay = function() {
+                    if (overlay.parentNode) {
+                        overlay.remove();
+                    }
+                    document.removeEventListener('keydown', escapeHandler);
+                };
+
                 // Close on backdrop click
                 overlay.addEventListener('click', function(e) {
                     if (e.target === overlay) {
-                        overlay.remove();
+                        closeOverlay();
                     }
                 });
+                
+                // Close on close button click
+                const closeBtn = modal.querySelector('.modal-close-btn');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', closeOverlay);
+                }
 
                 // Close on escape key
                 const escapeHandler = function(e) {
                     if (e.key === 'Escape') {
-                        overlay.remove();
-                        document.removeEventListener('keydown', escapeHandler);
+                        closeOverlay();
                     }
                 };
                 document.addEventListener('keydown', escapeHandler);
