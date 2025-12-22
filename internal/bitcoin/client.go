@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Client represents a Bitcoin Core RPC client
@@ -276,6 +277,73 @@ func (c *Client) GetAddressTransactions(address string) ([]AddressTransaction, e
 	}
 
 	return addressTxs, nil
+}
+
+// GetAddressBalanceHistory builds balance history from transaction data (like Sparrow wallet)
+// This creates a step chart showing balance changes at specific transaction times
+func (c *Client) GetAddressBalanceHistory(address string) ([]BalanceHistoryPoint, error) {
+	// Get all transactions for this address
+	transactions, err := c.GetAddressTransactions(address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transactions: %w", err)
+	}
+
+	// Sort transactions by time (oldest first)
+	// Use a simple bubble sort since transaction count is typically low
+	for i := 0; i < len(transactions)-1; i++ {
+		for j := 0; j < len(transactions)-i-1; j++ {
+			if transactions[j].Time > transactions[j+1].Time {
+				transactions[j], transactions[j+1] = transactions[j+1], transactions[j]
+			}
+		}
+	}
+
+	// Build balance history points
+	var history []BalanceHistoryPoint
+	var runningBalance int64 = 0
+
+	// Add starting point (balance 0)
+	if len(transactions) > 0 {
+		startTime := time.Unix(transactions[0].Time, 0)
+		history = append(history, BalanceHistoryPoint{
+			Timestamp: startTime.Add(-time.Hour), // 1 hour before first transaction
+			Balance:   0,
+		})
+	}
+
+	// Process each transaction to build balance timeline
+	for _, tx := range transactions {
+		// Convert amount from BTC to satoshis
+		amountSats := int64(tx.Amount * 100000000)
+
+		// Update running balance based on transaction type
+		switch tx.Category {
+		case "receive", "generate", "immature":
+			runningBalance += amountSats
+		case "send":
+			runningBalance += amountSats // Amount is negative for sends in listtransactions
+		}
+
+		// Add point to history
+		history = append(history, BalanceHistoryPoint{
+			Timestamp: time.Unix(tx.Time, 0),
+			Balance:   runningBalance,
+			TxID:      tx.TxID,
+			Amount:    amountSats,
+			Category:  tx.Category,
+		})
+	}
+
+	// Add current point (extends to now)
+	if len(history) > 0 {
+		lastBalance := history[len(history)-1].Balance
+		history = append(history, BalanceHistoryPoint{
+			Timestamp: time.Now(),
+			Balance:   lastBalance,
+		})
+	}
+
+	return history, nil
 }
 
 // ValidateAddress checks if an address is valid

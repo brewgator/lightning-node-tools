@@ -474,6 +474,23 @@
             font-weight: 600;
         }
 
+        .multisig-wallet-balance {
+            margin-left: 16px;
+            font-size: 14px;
+        }
+
+        .balance-label {
+            color: #8b949e;
+            font-weight: 500;
+            margin-right: 4px;
+        }
+
+        .balance-value {
+            color: #f0883e;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-weight: 600;
+        }
+
         .multisig-wallet-actions {
             display: flex;
             gap: 8px;
@@ -961,28 +978,49 @@
             if (!address) return;
 
             try {
-                // Fetch 7 days of balance history
-                const response = await fetch(`${API_BASE}/onchain/history?address=${encodeURIComponent(address.address)}&days=7`);
+                // Try transaction-based history first (Sparrow-style)
+                let response = await fetch(`${API_BASE}/onchain/tx-history?address=${encodeURIComponent(address.address)}`);
                 let data = [];
 
                 if (response.ok) {
-                    const balanceData = await response.json();
-                    const rawData = balanceData?.data;
+                    const txHistoryData = await response.json();
+                    const rawData = txHistoryData?.data;
 
-                    if (balanceData?.success && rawData) {
-                        const labels = Array.isArray(rawData.labels) ? rawData.labels : [];
-                        const datasets = Array.isArray(rawData.datasets) ? rawData.datasets : [];
-                        const balances = (datasets.length > 0 &&
-                                          datasets[0] &&
-                                          Array.isArray(datasets[0].data))
-                            ? datasets[0].data
-                            : [];
-
-                        if (labels.length > 0 && balances.length > 0) {
-                            data = labels.map((label, i) => ({
-                                x: new Date(label),
-                                y: balances[i] != null ? balances[i] : 0
+                    if (txHistoryData?.success && rawData && rawData.datasets && rawData.datasets.length > 0) {
+                        const dataPoints = rawData.datasets[0].data;
+                        if (Array.isArray(dataPoints) && dataPoints.length > 0) {
+                            // Convert transaction-based data points for chart
+                            data = dataPoints.map(point => ({
+                                x: new Date(point.x),
+                                y: point.y || 0
                             }));
+                        }
+                    }
+                }
+
+                // Fallback to old polling-based history if tx-history fails or is empty
+                if (data.length === 0) {
+                    response = await fetch(`${API_BASE}/onchain/history?address=${encodeURIComponent(address.address)}&days=7`);
+                    
+                    if (response.ok) {
+                        const balanceData = await response.json();
+                        const rawData = balanceData?.data;
+
+                        if (balanceData?.success && rawData) {
+                            const labels = Array.isArray(rawData.labels) ? rawData.labels : [];
+                            const datasets = Array.isArray(rawData.datasets) ? rawData.datasets : [];
+                            const balances = (datasets.length > 0 &&
+                                              datasets[0] &&
+                                              Array.isArray(datasets[0].data))
+                                ? datasets[0].data
+                                : [];
+
+                            if (labels.length > 0 && balances.length > 0) {
+                                data = labels.map((label, i) => ({
+                                    x: new Date(label),
+                                    y: balances[i] != null ? balances[i] : 0
+                                }));
+                            }
                         }
                     }
                 }
@@ -1008,7 +1046,8 @@
                             backgroundColor: 'rgba(240, 136, 62, 0.1)',
                             borderWidth: 1.5,
                             pointRadius: 0,
-                            tension: 0.2
+                            tension: 0,  // No smoothing for step chart
+                            stepped: 'after'  // Enable step chart like Sparrow
                         }]
                     },
                     options: {
@@ -1302,10 +1341,17 @@
                         <div class="multisig-wallet-title">
                             <span class="multisig-wallet-name">${escapeHtml(wallet.name)}</span>
                             <span class="multisig-wallet-type">${wallet.required_signers}/${wallet.total_signers} ${wallet.address_type}</span>
+                            <span class="multisig-wallet-balance" id="balance-${wallet.id}">
+                                <span class="balance-label">Balance:</span>
+                                <span class="balance-value">Loading...</span>
+                            </span>
                         </div>
                         <div class="multisig-wallet-actions">
                             <button class="btn btn-secondary btn-sm" onclick="generateAddresses(${wallet.id})">
                                 + Generate
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="showWalletDetails(${wallet.id})">
+                                📋 Details
                             </button>
                             <button class="btn btn-danger btn-sm" aria-label="Delete wallet" onclick="deleteMultisigWallet(${wallet.id}, '${escapeHtml(wallet.name)}')">
                                 🗑️
@@ -1347,6 +1393,9 @@
                 
                 // Load addresses for this wallet
                 loadWalletAddresses(wallet.id);
+                
+                // Calculate and display wallet balance
+                calculateWalletBalance(wallet.id);
             });
         }
 
@@ -1610,6 +1659,185 @@
             } catch (error) {
                 console.error('Error deleting multisig wallet:', error);
                 showToast(error.message, 'error');
+            }
+        }
+
+        // Calculate and display wallet balance
+        async function calculateWalletBalance(walletId) {
+            try {
+                const response = await fetch(`${API_BASE}/multisig/wallets/${walletId}/addresses`);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const walletAddresses = data.data || [];
+                
+                let totalBalance = 0;
+                
+                // Get balance for each address
+                for (const address of walletAddresses) {
+                    try {
+                        // Try transaction-based balance first
+                        let balanceResponse = await fetch(`${API_BASE}/onchain/tx-history?address=${encodeURIComponent(address.address)}`);
+                        let currentBalance = 0;
+                        
+                        if (balanceResponse.ok) {
+                            const txHistoryData = await balanceResponse.json();
+                            const dataPoints = txHistoryData?.data?.datasets?.[0]?.data;
+                            if (Array.isArray(dataPoints) && dataPoints.length > 0) {
+                                // Get the latest balance from transaction history
+                                currentBalance = dataPoints[dataPoints.length - 1]?.y || 0;
+                            }
+                        }
+                        
+                        // Fallback to polling-based balance if tx-history fails or empty
+                        if (currentBalance === 0) {
+                            balanceResponse = await fetch(`${API_BASE}/onchain/history?address=${encodeURIComponent(address.address)}&days=1`);
+                            if (balanceResponse.ok) {
+                                const balanceData = await balanceResponse.json();
+                                const balances = balanceData?.data?.datasets?.[0]?.data;
+                                if (Array.isArray(balances) && balances.length > 0) {
+                                    currentBalance = balances[balances.length - 1] || 0;
+                                }
+                            }
+                        }
+                        
+                        totalBalance += currentBalance;
+                    } catch (error) {
+                        console.warn(`Failed to fetch balance for ${address.address}:`, error);
+                    }
+                }
+                
+                // Update balance display
+                const balanceElement = document.getElementById(`balance-${walletId}`);
+                if (balanceElement) {
+                    const balanceValue = balanceElement.querySelector('.balance-value');
+                    if (balanceValue) {
+                        balanceValue.textContent = formatBalance(totalBalance);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error calculating balance for wallet ${walletId}:`, error);
+                const balanceElement = document.getElementById(`balance-${walletId}`);
+                if (balanceElement) {
+                    const balanceValue = balanceElement.querySelector('.balance-value');
+                    if (balanceValue) {
+                        balanceValue.textContent = 'Error';
+                        balanceValue.style.color = '#da3633';
+                    }
+                }
+            }
+        }
+
+        // Show wallet details modal
+        async function showWalletDetails(walletId) {
+            try {
+                const response = await fetch(`${API_BASE}/multisig/wallets/${walletId}`);
+                if (!response.ok) throw new Error('Failed to fetch wallet details');
+
+                const data = await response.json();
+                const wallet = data.data;
+
+                // Create modal
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background-color: rgba(0, 0, 0, 0.8); display: flex; 
+                    align-items: center; justify-content: center; z-index: 2000;
+                    backdrop-filter: blur(4px);
+                `;
+
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    background-color: #161b22; border: 1px solid #30363d; 
+                    border-radius: 12px; width: 90%; max-width: 800px; max-height: 80vh; 
+                    overflow-y: auto; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                `;
+
+                modal.innerHTML = `
+                    <div style="padding: 20px 24px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #f0f6fc;">
+                            Wallet Details - ${escapeHtml(wallet.name)}
+                        </h3>
+                        <button onclick="this.closest('div').remove()" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; width: 24px; height: 24px;">×</button>
+                    </div>
+                    <div style="padding: 20px 24px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                            <div>
+                                <div style="color: #f0f6fc; font-weight: 500; margin-bottom: 4px;">Name:</div>
+                                <div style="color: #c9d1d9;">${escapeHtml(wallet.name)}</div>
+                            </div>
+                            <div>
+                                <div style="color: #f0f6fc; font-weight: 500; margin-bottom: 4px;">Type:</div>
+                                <div style="color: #c9d1d9;">${wallet.required_signers}/${wallet.total_signers} ${wallet.address_type}</div>
+                            </div>
+                            <div>
+                                <div style="color: #f0f6fc; font-weight: 500; margin-bottom: 4px;">UUID:</div>
+                                <div style="color: #c9d1d9; font-family: monospace;">${wallet.uuid}</div>
+                            </div>
+                            <div>
+                                <div style="color: #f0f6fc; font-weight: 500; margin-bottom: 4px;">Network:</div>
+                                <div style="color: #c9d1d9;">${wallet.network}</div>
+                            </div>
+                            <div>
+                                <div style="color: #f0f6fc; font-weight: 500; margin-bottom: 4px;">Created:</div>
+                                <div style="color: #c9d1d9;">${new Date(wallet.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <div>
+                                <div style="color: #f0f6fc; font-weight: 500; margin-bottom: 4px;">Next Address Index:</div>
+                                <div style="color: #c9d1d9;">${wallet.next_address_index}</div>
+                            </div>
+                        </div>
+                        
+                        <h4 style="color: #f0883e; margin-bottom: 12px; font-size: 16px;">Extended Public Keys</h4>
+                        <div style="display: grid; gap: 12px;">
+                            ${wallet.extended_public_keys.map((key, index) => `
+                                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span style="color: #f0f6fc; font-weight: 500;">${escapeHtml(key.name)} (Key ${index + 1})</span>
+                                        <span style="background: #21262d; color: #8b949e; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Index ${key.key_index}</span>
+                                    </div>
+                                    <div style="margin-bottom: 6px;">
+                                        <div style="color: #8b949e; font-size: 12px; margin-bottom: 2px;">Extended Public Key:</div>
+                                        <div style="font-family: monospace; font-size: 11px; color: #58a6ff; word-break: break-all; background: #21262d; padding: 6px; border-radius: 3px;">${escapeHtml(key.xpub)}</div>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                        <div>
+                                            <div style="color: #8b949e; font-size: 12px; margin-bottom: 2px;">BIP32 Path:</div>
+                                            <div style="font-family: monospace; font-size: 12px; color: #c9d1d9;">${escapeHtml(key.bip32_path)}</div>
+                                        </div>
+                                        <div>
+                                            <div style="color: #8b949e; font-size: 12px; margin-bottom: 2px;">Fingerprint:</div>
+                                            <div style="font-family: monospace; font-size: 12px; color: #c9d1d9;">${escapeHtml(key.fingerprint)}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                overlay.appendChild(modal);
+                document.body.appendChild(overlay);
+
+                // Close on backdrop click
+                overlay.addEventListener('click', function(e) {
+                    if (e.target === overlay) {
+                        overlay.remove();
+                    }
+                });
+
+                // Close on escape key
+                const escapeHandler = function(e) {
+                    if (e.key === 'Escape') {
+                        overlay.remove();
+                        document.removeEventListener('keydown', escapeHandler);
+                    }
+                };
+                document.addEventListener('keydown', escapeHandler);
+
+            } catch (error) {
+                console.error('Error showing wallet details:', error);
+                showToast('Failed to load wallet details', 'error');
             }
         }
 

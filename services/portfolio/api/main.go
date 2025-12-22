@@ -165,6 +165,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/onchain/addresses", s.handleAddOnchainAddress).Methods("POST")
 	api.HandleFunc("/onchain/addresses/{id:[0-9]+}", s.handleDeleteOnchainAddress).Methods("DELETE")
 	api.HandleFunc("/onchain/history", s.handleOnchainHistory).Methods("GET")
+	api.HandleFunc("/onchain/tx-history", s.handleTransactionHistory).Methods("GET")
 
 	// Offline/Cold storage endpoints (consolidated)
 	api.HandleFunc("/offline/accounts", s.handleGetOfflineAccounts).Methods("GET")
@@ -626,6 +627,89 @@ func (s *Server) handleOnchainHistory(w http.ResponseWriter, r *http.Request) {
 	// Update the slices in the map
 	chartData["labels"] = labels
 	chartData["datasets"].([]map[string]interface{})[0]["data"] = data
+
+	s.writeJSON(w, APIResponse{Success: true, Data: chartData})
+}
+
+// handleTransactionHistory handles GET /api/onchain/tx-history
+// Returns transaction-based balance history like Sparrow wallet (step chart data)
+func (s *Server) handleTransactionHistory(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	address := r.URL.Query().Get("address")
+	if address == "" {
+		s.writeError(w, http.StatusBadRequest, "Address parameter is required")
+		return
+	}
+
+	// Check if Bitcoin client is available
+	if s.balanceService == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "Bitcoin client not available")
+		return
+	}
+
+	// We need access to the Bitcoin client - let's create one directly
+	bitcoinClient, err := bitcoin.NewClient()
+	if err != nil {
+		log.Printf("handleTransactionHistory: failed to create Bitcoin client: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Bitcoin client unavailable")
+		return
+	}
+
+	// Get transaction-based balance history
+	history, err := bitcoinClient.GetAddressBalanceHistory(address)
+	if err != nil {
+		log.Printf("handleTransactionHistory: failed to get transaction history for address %s: %v", address, err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get transaction-based balance history")
+		return
+	}
+
+	// Format data for step chart visualization
+	chartData := map[string]interface{}{
+		"labels": make([]string, 0, len(history)),
+		"datasets": []map[string]interface{}{
+			{
+				"label":           fmt.Sprintf("Balance for %s", address),
+				"data":            make([]map[string]interface{}, 0, len(history)),
+				"backgroundColor": "rgba(240, 136, 62, 0.2)",
+				"borderColor":     "rgba(240, 136, 62, 1)",
+				"borderWidth":     2,
+				"stepped":         true, // Enable step chart
+				"fill":            false,
+			},
+		},
+		"metadata": map[string]interface{}{
+			"address":       address,
+			"data_points":   len(history),
+			"data_type":     "transaction_based",
+			"visualization": "step_chart",
+		},
+	}
+
+	// Populate chart data with transaction-based points
+	labels := chartData["labels"].([]string)
+	dataPoints := chartData["datasets"].([]map[string]interface{})[0]["data"].([]map[string]interface{})
+
+	for _, point := range history {
+		labels = append(labels, point.Timestamp.Format("2006-01-02T15:04:05Z"))
+
+		dataPoint := map[string]interface{}{
+			"x": point.Timestamp.Format("2006-01-02T15:04:05Z"),
+			"y": point.Balance,
+		}
+
+		// Add transaction metadata if available
+		if point.TxID != "" {
+			dataPoint["txid"] = point.TxID
+			dataPoint["amount"] = point.Amount
+			dataPoint["category"] = point.Category
+		}
+
+		dataPoints = append(dataPoints, dataPoint)
+	}
+
+	// Update the slices in the map
+	chartData["labels"] = labels
+	chartData["datasets"].([]map[string]interface{})[0]["data"] = dataPoints
 
 	s.writeJSON(w, APIResponse{Success: true, Data: chartData})
 }
