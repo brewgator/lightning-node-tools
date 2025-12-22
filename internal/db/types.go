@@ -96,3 +96,68 @@ type ColdStorageBalanceHistory struct {
 	IsVerified      bool      `json:"is_verified" db:"is_verified"`
 	Notes           string    `json:"notes" db:"notes"`
 }
+
+// MultisigWallet represents a multisig wallet configuration
+type MultisigWallet struct {
+	ID                   int64                    `json:"id" db:"id"`
+	Name                 string                   `json:"name" db:"name"`
+	UUID                 string                   `json:"uuid" db:"uuid"`
+	AddressType          string                   `json:"address_type" db:"address_type"`
+	Network              string                   `json:"network" db:"network"`
+	RequiredSigners      int                      `json:"required_signers" db:"required_signers"`
+	TotalSigners         int                      `json:"total_signers" db:"total_signers"`
+	StartingAddressIndex int                      `json:"starting_address_index" db:"starting_address_index"`
+	ExtendedPublicKeys   []MultisigExtendedPubKey `json:"extended_public_keys" db:"-"`
+	Active               bool                     `json:"active" db:"active"`
+	CreatedAt            time.Time                `json:"created_at" db:"created_at"`
+	LastScanned          *time.Time               `json:"last_scanned" db:"last_scanned"`
+	NextAddressIndex     int                      `json:"next_address_index" db:"next_address_index"`
+}
+
+// MultisigExtendedPubKey represents an extended public key in a multisig configuration
+type MultisigExtendedPubKey struct {
+	ID          int64  `json:"id" db:"id"`
+	WalletID    int64  `json:"wallet_id" db:"wallet_id"`
+	Name        string `json:"name" db:"name"`
+	XPub        string `json:"xpub" db:"xpub"`
+	BIP32Path   string `json:"bip32_path" db:"bip32_path"`
+	Fingerprint string `json:"fingerprint" db:"fingerprint"`
+	KeyIndex    int    `json:"key_index" db:"key_index"`
+}
+
+// MultisigAddress represents a derived address from a multisig wallet
+type MultisigAddress struct {
+	ID           int64     `json:"id" db:"id"`
+	WalletID     int64     `json:"wallet_id" db:"wallet_id"`
+	Address      string    `json:"address" db:"address"`
+	AddressIndex int       `json:"address_index" db:"address_index"`
+	ScriptType   string    `json:"script_type" db:"script_type"`
+	RedeemScript string    `json:"redeem_script" db:"redeem_script"`
+	Active       bool      `json:"active" db:"active"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+}
+
+// WalletConfig represents the JSON structure of wallet config files
+type WalletConfig struct {
+	Name                 string                 `json:"name"`
+	UUID                 string                 `json:"uuid"`
+	AddressType          string                 `json:"addressType"`
+	Network              string                 `json:"network"`
+	Quorum               WalletQuorum           `json:"quorum"`
+	StartingAddressIndex int                    `json:"startingAddressIndex"`
+	ExtendedPublicKeys   []WalletExtendedPubKey `json:"extendedPublicKeys"`
+}
+
+// WalletQuorum represents the quorum configuration in wallet config
+type WalletQuorum struct {
+	RequiredSigners int `json:"requiredSigners"`
+	TotalSigners    int `json:"totalSigners"`
+}
+
+// WalletExtendedPubKey represents an extended public key in wallet config JSON
+type WalletExtendedPubKey struct {
+	Name      string `json:"name"`
+	XPub      string `json:"xpub"`
+	BIP32Path string `json:"bip32Path"`
+	XFP       string `json:"xfp"`
+}

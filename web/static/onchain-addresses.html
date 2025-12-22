@@ -434,6 +434,119 @@
         .toast.info {
             background: #0969da;
         }
+
+        /* Multisig Wallet Styles */
+        .multisig-wallet {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .multisig-wallet-header {
+            padding: 16px;
+            background: #21262d;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .multisig-wallet-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .multisig-wallet-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f0f6fc;
+        }
+
+        .multisig-wallet-type {
+            background: #f0883e;
+            color: #0d1117;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .multisig-wallet-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .multisig-wallet-body {
+            padding: 16px;
+        }
+
+        .multisig-wallet-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .multisig-info-item {
+            color: #8b949e;
+            font-size: 13px;
+        }
+
+        .multisig-info-label {
+            display: block;
+            color: #f0f6fc;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .multisig-addresses {
+            margin-top: 12px;
+        }
+
+        .multisig-addresses-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .multisig-addresses-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #f0f6fc;
+        }
+
+        .multisig-address-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 8px;
+        }
+
+        .multisig-address {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .multisig-address-text {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 12px;
+            color: #58a6ff;
+        }
+
+        .empty-multisig {
+            text-align: center;
+            padding: 20px;
+            color: #8b949e;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -450,9 +563,22 @@
 
         <div class="toolbar">
             <input type="text" class="search-box" placeholder="Search addresses or labels..." id="searchInput">
-            <button class="btn btn-primary" onclick="openAddModal()">
-                <span>+</span> Add Address
-            </button>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary" onclick="openAddModal()">
+                    <span>+</span> Add Address
+                </button>
+                <button class="btn btn-secondary" onclick="openMultisigModal()">
+                    <span>🔐</span> Import Multisig
+                </button>
+            </div>
+        </div>
+
+        <!-- Multisig Wallets Section -->
+        <div class="multisig-section" style="margin-bottom: 20px;">
+            <h2 style="color: #f0883e; margin-bottom: 10px; font-size: 18px;">📊 Multisig Wallets</h2>
+            <div class="multisig-wallets" id="multisigWallets">
+                <!-- Multisig wallets will be loaded here -->
+            </div>
         </div>
 
         <div class="addresses-table">
@@ -474,10 +600,15 @@
 
         <div id="emptyState" class="empty-state" style="display: none;">
             <h3>No addresses tracked yet</h3>
-            <p>Start by adding your first Bitcoin address to track its balance</p>
-            <button class="btn btn-primary" onclick="openAddModal()" style="margin-top: 16px;">
-                <span>+</span> Add Your First Address
-            </button>
+            <p>Start by adding your first Bitcoin address to track its balance, or import a multisig wallet</p>
+            <div style="margin-top: 16px; display: flex; gap: 12px; justify-content: center;">
+                <button class="btn btn-primary" onclick="openAddModal()">
+                    <span>+</span> Add Your First Address
+                </button>
+                <button class="btn btn-secondary" onclick="openMultisigModal()">
+                    <span>🔐</span> Import Multisig
+                </button>
+            </div>
         </div>
     </div>
 
@@ -539,12 +670,47 @@
         </div>
     </div>
 
+    <!-- Import Multisig Wallet Modal -->
+    <div id="multisigModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Import Multisig Wallet</h3>
+                <button class="close" onclick="closeMultisigModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="multisigForm">
+                    <div class="form-group">
+                        <label class="form-label" for="walletConfigFile">Wallet Config JSON File *</label>
+                        <input
+                            type="file"
+                            class="form-control"
+                            id="walletConfigFile"
+                            accept=".json"
+                            required
+                        >
+                        <div class="form-help">Select a wallet configuration JSON file from Unchained or similar multisig coordinators</div>
+                    </div>
+                    <div id="walletPreview" style="display: none; margin-top: 16px; padding: 12px; background: #21262d; border-radius: 6px;">
+                        <h4 style="margin: 0 0 8px 0; color: #f0883e;">Wallet Preview</h4>
+                        <div id="walletDetails"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeMultisigModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" onclick="importMultisigWallet()" id="importBtn" disabled>Import Wallet</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // Global variables
         let addresses = [];
+        let multisigWallets = [];
         let currentSort = { field: null, direction: 'asc' };
         let deleteAddressId = null;
+        let selectedWalletConfig = null;
 
         // API Configuration - use current origin to match the server's port
         const API_BASE = window.location.origin + '/api';
@@ -564,11 +730,16 @@
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
             loadAddresses();
+            loadMultisigWallets();
             setupSearch();
             setupSorting();
+            setupMultisigFileUpload();
 
             // Auto-refresh every 30 seconds
-            setInterval(loadAddresses, 30000);
+            setInterval(() => {
+                loadAddresses();
+                loadMultisigWallets();
+            }, 30000);
         });
 
         // Load addresses from API
@@ -1064,8 +1235,306 @@
                 if (e.target === this) {
                     closeAddModal();
                     closeDeleteModal();
+                    closeMultisigModal();
                 }
             });
+        });
+
+        // Multisig wallet functions
+
+        // Load multisig wallets from API
+        async function loadMultisigWallets() {
+            try {
+                const response = await fetch(`${API_BASE}/multisig/wallets`);
+                if (!response.ok) throw new Error('Failed to fetch multisig wallets');
+
+                const data = await response.json();
+                multisigWallets = data.data || [];
+
+                renderMultisigWallets();
+            } catch (error) {
+                console.error('Error loading multisig wallets:', error);
+                showToast('Failed to load multisig wallets', 'error');
+            }
+        }
+
+        // Render multisig wallets
+        function renderMultisigWallets() {
+            const container = document.getElementById('multisigWallets');
+            
+            if (multisigWallets.length === 0) {
+                container.innerHTML = '<div class="empty-multisig">No multisig wallets imported yet</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            
+            multisigWallets.forEach(wallet => {
+                const walletDiv = document.createElement('div');
+                walletDiv.className = 'multisig-wallet';
+                
+                walletDiv.innerHTML = `
+                    <div class="multisig-wallet-header">
+                        <div class="multisig-wallet-title">
+                            <span class="multisig-wallet-name">${escapeHtml(wallet.name)}</span>
+                            <span class="multisig-wallet-type">${wallet.required_signers}/${wallet.total_signers} ${wallet.address_type}</span>
+                        </div>
+                        <div class="multisig-wallet-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="generateAddresses(${wallet.id})">
+                                + Generate
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteMultisigWallet(${wallet.id}, '${escapeHtml(wallet.name)}')">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                    <div class="multisig-wallet-body">
+                        <div class="multisig-wallet-info">
+                            <div class="multisig-info-item">
+                                <span class="multisig-info-label">Network:</span>
+                                ${wallet.network}
+                            </div>
+                            <div class="multisig-info-item">
+                                <span class="multisig-info-label">UUID:</span>
+                                ${wallet.uuid}
+                            </div>
+                            <div class="multisig-info-item">
+                                <span class="multisig-info-label">Created:</span>
+                                ${new Date(wallet.created_at).toLocaleDateString()}
+                            </div>
+                            <div class="multisig-info-item">
+                                <span class="multisig-info-label">Next Index:</span>
+                                ${wallet.next_address_index}
+                            </div>
+                        </div>
+                        <div class="multisig-addresses">
+                            <div class="multisig-addresses-header">
+                                <span class="multisig-addresses-title">Generated Addresses</span>
+                                <span style="color: #8b949e; font-size: 12px;" id="addressCount-${wallet.id}">Loading...</span>
+                            </div>
+                            <div class="multisig-address-list" id="addresses-${wallet.id}">
+                                <div style="color: #8b949e; font-style: italic;">Loading addresses...</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(walletDiv);
+                
+                // Load addresses for this wallet
+                loadWalletAddresses(wallet.id);
+            });
+        }
+
+        // Load addresses for a specific wallet
+        async function loadWalletAddresses(walletId) {
+            try {
+                const response = await fetch(`${API_BASE}/multisig/wallets/${walletId}/addresses`);
+                if (!response.ok) throw new Error('Failed to fetch wallet addresses');
+
+                const data = await response.json();
+                const addresses = data.data || [];
+
+                const addressesContainer = document.getElementById(`addresses-${walletId}`);
+                const countContainer = document.getElementById(`addressCount-${walletId}`);
+
+                countContainer.textContent = `${addresses.length} addresses`;
+
+                if (addresses.length === 0) {
+                    addressesContainer.innerHTML = '<div style="color: #8b949e; font-style: italic;">No addresses generated yet</div>';
+                    return;
+                }
+
+                addressesContainer.innerHTML = '';
+                addresses.forEach(address => {
+                    const addressDiv = document.createElement('div');
+                    addressDiv.className = 'multisig-address';
+                    
+                    addressDiv.innerHTML = `
+                        <span class="multisig-address-text" title="${escapeHtml(address.address)}">${truncateAddress(address.address)}</span>
+                        <button class="copy-btn" onclick="copyAddress('${address.address}')" title="Copy address">📋</button>
+                    `;
+                    
+                    addressesContainer.appendChild(addressDiv);
+                });
+            } catch (error) {
+                console.error(`Error loading addresses for wallet ${walletId}:`, error);
+                const addressesContainer = document.getElementById(`addresses-${walletId}`);
+                if (addressesContainer) {
+                    addressesContainer.innerHTML = '<div style="color: #da3633;">Failed to load addresses</div>';
+                }
+            }
+        }
+
+        // Setup file upload handling
+        function setupMultisigFileUpload() {
+            const fileInput = document.getElementById('walletConfigFile');
+            if (fileInput) {
+                fileInput.addEventListener('change', handleWalletConfigFile);
+            }
+        }
+
+        // Handle wallet config file selection
+        async function handleWalletConfigFile(event) {
+            const file = event.target.files[0];
+            const preview = document.getElementById('walletPreview');
+            const details = document.getElementById('walletDetails');
+            const importBtn = document.getElementById('importBtn');
+
+            if (!file) {
+                preview.style.display = 'none';
+                importBtn.disabled = true;
+                selectedWalletConfig = null;
+                return;
+            }
+
+            try {
+                const text = await file.text();
+                const config = JSON.parse(text);
+                
+                // Validate basic structure
+                if (!config.name || !config.uuid || !config.quorum || !config.extendedPublicKeys) {
+                    throw new Error('Invalid wallet config format');
+                }
+
+                selectedWalletConfig = text;
+
+                // Show preview
+                details.innerHTML = `
+                    <div style="margin-bottom: 8px;">
+                        <strong>${escapeHtml(config.name)}</strong>
+                        <span style="margin-left: 8px; background: #f0883e; color: #0d1117; padding: 2px 6px; border-radius: 3px; font-size: 11px;">
+                            ${config.quorum.requiredSigners}/${config.quorum.totalSigners} ${config.addressType}
+                        </span>
+                    </div>
+                    <div style="color: #8b949e; font-size: 12px; margin-bottom: 4px;">UUID: ${config.uuid}</div>
+                    <div style="color: #8b949e; font-size: 12px; margin-bottom: 4px;">Network: ${config.network}</div>
+                    <div style="color: #8b949e; font-size: 12px;">Keys: ${config.extendedPublicKeys.length}</div>
+                `;
+
+                preview.style.display = 'block';
+                importBtn.disabled = false;
+
+            } catch (error) {
+                showToast(`Invalid wallet config: ${error.message}`, 'error');
+                preview.style.display = 'none';
+                importBtn.disabled = true;
+                selectedWalletConfig = null;
+            }
+        }
+
+        // Modal functions for multisig
+        function openMultisigModal() {
+            document.getElementById('multisigModal').classList.add('show');
+            document.getElementById('walletConfigFile').focus();
+        }
+
+        function closeMultisigModal() {
+            document.getElementById('multisigModal').classList.remove('show');
+            document.getElementById('multisigForm').reset();
+            document.getElementById('walletPreview').style.display = 'none';
+            document.getElementById('importBtn').disabled = true;
+            selectedWalletConfig = null;
+        }
+
+        // Import multisig wallet
+        async function importMultisigWallet() {
+            if (!selectedWalletConfig) {
+                showToast('Please select a valid wallet config file', 'error');
+                return;
+            }
+
+            const importBtn = document.getElementById('importBtn');
+            importBtn.disabled = true;
+            importBtn.textContent = 'Importing...';
+
+            try {
+                const response = await fetch(`${API_BASE}/multisig/wallets`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: selectedWalletConfig
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to import wallet');
+                }
+
+                showToast('Multisig wallet imported successfully', 'success');
+                closeMultisigModal();
+                loadMultisigWallets();
+
+            } catch (error) {
+                console.error('Error importing multisig wallet:', error);
+                showToast(error.message, 'error');
+            } finally {
+                importBtn.disabled = false;
+                importBtn.textContent = 'Import Wallet';
+            }
+        }
+
+        // Generate addresses for a wallet
+        async function generateAddresses(walletId, count = 5) {
+            try {
+                const response = await fetch(`${API_BASE}/multisig/wallets/${walletId}/addresses/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ count })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to generate addresses');
+                }
+
+                showToast(`Generated ${data.data.generated_new} new addresses`, 'success');
+                loadWalletAddresses(walletId);
+
+            } catch (error) {
+                console.error('Error generating addresses:', error);
+                showToast(error.message, 'error');
+            }
+        }
+
+        // Delete multisig wallet
+        async function deleteMultisigWallet(walletId, walletName) {
+            if (!confirm(`Are you sure you want to delete the multisig wallet "${walletName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/multisig/wallets/${walletId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to delete wallet');
+                }
+
+                showToast('Multisig wallet deleted successfully', 'success');
+                loadMultisigWallets();
+
+            } catch (error) {
+                console.error('Error deleting multisig wallet:', error);
+                showToast(error.message, 'error');
+            }
+        }
+
+        // Update close modals on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeAddModal();
+                closeDeleteModal();
+                closeMultisigModal();
+            }
         });
     </script>
 </body>
