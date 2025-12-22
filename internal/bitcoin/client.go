@@ -292,30 +292,30 @@ func btcToSatoshis(amount float64) (int64, error) {
 	if len(parts) == 2 {
 		fracPart = parts[1]
 	}
-	
+
 	// Ensure we have exactly 8 fractional digits (pad with zeros if needed)
 	for len(fracPart) < 8 {
 		fracPart += "0"
 	}
-	
+
 	// Remove leading minus sign if present for parsing
 	isNegative := strings.HasPrefix(intPart, "-")
 	if isNegative {
 		intPart = intPart[1:]
 	}
-	
+
 	// Combine integer and fractional parts to get satoshis
 	satsStr := intPart + fracPart
 	amountSats, err := strconv.ParseInt(satsStr, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to convert BTC amount %q to satoshis: %w", amountStr, err)
 	}
-	
+
 	// Restore negative sign if needed
 	if isNegative {
 		amountSats = -amountSats
 	}
-	
+
 	return amountSats, nil
 }
 

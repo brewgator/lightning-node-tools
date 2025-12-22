@@ -693,14 +693,14 @@ func (s *Server) handleTransactionHistory(w http.ResponseWriter, r *http.Request
 		s.writeError(w, http.StatusInternalServerError, "Failed to build chart data structure")
 		return
 	}
-	
+
 	datasets, ok := chartData["datasets"].([]map[string]interface{})
 	if !ok || len(datasets) == 0 {
 		log.Printf("handleTransactionHistory: failed to assert datasets as []map[string]interface{}")
 		s.writeError(w, http.StatusInternalServerError, "Failed to build chart data structure")
 		return
 	}
-	
+
 	dataPoints, ok := datasets[0]["data"].([]map[string]interface{})
 	if !ok {
 		log.Printf("handleTransactionHistory: failed to assert data as []map[string]interface{}")
