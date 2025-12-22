@@ -108,3 +108,13 @@ type DescriptorInfo struct {
 	IsSolvable     bool   `json:"issolvable"`
 	HasPrivateKeys bool   `json:"hasprivatekeys"`
 }
+
+// BalanceHistoryPoint represents a point in time balance for step chart visualization
+// This is used to create Sparrow-wallet-style balance history charts
+type BalanceHistoryPoint struct {
+	Timestamp time.Time `json:"timestamp"`
+	Balance   int64     `json:"balance"`            // Balance in satoshis at this point in time
+	TxID      string    `json:"txid,omitempty"`     // Transaction ID that caused this balance change
+	Amount    int64     `json:"amount,omitempty"`   // Amount of this transaction in satoshis
+	Category  string    `json:"category,omitempty"` // Transaction category: "receive", "send", "generate"
+}
