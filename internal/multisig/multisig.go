@@ -214,8 +214,14 @@ func (ms *MultisigService) DeriveAddress(wallet *db.MultisigWallet, addressIndex
 		}
 
 		// Derive the child key at the specified index
-		// For most multisig wallets, we derive m/0/addressIndex
-		childKey, err := masterKey.Derive(0)
+		// For standard multisig wallets, the xpub is at the account level (e.g., m/48'/0'/0'/2')
+		// and we derive using the path: 0/addressIndex (receive addresses) or 1/addressIndex (change addresses)
+		// The BIP32Path field in the config documents the original derivation path of the xpub,
+		// but we derive relative to that base path here.
+		// 
+		// Future enhancement: Parse BIP32Path to determine if we should use path 0 (receive) 
+		// or path 1 (change), or support custom derivation paths.
+		childKey, err := masterKey.Derive(0) // Receive address path
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive child key (0) for key %d: %w", i, err)
 		}
