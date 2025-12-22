@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -119,10 +120,12 @@ func (d *Deployer) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse webhook payload
+	// Clean and parse webhook payload
+	cleanedBody := d.cleanJSON(body)
 	var payload WebhookPayload
-	if err := json.Unmarshal(body, &payload); err != nil {
+	if err := json.Unmarshal(cleanedBody, &payload); err != nil {
 		log.Printf("❌ Error parsing webhook payload: %v", err)
+		log.Printf("📄 Raw payload (first 500 chars): %s", string(body)[:min(len(body), 500)])
 		http.Error(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
@@ -158,6 +161,31 @@ func (d *Deployer) verifySignature(signature string, body []byte) bool {
 	expectedSignature := "sha256=" + hex.EncodeToString(hash.Sum(nil))
 
 	return hmac.Equal([]byte(signature), []byte(expectedSignature))
+}
+
+// cleanJSON fixes common JSON issues in webhook payloads
+func (d *Deployer) cleanJSON(body []byte) []byte {
+	// Fix unescaped newlines in string values
+	re := regexp.MustCompile(`"([^"]*)"`)
+	cleaned := re.ReplaceAllFunc(body, func(match []byte) []byte {
+		// Extract the content between quotes
+		content := string(match[1 : len(match)-1])
+		// Escape newlines and other problematic characters
+		content = strings.ReplaceAll(content, "\n", "\\n")
+		content = strings.ReplaceAll(content, "\r", "\\r")
+		content = strings.ReplaceAll(content, "\t", "\\t")
+		content = strings.ReplaceAll(content, "\"", "\\\"")
+		return []byte(`"` + content + `"`)
+	})
+	return cleaned
+}
+
+// min returns the smaller of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (d *Deployer) deploy(payload WebhookPayload) {
