@@ -177,10 +177,10 @@ func (ms *MultisigService) validateWalletConfig(config *db.WalletConfig) error {
 // DeriveAddress derives a multisig address at a specific index using BIP32 hierarchical deterministic key derivation.
 //
 // The function performs the following cryptographic operations:
-//   1. Derives child keys from each extended public key at the specified index
-//   2. Sorts the resulting public keys lexicographically for deterministic ordering
-//   3. Creates a multisig redeem script with the required signature threshold
-//   4. Generates the final address based on the wallet's address type (P2SH, P2WSH, or P2SH-P2WSH)
+//  1. Derives child keys from each extended public key at the specified index
+//  2. Sorts the resulting public keys lexicographically for deterministic ordering
+//  3. Creates a multisig redeem script with the required signature threshold
+//  4. Generates the final address based on the wallet's address type (P2SH, P2WSH, or P2SH-P2WSH)
 //
 // Address derivation follows the standard path: m/0/addressIndex for most multisig wallets,
 // though this can be customized via the BIP32Path in the wallet configuration.
@@ -293,13 +293,13 @@ func (ms *MultisigService) DeriveAddress(wallet *db.MultisigWallet, addressIndex
 		if err != nil {
 			return nil, fmt.Errorf("failed to create witness script hash: %w", err)
 		}
-		
+
 		// Then wrap it in a P2SH address
 		witnessScript, err := txscript.PayToAddrScript(witnessAddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create witness script: %w", err)
 		}
-		
+
 		scriptAddr, err := btcutil.NewAddressScriptHash(witnessScript, netParams)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create P2SH-P2WSH address: %w", err)
