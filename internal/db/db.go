@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -243,6 +244,100 @@ func (db *Database) initTables() error {
 
 		`CREATE INDEX IF NOT EXISTS idx_cold_storage_history_mock_timestamp ON cold_storage_history_mock(timestamp);`,
 		`CREATE INDEX IF NOT EXISTS idx_cold_storage_history_mock_account_id ON cold_storage_history_mock(account_id);`,
+
+		// Multisig wallet tables
+		`CREATE TABLE IF NOT EXISTS multisig_wallets (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			uuid TEXT UNIQUE NOT NULL,
+			address_type TEXT NOT NULL,
+			network TEXT NOT NULL,
+			required_signers INTEGER NOT NULL,
+			total_signers INTEGER NOT NULL,
+			starting_address_index INTEGER NOT NULL DEFAULT 0,
+			next_address_index INTEGER NOT NULL DEFAULT 0,
+			active BOOLEAN NOT NULL DEFAULT 1,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_scanned DATETIME
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_multisig_wallets_uuid ON multisig_wallets(uuid);`,
+		`CREATE INDEX IF NOT EXISTS idx_multisig_wallets_active ON multisig_wallets(active);`,
+
+		`CREATE TABLE IF NOT EXISTS multisig_extended_pubkeys (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			wallet_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			xpub TEXT NOT NULL,
+			bip32_path TEXT NOT NULL,
+			fingerprint TEXT NOT NULL,
+			key_index INTEGER NOT NULL,
+			FOREIGN KEY(wallet_id) REFERENCES multisig_wallets(id) ON DELETE CASCADE
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_multisig_extended_pubkeys_wallet_id ON multisig_extended_pubkeys(wallet_id);`,
+
+		`CREATE TABLE IF NOT EXISTS multisig_addresses (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			wallet_id INTEGER NOT NULL,
+			address TEXT UNIQUE NOT NULL,
+			address_index INTEGER NOT NULL,
+			script_type TEXT NOT NULL,
+			redeem_script TEXT,
+			active BOOLEAN NOT NULL DEFAULT 1,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY(wallet_id) REFERENCES multisig_wallets(id) ON DELETE CASCADE
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_multisig_addresses_wallet_id ON multisig_addresses(wallet_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_multisig_addresses_address ON multisig_addresses(address);`,
+
+		// Mock multisig tables
+		`CREATE TABLE IF NOT EXISTS multisig_wallets_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			uuid TEXT UNIQUE NOT NULL,
+			address_type TEXT NOT NULL,
+			network TEXT NOT NULL,
+			required_signers INTEGER NOT NULL,
+			total_signers INTEGER NOT NULL,
+			starting_address_index INTEGER NOT NULL DEFAULT 0,
+			next_address_index INTEGER NOT NULL DEFAULT 0,
+			active BOOLEAN NOT NULL DEFAULT 1,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_scanned DATETIME
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_multisig_wallets_mock_uuid ON multisig_wallets_mock(uuid);`,
+		`CREATE INDEX IF NOT EXISTS idx_multisig_wallets_mock_active ON multisig_wallets_mock(active);`,
+
+		`CREATE TABLE IF NOT EXISTS multisig_extended_pubkeys_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			wallet_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			xpub TEXT NOT NULL,
+			bip32_path TEXT NOT NULL,
+			fingerprint TEXT NOT NULL,
+			key_index INTEGER NOT NULL,
+			FOREIGN KEY(wallet_id) REFERENCES multisig_wallets_mock(id) ON DELETE CASCADE
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_multisig_extended_pubkeys_mock_wallet_id ON multisig_extended_pubkeys_mock(wallet_id);`,
+
+		`CREATE TABLE IF NOT EXISTS multisig_addresses_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			wallet_id INTEGER NOT NULL,
+			address TEXT UNIQUE NOT NULL,
+			address_index INTEGER NOT NULL,
+			script_type TEXT NOT NULL,
+			redeem_script TEXT,
+			active BOOLEAN NOT NULL DEFAULT 1,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY(wallet_id) REFERENCES multisig_wallets_mock(id) ON DELETE CASCADE
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_multisig_addresses_mock_wallet_id ON multisig_addresses_mock(wallet_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_multisig_addresses_mock_address ON multisig_addresses_mock(address);`,
 	}
 
 	for _, query := range queries {
@@ -837,4 +932,325 @@ func (db *Database) GetColdStorageEntriesWithWarnings() ([]map[string]interface{
 	}
 
 	return entries, rows.Err()
+}
+
+// MultisigWallet database methods
+
+// InsertMultisigWallet creates a new multisig wallet and its extended public keys
+func (db *Database) InsertMultisigWallet(wallet *MultisigWallet) (*MultisigWallet, error) {
+	walletTableName := db.getTableName("multisig_wallets")
+	keyTableName := db.getTableName("multisig_extended_pubkeys")
+
+	// Start transaction
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Insert wallet
+	walletQuery := fmt.Sprintf(`
+		INSERT INTO %s (name, uuid, address_type, network, required_signers, total_signers, 
+		                starting_address_index, next_address_index, active, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, walletTableName)
+
+	now := time.Now()
+	result, err := tx.Exec(walletQuery,
+		wallet.Name, wallet.UUID, wallet.AddressType, wallet.Network,
+		wallet.RequiredSigners, wallet.TotalSigners, wallet.StartingAddressIndex,
+		wallet.NextAddressIndex, wallet.Active, now,
+	)
+	if err != nil {
+		// Check for constraint violations (e.g., duplicate UUID)
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return nil, fmt.Errorf("wallet with this UUID already exists: %w", err)
+		}
+		return nil, fmt.Errorf("failed to insert wallet: %w", err)
+	}
+
+	walletID, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get wallet ID: %w", err)
+	}
+
+	// Insert extended public keys
+	keyQuery := fmt.Sprintf(`
+		INSERT INTO %s (wallet_id, name, xpub, bip32_path, fingerprint, key_index)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, keyTableName)
+
+	for i, key := range wallet.ExtendedPublicKeys {
+		_, err = tx.Exec(keyQuery,
+			walletID, key.Name, key.XPub, key.BIP32Path, key.Fingerprint, i,
+		)
+		if err != nil {
+			// Check for constraint violations (e.g., duplicate UUID)
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				return nil, fmt.Errorf("extended public key %d: duplicate entry detected: %w", i, err)
+			}
+			return nil, fmt.Errorf("failed to insert extended public key %d: %w", i, err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	wallet.ID = walletID
+	wallet.CreatedAt = now
+	return wallet, nil
+}
+
+// GetMultisigWallets retrieves all multisig wallets with their extended public keys
+func (db *Database) GetMultisigWallets() ([]MultisigWallet, error) {
+	walletTableName := db.getTableName("multisig_wallets")
+	keyTableName := db.getTableName("multisig_extended_pubkeys")
+
+	// Get all wallets
+	walletQuery := fmt.Sprintf(`
+		SELECT id, name, uuid, address_type, network, required_signers, total_signers,
+		       starting_address_index, next_address_index, active, created_at, last_scanned
+		FROM %s
+		WHERE active = 1
+		ORDER BY created_at DESC
+	`, walletTableName)
+
+	rows, err := db.conn.Query(walletQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var wallets []MultisigWallet
+	for rows.Next() {
+		var wallet MultisigWallet
+		var lastScanned sql.NullTime
+		err := rows.Scan(
+			&wallet.ID, &wallet.Name, &wallet.UUID, &wallet.AddressType, &wallet.Network,
+			&wallet.RequiredSigners, &wallet.TotalSigners, &wallet.StartingAddressIndex,
+			&wallet.NextAddressIndex, &wallet.Active, &wallet.CreatedAt, &lastScanned,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if lastScanned.Valid {
+			wallet.LastScanned = &lastScanned.Time
+		}
+
+		// Get extended public keys for this wallet
+		keyQuery := fmt.Sprintf(`
+			SELECT id, wallet_id, name, xpub, bip32_path, fingerprint, key_index
+			FROM %s
+			WHERE wallet_id = ?
+			ORDER BY key_index ASC
+		`, keyTableName)
+
+		keyRows, err := db.conn.Query(keyQuery, wallet.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		var keys []MultisigExtendedPubKey
+		for keyRows.Next() {
+			var key MultisigExtendedPubKey
+			err := keyRows.Scan(
+				&key.ID, &key.WalletID, &key.Name, &key.XPub, &key.BIP32Path,
+				&key.Fingerprint, &key.KeyIndex,
+			)
+			if err != nil {
+				keyRows.Close()
+				return nil, err
+			}
+			keys = append(keys, key)
+		}
+		keyRows.Close()
+
+		wallet.ExtendedPublicKeys = keys
+		wallets = append(wallets, wallet)
+	}
+
+	return wallets, rows.Err()
+}
+
+// GetMultisigWalletByID retrieves a specific multisig wallet by ID
+func (db *Database) GetMultisigWalletByID(id int64) (*MultisigWallet, error) {
+	walletTableName := db.getTableName("multisig_wallets")
+	keyTableName := db.getTableName("multisig_extended_pubkeys")
+
+	// Get wallet
+	walletQuery := fmt.Sprintf(`
+		SELECT id, name, uuid, address_type, network, required_signers, total_signers,
+		       starting_address_index, next_address_index, active, created_at, last_scanned
+		FROM %s
+		WHERE id = ?
+	`, walletTableName)
+
+	var wallet MultisigWallet
+	var lastScanned sql.NullTime
+	err := db.conn.QueryRow(walletQuery, id).Scan(
+		&wallet.ID, &wallet.Name, &wallet.UUID, &wallet.AddressType, &wallet.Network,
+		&wallet.RequiredSigners, &wallet.TotalSigners, &wallet.StartingAddressIndex,
+		&wallet.NextAddressIndex, &wallet.Active, &wallet.CreatedAt, &lastScanned,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if lastScanned.Valid {
+		wallet.LastScanned = &lastScanned.Time
+	}
+
+	// Get extended public keys
+	keyQuery := fmt.Sprintf(`
+		SELECT id, wallet_id, name, xpub, bip32_path, fingerprint, key_index
+		FROM %s
+		WHERE wallet_id = ?
+		ORDER BY key_index ASC
+	`, keyTableName)
+
+	keyRows, err := db.conn.Query(keyQuery, wallet.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer keyRows.Close()
+
+	var keys []MultisigExtendedPubKey
+	for keyRows.Next() {
+		var key MultisigExtendedPubKey
+		err := keyRows.Scan(
+			&key.ID, &key.WalletID, &key.Name, &key.XPub, &key.BIP32Path,
+			&key.Fingerprint, &key.KeyIndex,
+		)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+
+	wallet.ExtendedPublicKeys = keys
+	return &wallet, nil
+}
+
+// GetMultisigWalletByUUID retrieves a specific multisig wallet by UUID
+func (db *Database) GetMultisigWalletByUUID(uuid string) (*MultisigWallet, error) {
+	walletTableName := db.getTableName("multisig_wallets")
+
+	query := fmt.Sprintf(`
+		SELECT id FROM %s WHERE uuid = ?
+	`, walletTableName)
+
+	var id int64
+	err := db.conn.QueryRow(query, uuid).Scan(&id)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return db.GetMultisigWalletByID(id)
+}
+
+// DeleteMultisigWallet marks a multisig wallet as inactive
+func (db *Database) DeleteMultisigWallet(id int64) error {
+	tableName := db.getTableName("multisig_wallets")
+	query := fmt.Sprintf(`UPDATE %s SET active = 0 WHERE id = ?`, tableName)
+
+	result, err := db.conn.Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+// InsertMultisigAddress creates a new derived address from a multisig wallet
+func (db *Database) InsertMultisigAddress(address *MultisigAddress) (*MultisigAddress, error) {
+	tableName := db.getTableName("multisig_addresses")
+	query := fmt.Sprintf(`
+		INSERT INTO %s (wallet_id, address, address_index, script_type, redeem_script, active, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, tableName)
+
+	now := time.Now()
+	result, err := db.conn.Exec(query,
+		address.WalletID, address.Address, address.AddressIndex, address.ScriptType,
+		address.RedeemScript, address.Active, now,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	address.ID = id
+	address.CreatedAt = now
+	return address, nil
+}
+
+// GetMultisigAddressesByWalletID retrieves all addresses for a specific multisig wallet
+func (db *Database) GetMultisigAddressesByWalletID(walletID int64) ([]MultisigAddress, error) {
+	tableName := db.getTableName("multisig_addresses")
+	query := fmt.Sprintf(`
+		SELECT id, wallet_id, address, address_index, script_type, redeem_script, active, created_at
+		FROM %s
+		WHERE wallet_id = ? AND active = 1
+		ORDER BY address_index ASC
+	`, tableName)
+
+	rows, err := db.conn.Query(query, walletID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var addresses []MultisigAddress
+	for rows.Next() {
+		var addr MultisigAddress
+		err := rows.Scan(
+			&addr.ID, &addr.WalletID, &addr.Address, &addr.AddressIndex,
+			&addr.ScriptType, &addr.RedeemScript, &addr.Active, &addr.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		addresses = append(addresses, addr)
+	}
+
+	return addresses, rows.Err()
+}
+
+// UpdateMultisigWalletLastScanned updates the last scanned timestamp for a wallet
+func (db *Database) UpdateMultisigWalletLastScanned(id int64, timestamp time.Time) error {
+	tableName := db.getTableName("multisig_wallets")
+	query := fmt.Sprintf(`UPDATE %s SET last_scanned = ? WHERE id = ?`, tableName)
+
+	_, err := db.conn.Exec(query, timestamp, id)
+	return err
+}
+
+// UpdateMultisigWalletNextAddressIndex updates the next address index for a wallet
+func (db *Database) UpdateMultisigWalletNextAddressIndex(id int64, nextIndex int) error {
+	tableName := db.getTableName("multisig_wallets")
+	query := fmt.Sprintf(`UPDATE %s SET next_address_index = ? WHERE id = ?`, tableName)
+
+	_, err := db.conn.Exec(query, nextIndex, id)
+	return err
 }

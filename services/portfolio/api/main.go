@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -13,6 +16,7 @@ import (
 
 	"github.com/brewgator/lightning-node-tools/internal/bitcoin"
 	"github.com/brewgator/lightning-node-tools/internal/db"
+	"github.com/brewgator/lightning-node-tools/internal/multisig"
 	"github.com/brewgator/lightning-node-tools/internal/utils"
 
 	"github.com/gorilla/mux"
@@ -24,13 +28,17 @@ const (
 	MaxHistoryDays = 365
 	// BitcoinGenesisDate is the date of the Bitcoin genesis block (January 3, 2009)
 	BitcoinGenesisDate = "2009-01-03"
+	// MaxAddressGenerationBatch is the maximum number of addresses that can be generated in a single request
+	// This limit prevents database overload and API timeouts for large batch operations
+	MaxAddressGenerationBatch = 100
 )
 
 type Server struct {
-	db             *db.Database
-	router         *mux.Router
-	balanceService *bitcoin.BalanceService
-	mockMode       bool
+	db              *db.Database
+	router          *mux.Router
+	balanceService  *bitcoin.BalanceService
+	multisigService *multisig.MultisigService
+	mockMode        bool
 }
 
 type APIResponse struct {
@@ -86,19 +94,36 @@ func main() {
 		}
 	}
 
+	// Initialize multisig service
+	multisigService := multisig.NewMultisigService(database)
+
 	server := &Server{
-		db:             database,
-		router:         mux.NewRouter(),
-		balanceService: balanceService,
-		mockMode:       *mockMode,
+		db:              database,
+		router:          mux.NewRouter(),
+		balanceService:  balanceService,
+		multisigService: multisigService,
+		mockMode:        *mockMode,
 	}
 
 	server.setupRoutes()
 
-	// Setup CORS
+	// Setup CORS with environment-based configuration
+	// Security Note: Using localhost origins in production exposes the API to CSRF attacks
+	// from any application running on the user's machine. Always set ALLOWED_ORIGINS in production.
+	allowedOrigins := []string{"http://localhost:8090", "http://127.0.0.1:8090"}
+
+	// Check for production origins from environment variable
+	if envOrigins := os.Getenv("ALLOWED_ORIGINS"); envOrigins != "" {
+		allowedOrigins = strings.Split(envOrigins, ",")
+		log.Printf("🔒 Using CORS origins from environment: %v", allowedOrigins)
+	} else {
+		// WARNING: Using localhost origins - NOT suitable for production!
+		log.Printf("⚠️  WARNING: Using default localhost CORS origins. Set ALLOWED_ORIGINS environment variable for production!")
+		log.Printf("⚠️  Example: export ALLOWED_ORIGINS='https://yourdomain.com,https://app.yourdomain.com'")
+	}
+
 	c := cors.New(cors.Options{
-		// TODO: Replace with your actual frontend domain(s) in production.
-		AllowedOrigins: []string{"https://your-frontend-domain.com"},
+		AllowedOrigins: allowedOrigins,
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"*"},
 	})
@@ -147,6 +172,14 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/offline/accounts/{id:[0-9]+}/balance", s.handleUpdateOfflineAccountBalance).Methods("PUT")
 	api.HandleFunc("/offline/accounts/{id:[0-9]+}", s.handleDeleteOfflineAccount).Methods("DELETE")
 	api.HandleFunc("/offline/history", s.handleOfflineHistory).Methods("GET")
+
+	// Multisig wallet endpoints
+	api.HandleFunc("/multisig/wallets", s.handleGetMultisigWallets).Methods("GET")
+	api.HandleFunc("/multisig/wallets", s.handleImportMultisigWallet).Methods("POST")
+	api.HandleFunc("/multisig/wallets/{id:[0-9]+}", s.handleGetMultisigWallet).Methods("GET")
+	api.HandleFunc("/multisig/wallets/{id:[0-9]+}", s.handleDeleteMultisigWallet).Methods("DELETE")
+	api.HandleFunc("/multisig/wallets/{id:[0-9]+}/addresses", s.handleGetMultisigAddresses).Methods("GET")
+	api.HandleFunc("/multisig/wallets/{id:[0-9]+}/addresses/generate", s.handleGenerateMultisigAddresses).Methods("POST")
 
 	// Health check
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
@@ -852,4 +885,231 @@ func (s *Server) handleOfflineHistory(w http.ResponseWriter, r *http.Request) {
 	chartData["datasets"].([]map[string]interface{})[0]["data"] = data
 
 	s.writeJSON(w, APIResponse{Success: true, Data: chartData})
+}
+
+// Multisig wallet handlers
+
+// handleGetMultisigWallets handles GET /api/multisig/wallets
+func (s *Server) handleGetMultisigWallets(w http.ResponseWriter, r *http.Request) {
+	wallets, err := s.multisigService.GetWallets()
+	if err != nil {
+		log.Printf("handleGetMultisigWallets: failed to get wallets: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get multisig wallets")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{Success: true, Data: wallets})
+}
+
+// handleImportMultisigWallet handles POST /api/multisig/wallets
+func (s *Server) handleImportMultisigWallet(w http.ResponseWriter, r *http.Request) {
+	// Read the uploaded JSON file
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "Failed to read request body")
+		return
+	}
+
+	// Import the wallet config
+	wallet, err := s.multisigService.ImportWalletConfig(body)
+	if err != nil {
+		log.Printf("handleImportMultisigWallet: failed to import wallet: %v", err)
+		if strings.Contains(err.Error(), "already exists") {
+			s.writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("Failed to import wallet: %v", err))
+		return
+	}
+
+	// Generate initial addresses (first 5 addresses)
+	addresses, err := s.multisigService.GenerateAddresses(wallet.ID, 5)
+	if err != nil {
+		log.Printf("handleImportMultisigWallet: failed to generate initial addresses: %v", err)
+		// Don't fail the import, but include a warning in the response
+		response := map[string]interface{}{
+			"wallet":    wallet,
+			"addresses": []db.MultisigAddress{},
+			"warning":   "Initial address generation failed. You may need to generate addresses manually.",
+		}
+		s.writeJSON(w, APIResponse{
+			Success: true,
+			Data:    response,
+		})
+		return
+	}
+
+	response := map[string]interface{}{
+		"wallet":    wallet,
+		"addresses": addresses,
+	}
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data:    response,
+	})
+}
+
+// handleGetMultisigWallet handles GET /api/multisig/wallets/{id}
+func (s *Server) handleGetMultisigWallet(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr, ok := vars["id"]
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "Wallet ID is required")
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid wallet ID")
+		return
+	}
+
+	wallet, err := s.multisigService.GetWalletByID(id)
+	if err != nil {
+		log.Printf("handleGetMultisigWallet: failed to get wallet: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get wallet")
+		return
+	}
+	if wallet == nil {
+		s.writeError(w, http.StatusNotFound, "Wallet not found")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{Success: true, Data: wallet})
+}
+
+// handleDeleteMultisigWallet handles DELETE /api/multisig/wallets/{id}
+func (s *Server) handleDeleteMultisigWallet(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr, ok := vars["id"]
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "Wallet ID is required")
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid wallet ID")
+		return
+	}
+
+	// Check if wallet exists
+	wallet, err := s.multisigService.GetWalletByID(id)
+	if err != nil {
+		log.Printf("handleDeleteMultisigWallet: failed to get wallet: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to check wallet")
+		return
+	}
+	if wallet == nil {
+		s.writeError(w, http.StatusNotFound, "Wallet not found")
+		return
+	}
+
+	// Delete the wallet
+	err = s.multisigService.DeleteWallet(id)
+	if err != nil {
+		log.Printf("handleDeleteMultisigWallet: failed to delete wallet: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to delete wallet")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data: map[string]interface{}{
+			"message": "Wallet deleted successfully",
+			"name":    html.EscapeString(wallet.Name),
+		},
+	})
+}
+
+// handleGetMultisigAddresses handles GET /api/multisig/wallets/{id}/addresses
+func (s *Server) handleGetMultisigAddresses(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr, ok := vars["id"]
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "Wallet ID is required")
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid wallet ID")
+		return
+	}
+
+	addresses, err := s.multisigService.GetWalletAddresses(id)
+	if err != nil {
+		log.Printf("handleGetMultisigAddresses: failed to get addresses: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get addresses")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{Success: true, Data: addresses})
+}
+
+// GenerateAddressesRequest represents the request body for generating addresses
+type GenerateAddressesRequest struct {
+	Count int `json:"count"`
+}
+
+// handleGenerateMultisigAddresses handles POST /api/multisig/wallets/{id}/addresses/generate
+func (s *Server) handleGenerateMultisigAddresses(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr, ok := vars["id"]
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "Wallet ID is required")
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid wallet ID")
+		return
+	}
+
+	var req GenerateAddressesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid JSON request body")
+		return
+	}
+
+	// Validate count
+	if req.Count <= 0 || req.Count > MaxAddressGenerationBatch {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("Count must be between 1 and %d", MaxAddressGenerationBatch))
+		return
+	}
+
+	// Validate wallet exists first
+	wallet, err := s.multisigService.GetWalletByID(id)
+	if err != nil {
+		log.Printf("handleGenerateMultisigAddresses: failed to get wallet: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to check wallet")
+		return
+	}
+	if wallet == nil {
+		s.writeError(w, http.StatusNotFound, "Wallet not found")
+		return
+	}
+
+	// Generate addresses
+	addresses, err := s.multisigService.GenerateAddresses(id, req.Count)
+	if err != nil {
+		log.Printf("handleGenerateMultisigAddresses: failed to generate addresses: %v", err)
+		if strings.Contains(err.Error(), "not found") {
+			s.writeError(w, http.StatusNotFound, "Wallet not found")
+			return
+		}
+		s.writeError(w, http.StatusInternalServerError, "Failed to generate addresses")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{
+		Success: true,
+		Data: map[string]interface{}{
+			"addresses":       addresses,
+			"count":           len(addresses),
+			"requested_count": req.Count,
+		},
+	})
 }
