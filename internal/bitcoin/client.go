@@ -3,6 +3,7 @@ package bitcoin
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -280,6 +281,44 @@ func (c *Client) GetAddressTransactions(address string) ([]AddressTransaction, e
 	return addressTxs, nil
 }
 
+// btcToSatoshis converts a BTC amount (as float64) to satoshis (int64) using exact decimal arithmetic
+// to avoid floating-point precision errors. Returns an error if the conversion fails.
+func btcToSatoshis(amount float64) (int64, error) {
+	// Convert amount to string with 8 decimal places
+	amountStr := fmt.Sprintf("%.8f", amount)
+	parts := strings.SplitN(amountStr, ".", 2)
+	intPart := parts[0]
+	fracPart := ""
+	if len(parts) == 2 {
+		fracPart = parts[1]
+	}
+	
+	// Ensure we have exactly 8 fractional digits (pad with zeros if needed)
+	for len(fracPart) < 8 {
+		fracPart += "0"
+	}
+	
+	// Remove leading minus sign if present for parsing
+	isNegative := strings.HasPrefix(intPart, "-")
+	if isNegative {
+		intPart = intPart[1:]
+	}
+	
+	// Combine integer and fractional parts to get satoshis
+	satsStr := intPart + fracPart
+	amountSats, err := strconv.ParseInt(satsStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert BTC amount %q to satoshis: %w", amountStr, err)
+	}
+	
+	// Restore negative sign if needed
+	if isNegative {
+		amountSats = -amountSats
+	}
+	
+	return amountSats, nil
+}
+
 // GetAddressBalanceHistory builds balance history from transaction data (like Sparrow wallet).
 // This creates a step chart showing balance changes at specific transaction times.
 // If the address has no transactions, it returns an empty slice and a nil error.
@@ -310,31 +349,10 @@ func (c *Client) GetAddressBalanceHistory(address string) ([]BalanceHistoryPoint
 
 	// Process each transaction to build balance timeline
 	for _, tx := range transactions {
-		// Convert amount from BTC to satoshis using exact decimal arithmetic to avoid floating-point errors
-		amountStr := fmt.Sprintf("%.8f", tx.Amount)
-		parts := strings.SplitN(amountStr, ".", 2)
-		intPart := parts[0]
-		fracPart := ""
-		if len(parts) == 2 {
-			fracPart = parts[1]
-		}
-		// Ensure we have exactly 8 fractional digits (pad with zeros if needed)
-		for len(fracPart) < 8 {
-			fracPart += "0"
-		}
-		// Remove leading minus sign if present for parsing
-		isNegative := strings.HasPrefix(intPart, "-")
-		if isNegative {
-			intPart = intPart[1:]
-		}
-		satsStr := intPart + fracPart
-		amountSats, errConv := strconv.ParseInt(satsStr, 10, 64)
-		if errConv != nil {
-			return nil, fmt.Errorf("failed to convert BTC amount %q to satoshis: %w", amountStr, errConv)
-		}
-		// Restore negative sign if needed
-		if isNegative {
-			amountSats = -amountSats
+		// Convert amount from BTC to satoshis using exact decimal arithmetic
+		amountSats, err := btcToSatoshis(tx.Amount)
+		if err != nil {
+			return nil, err
 		}
 
 		// Update running balance based on transaction type
@@ -346,7 +364,7 @@ func (c *Client) GetAddressBalanceHistory(address string) ([]BalanceHistoryPoint
 			runningBalance += amountSats // Amount is already negative for sends
 		default:
 			// Log unknown or unsupported categories to avoid silent miscalculations
-			fmt.Printf("warning: unknown transaction category %q for tx %s; amount=%f\n", tx.Category, tx.TxID, tx.Amount)
+			log.Printf("warning: unknown transaction category %q for tx %s; amount=%f\n", tx.Category, tx.TxID, tx.Amount)
 		}
 
 		// Add point to history
