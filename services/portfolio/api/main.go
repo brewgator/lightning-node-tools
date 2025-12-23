@@ -13,6 +13,7 @@ import (
 
 	"github.com/brewgator/lightning-node-tools/internal/bitcoin"
 	"github.com/brewgator/lightning-node-tools/internal/db"
+	"github.com/brewgator/lightning-node-tools/internal/lnd"
 	"github.com/brewgator/lightning-node-tools/internal/utils"
 
 	"github.com/gorilla/mux"
@@ -27,10 +28,12 @@ const (
 )
 
 type Server struct {
-	db             *db.Database
-	router         *mux.Router
-	balanceService *bitcoin.BalanceService
-	mockMode       bool
+	db              *db.Database
+	router          *mux.Router
+	balanceService  *bitcoin.BalanceService
+	realtimeService *bitcoin.RealtimeBalanceService
+	lndClient       *lnd.Client
+	mockMode        bool
 }
 
 type APIResponse struct {
@@ -70,27 +73,38 @@ func main() {
 	}
 
 	var balanceService *bitcoin.BalanceService
+	var realtimeService *bitcoin.RealtimeBalanceService
+	var lndClient *lnd.Client
 
-	// Initialize Bitcoin balance service if not disabled
+	// Initialize real-time Bitcoin service if not disabled
 	if !*noBitcoinNode && !*mockMode {
 		bitcoinClient, err := bitcoin.NewClient()
 		if err != nil {
 			log.Printf("⚠️  Warning: Failed to connect to Bitcoin node: %v", err)
-			log.Printf("💡 Balance updates will be disabled. Ensure bitcoin-cli is available and Bitcoin Core is running.")
+			log.Printf("💡 Real-time balance updates will be disabled. Ensure bitcoin-cli is available and Bitcoin Core is running.")
 		} else {
-			fmt.Println("₿ Connected to Bitcoin Core node")
-			balanceService = bitcoin.NewBalanceService(bitcoinClient, database, 30*time.Minute)
+			fmt.Println("₿ Connected to Bitcoin Core node for real-time queries")
+			realtimeService = bitcoin.NewRealtimeBalanceService(bitcoinClient, database)
+			// Note: Real-time service doesn't need to start - it responds to API calls on-demand
+		}
 
-			// Start balance service in background
-			go balanceService.Start()
+		// Initialize LND client for Lightning data
+		lndClient, err = lnd.NewClient()
+		if err != nil {
+			log.Printf("⚠️  Warning: Failed to connect to LND: %v", err)
+			log.Printf("💡 Lightning balance data will not be available")
+		} else {
+			fmt.Println("⚡ Connected to LND node")
 		}
 	}
 
 	server := &Server{
-		db:             database,
-		router:         mux.NewRouter(),
-		balanceService: balanceService,
-		mockMode:       *mockMode,
+		db:              database,
+		router:          mux.NewRouter(),
+		balanceService:  balanceService,
+		realtimeService: realtimeService,
+		lndClient:       lndClient,
+		mockMode:        *mockMode,
 	}
 
 	server.setupRoutes()
@@ -113,12 +127,7 @@ func main() {
 	}
 	fmt.Printf("\n")
 
-	// Cleanup function
-	defer func() {
-		if balanceService != nil {
-			balanceService.Stop()
-		}
-	}()
+	// Real-time service doesn't need cleanup (no background processes)
 
 	log.Fatal(http.ListenAndServe(addr, handler))
 }
@@ -159,16 +168,61 @@ func (s *Server) setupRoutes() {
 }
 
 func (s *Server) handleCurrentPortfolio(w http.ResponseWriter, r *http.Request) {
-	snapshot, err := s.db.GetLatestBalanceSnapshot()
-	if err != nil {
-		log.Printf("handleCurrentPortfolio: failed to get latest balance snapshot: %v", err)
-		s.writeError(w, http.StatusInternalServerError, "Failed to get current portfolio")
+	if s.mockMode {
+		// Return mock data for testing
+		mockSnapshot := &bitcoin.PortfolioSnapshot{
+			Timestamp:          time.Now(),
+			LightningLocal:     5000000,
+			LightningRemote:    3000000,
+			OnchainConfirmed:   2000000,
+			OnchainUnconfirmed: 100000,
+			TrackedAddresses:   1500000,
+			ColdStorage:        10000000,
+			TotalPortfolio:     18600000,
+			TotalLiquid:        8600000,
+		}
+		s.writeJSON(w, APIResponse{Success: true, Data: mockSnapshot})
 		return
 	}
 
-	if snapshot == nil {
-		s.writeError(w, http.StatusNotFound, "No portfolio data available")
+	// Use real-time service if available
+	if s.realtimeService == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "Real-time balance service not available")
 		return
+	}
+
+	// Get real-time portfolio calculation
+	snapshot, err := s.realtimeService.GetCurrentPortfolio()
+	if err != nil {
+		log.Printf("handleCurrentPortfolio: failed to calculate real-time portfolio: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to calculate current portfolio")
+		return
+	}
+
+	// Add Lightning data if LND client is available
+	if s.lndClient != nil {
+		lightningBalances, err := s.lndClient.GetChannelBalances()
+		if err != nil {
+			log.Printf("Warning: Failed to get Lightning balances: %v", err)
+		} else {
+			snapshot.LightningLocal = lightningBalances.LocalBalance
+			snapshot.LightningRemote = lightningBalances.RemoteBalance
+			// Recalculate totals with Lightning data
+			snapshot.TotalLiquid = snapshot.TrackedAddresses + snapshot.LightningLocal
+			snapshot.TotalPortfolio = snapshot.TotalLiquid + snapshot.ColdStorage
+		}
+
+		// Get on-chain wallet balance if available
+		onchainBalance, err := s.lndClient.GetWalletBalance()
+		if err != nil {
+			log.Printf("Warning: Failed to get on-chain wallet balance: %v", err)
+		} else {
+			snapshot.OnchainConfirmed = onchainBalance.ConfirmedBalance
+			snapshot.OnchainUnconfirmed = onchainBalance.UnconfirmedBalance
+			// Update totals with on-chain data
+			snapshot.TotalLiquid = snapshot.TrackedAddresses + snapshot.LightningLocal + snapshot.OnchainConfirmed + snapshot.OnchainUnconfirmed
+			snapshot.TotalPortfolio = snapshot.TotalLiquid + snapshot.ColdStorage
+		}
 	}
 
 	s.writeJSON(w, APIResponse{Success: true, Data: snapshot})
@@ -201,10 +255,34 @@ func (s *Server) handlePortfolioHistory(w http.ResponseWriter, r *http.Request) 
 		from = to.AddDate(0, 0, -days)
 	}
 
-	snapshots, err := s.db.GetBalanceSnapshots(from, to)
+	if s.mockMode {
+		// Return mock historical data
+		var mockSnapshots []bitcoin.PortfolioSnapshot
+		current := from
+		for current.Before(to) || current.Equal(to) {
+			mockSnapshots = append(mockSnapshots, bitcoin.PortfolioSnapshot{
+				Timestamp:        current,
+				TrackedAddresses: 1500000 + int64((current.Unix()%1000)*100), // Some variation
+				ColdStorage:      10000000,
+				TotalPortfolio:   11500000 + int64((current.Unix()%1000)*100),
+				TotalLiquid:      1500000 + int64((current.Unix()%1000)*100),
+			})
+			current = current.AddDate(0, 0, 1)
+		}
+		s.writeJSON(w, APIResponse{Success: true, Data: mockSnapshots})
+		return
+	}
+
+	// Use real-time service for historical data generation
+	if s.realtimeService == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "Real-time balance service not available")
+		return
+	}
+
+	snapshots, err := s.realtimeService.GetPortfolioHistory(from, to)
 	if err != nil {
-		log.Printf("handlePortfolioHistory: failed to get balance snapshots: %v", err)
-		s.writeError(w, http.StatusInternalServerError, "Failed to get portfolio history")
+		log.Printf("handlePortfolioHistory: failed to generate portfolio history: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to generate portfolio history")
 		return
 	}
 
@@ -555,10 +633,71 @@ func (s *Server) handleOnchainHistory(w http.ResponseWriter, r *http.Request) {
 		from = to.AddDate(0, 0, -days)
 	}
 
-	balances, err := s.db.GetAddressBalanceHistory(address, from, to)
+	if s.mockMode {
+		// Return mock address history data
+		var mockBalances []bitcoin.AddressBalanceResult
+		current := from
+		balance := int64(100000) // Starting mock balance
+		for current.Before(to) || current.Equal(to) {
+			// Add some variation to mock data
+			balance += int64((current.Unix() % 10) * 1000)
+			mockBalances = append(mockBalances, bitcoin.AddressBalanceResult{
+				Address:     address,
+				Balance:     balance,
+				TxCount:     int64(current.Unix() % 5),
+				LastUpdated: current,
+				Source:      "mock",
+			})
+			current = current.AddDate(0, 0, 1)
+		}
+
+		// Format data for Chart.js consumption
+		chartData := map[string]interface{}{
+			"labels": make([]string, 0, len(mockBalances)),
+			"datasets": []map[string]interface{}{
+				{
+					"label":           fmt.Sprintf("Balance for %s", address),
+					"data":            make([]int64, 0, len(mockBalances)),
+					"backgroundColor": "rgba(255, 159, 64, 0.2)",
+					"borderColor":     "rgba(255, 159, 64, 1)",
+					"borderWidth":     1,
+				},
+			},
+			"metadata": map[string]interface{}{
+				"address":        address,
+				"days_requested": days,
+				"days_with_data": len(mockBalances),
+				"source":         "mock",
+			},
+		}
+
+		// Populate chart data
+		labels := chartData["labels"].([]string)
+		data := chartData["datasets"].([]map[string]interface{})[0]["data"].([]int64)
+
+		for _, balance := range mockBalances {
+			labels = append(labels, balance.LastUpdated.Format("2006-01-02"))
+			data = append(data, balance.Balance)
+		}
+
+		// Update the slices in the map
+		chartData["labels"] = labels
+		chartData["datasets"].([]map[string]interface{})[0]["data"] = data
+
+		s.writeJSON(w, APIResponse{Success: true, Data: chartData})
+		return
+	}
+
+	// Use real-time service for transaction-based history
+	if s.realtimeService == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "Real-time balance service not available")
+		return
+	}
+
+	balances, err := s.realtimeService.GetAddressHistory(address, from, to)
 	if err != nil {
-		log.Printf("handleOnchainHistory: failed to get balance history for address %s: %v", address, err)
-		s.writeError(w, http.StatusInternalServerError, "Failed to get address balance history")
+		log.Printf("handleOnchainHistory: failed to get address history for %s: %v", address, err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to scan address transaction history")
 		return
 	}
 
@@ -586,7 +725,7 @@ func (s *Server) handleOnchainHistory(w http.ResponseWriter, r *http.Request) {
 	data := chartData["datasets"].([]map[string]interface{})[0]["data"].([]int64)
 
 	for _, balance := range balances {
-		labels = append(labels, balance.Timestamp.Format("2006-01-02"))
+		labels = append(labels, balance.LastUpdated.Format("2006-01-02"))
 		data = append(data, balance.Balance)
 	}
 

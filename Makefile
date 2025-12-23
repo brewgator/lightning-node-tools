@@ -1,10 +1,10 @@
-.PHONY: build clean all channel-manager telegram-monitor dashboard-collector dashboard-api forwarding-collector dashboard deploy install-services test test-verbose test-coverage test-unit test-integration test-api test-collector test-forwarding test-db test-utils test-race test-clean
+.PHONY: build clean all channel-manager telegram-monitor dashboard-api forwarding-collector dashboard deploy install-services test test-verbose test-coverage test-unit test-integration test-api test-forwarding test-db test-utils test-race test-clean
 
 # Default target - build all tools
 all: build
 
 # Build all tools
-build: channel-manager telegram-monitor portfolio-collector portfolio-api forwarding-collector webhook-deployer
+build: channel-manager telegram-monitor portfolio-api forwarding-collector webhook-deployer
 
 # Build channel-manager
 channel-manager:
@@ -17,12 +17,6 @@ telegram-monitor:
 	@echo "Building telegram-monitor..."
 	@mkdir -p bin
 	go build -o bin/telegram-monitor ./tools/monitoring
-
-# Build portfolio-collector
-portfolio-collector:
-	@echo "Building portfolio-collector..."
-	@mkdir -p bin
-	go build -o bin/portfolio-collector ./services/portfolio/collector
 
 # Build portfolio-api
 portfolio-api:
@@ -43,13 +37,12 @@ webhook-deployer:
 	@mkdir -p bin
 	go build -o bin/webhook-deployer ./services/deployment/webhook-deployer
 
-# Build complete portfolio system (collector + api)
-portfolio: portfolio-collector portfolio-api
-	@echo "Portfolio components built successfully!"
+# Build complete portfolio system (real-time API only)
+portfolio: portfolio-api
+	@echo "Real-time Portfolio API built successfully!"
 	@echo "To start:"
-	@echo "  1. ./bin/portfolio-collector --oneshot  # Test data collection"
-	@echo "  2. ./bin/portfolio-api                  # Start web API"
-	@echo "  3. Open http://localhost:8090           # View dashboard"
+	@echo "  1. ./bin/portfolio-api                  # Start real-time web API"
+	@echo "  2. Open http://localhost:8090           # View dashboard"
 
 
 # Clean build artifacts
@@ -62,7 +55,6 @@ install: build
 	@echo "Installing tools to GOPATH/bin..."
 	go install ./tools/channel-manager
 	go install ./tools/monitoring
-	go install ./services/portfolio/collector
 	go install ./services/portfolio/api
 
 # Run tests
@@ -77,7 +69,7 @@ test-verbose:
 test-coverage:
 	@echo "Running tests with coverage..."
 	@# Only test packages that have test files
-	go test -v -coverprofile=coverage.out ./internal/db ./services/portfolio/api ./services/portfolio/collector ./services/lightning/forwarding-collector
+	go test -v -coverprofile=coverage.out ./internal/db ./services/portfolio/api ./services/lightning/forwarding-collector
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
@@ -99,8 +91,6 @@ test-integration:
 test-api:
 	go test -v ./services/portfolio/api/...
 
-test-collector:
-	go test -v ./services/portfolio/collector/...
 
 test-forwarding:
 	go test -v ./services/lightning/forwarding-collector/...
@@ -171,7 +161,6 @@ help:
 	@echo "  build (default)     - Build all tools"
 	@echo "  channel-manager     - Build only channel-manager"
 	@echo "  telegram-monitor    - Build only telegram-monitor"
-	@echo "  portfolio-collector - Build only portfolio-collector"
 	@echo "  portfolio-api       - Build only portfolio-api"
 	@echo "  forwarding-collector - Build only forwarding-collector"
 	@echo "  portfolio           - Build complete portfolio system"
@@ -189,7 +178,6 @@ help:
 	@echo "  test-unit          - Run unit tests only"
 	@echo "  test-integration   - Run integration tests only"
 	@echo "  test-api           - Run API tests only"
-	@echo "  test-collector     - Run collector tests only"
 	@echo "  test-forwarding    - Run forwarding tests only"
 	@echo "  test-db            - Run database tests only"
 	@echo "  test-race          - Run tests with race detection"
