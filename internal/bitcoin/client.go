@@ -23,6 +23,7 @@ var allowedCommands = map[string]bool{
 	"validateaddress":   true,
 	"getaddressinfo":    true,
 	"rescanblockchain":  true,
+	"getwalletinfo":     true,
 }
 
 // addressRegex matches valid Bitcoin addresses (common formats)
@@ -69,7 +70,7 @@ func sanitizeString(s string) error {
 	return nil
 }
 
-// NewClient creates a new Bitcoin Core client
+// NewClient creates a new Bitcoin Core client and ensures tracking wallet exists
 func NewClient() (*Client, error) {
 	// Test Bitcoin Core connectivity (without wallet)
 	// Note: This command doesn't involve user input and is safe to call directly
@@ -79,6 +80,19 @@ func NewClient() (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Bitcoin Core: %w", err)
 	}
+
+	// Set up the tracking wallet for address monitoring
+	err = SetupTrackingWallet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to set up tracking wallet: %w", err)
+	}
+
+	// Ensure wallet is loaded
+	err = LoadTrackingWallet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tracking wallet: %w", err)
+	}
+
 	return &Client{}, nil
 }
 
