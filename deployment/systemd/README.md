@@ -23,22 +23,21 @@ sudo cp *.service.example /etc/systemd/system/
 ### Edit paths:
 ```bash
 # Replace YOUR_USERNAME with actual username in each service file
-sudo nano /etc/systemd/system/bitcoin-dashboard-api.service
+sudo nano /etc/systemd/system/bitcoin-portfolio-api.service
 ```
 
 ### Enable services:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable bitcoin-dashboard-api bitcoin-dashboard-collector
-sudo systemctl start bitcoin-dashboard-api bitcoin-dashboard-collector
+sudo systemctl enable bitcoin-portfolio-api
+sudo systemctl start bitcoin-portfolio-api
 ```
 
 ## Services
 
 | Service | Purpose | Port |
 |---------|---------|------|
-| `bitcoin-dashboard-api` | Portfolio REST API | 8090 |
-| `bitcoin-dashboard-collector` | Data collection (15min) | - |
+| `bitcoin-portfolio-api` | Real-time Portfolio API | 8090 |
 | `bitcoin-forwarding-collector` | Lightning forwarding events | - |
 | `webhook-deployer` | Auto-deployment | 9000 |
 | `lightning-telegram-monitor` | Telegram alerts (timer) | - |
@@ -53,13 +52,13 @@ sudo systemctl start bitcoin-dashboard-api bitcoin-dashboard-collector
 
 ```bash
 # Check status
-sudo systemctl status bitcoin-dashboard-api
+sudo systemctl status bitcoin-portfolio-api
 
 # View logs  
-journalctl -f -u bitcoin-dashboard-api
+journalctl -f -u bitcoin-portfolio-api
 
 # Restart
-sudo systemctl restart bitcoin-dashboard-api
+sudo systemctl restart bitcoin-portfolio-api
 ```
 
 Common issues:

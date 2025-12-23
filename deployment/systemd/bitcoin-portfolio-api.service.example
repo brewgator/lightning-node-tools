@@ -1,0 +1,39 @@
+[Unit]
+Description=Bitcoin Portfolio Real-time API
+Documentation=https://github.com/brewgator/lightning-node-tools
+After=network.target bitcoin.service lnd.service
+Wants=bitcoin.service lnd.service
+PartOf=bitcoin-dashboard.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+Group=YOUR_GROUP
+WorkingDirectory=/path/to/lightning-node-tools
+ExecStart=/path/to/lightning-node-tools/bin/portfolio-api --host 0.0.0.0 --port 8090
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bitcoin-portfolio-api
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/path/to/lightning-node-tools/data
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=512M
+
+# Environment - adjust PATH as needed for your system
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=multi-user.target
+Also=bitcoin-dashboard.target
