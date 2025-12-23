@@ -341,43 +341,55 @@ func (c *Client) RescanBlockchain(startHeight int64) error {
 	return err
 }
 
-// SetupTrackingWallet ensures the tracker_watchonly wallet exists
+// SetupTrackingWallet ensures the tracker_watchonly wallet exists and is loaded
 func SetupTrackingWallet() error {
 	log.Println("🔧 Setting up Bitcoin Core tracking wallet...")
 
-	// Check if wallet already exists
-	exists, err := walletExists("tracker_watchonly")
-	if err != nil {
-		return fmt.Errorf("failed to check wallet existence: %w", err)
-	}
-
-	if exists {
-		log.Println("✅ Tracking wallet 'tracker_watchonly' already exists")
+	// First try to load existing wallet if it exists
+	err := LoadTrackingWallet()
+	if err == nil {
+		log.Println("✅ Tracking wallet loaded successfully")
 		return nil
 	}
 
-	log.Println("📝 Creating watch-only wallet 'tracker_watchonly'...")
+	log.Printf("📝 Wallet not loaded, checking if it exists on disk...")
 
-	// Create the watch-only wallet
+	// Try to create the wallet - this will fail if it already exists, which is fine
 	cmd := exec.Command("bitcoin-cli", "createwallet", "tracker_watchonly", "false", "false", "", "false", "true", "false")
 	output, err := cmd.Output()
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
-			return fmt.Errorf("failed to create tracking wallet: %v, stderr: %s", err, string(exitError.Stderr))
+			stderr := string(exitError.Stderr)
+			// If wallet already exists, try to load it
+			if containsStr(stderr, "Database already exists") || containsStr(stderr, "already exists") {
+				log.Println("📁 Wallet database already exists, attempting to load...")
+				return LoadTrackingWallet()
+			}
+			return fmt.Errorf("failed to create tracking wallet: %v, stderr: %s", err, stderr)
 		}
 		return fmt.Errorf("failed to create tracking wallet: %v", err)
 	}
 
 	log.Printf("✅ Created tracking wallet successfully: %s", string(output))
-	return nil
+
+	// Ensure it's loaded after creation
+	return LoadTrackingWallet()
 }
 
 // LoadTrackingWallet loads the tracking wallet if it exists but isn't loaded
 func LoadTrackingWallet() error {
-	log.Println("🔄 Ensuring tracking wallet is loaded...")
+	log.Println("🔄 Attempting to load tracking wallet...")
 
-	// Try to load the wallet (this will fail if already loaded, which is fine)
-	cmd := exec.Command("bitcoin-cli", "loadwallet", "tracker_watchonly")
+	// First check if it's already loaded by testing wallet info
+	cmd := exec.Command("bitcoin-cli", "-rpcwallet=tracker_watchonly", "getwalletinfo")
+	_, err := cmd.Output()
+	if err == nil {
+		log.Println("✅ Tracking wallet already loaded and accessible")
+		return nil
+	}
+
+	// Try to load the wallet
+	cmd = exec.Command("bitcoin-cli", "loadwallet", "tracker_watchonly")
 	output, err := cmd.Output()
 	if err != nil {
 		// Check if it's already loaded
@@ -392,7 +404,7 @@ func LoadTrackingWallet() error {
 		return fmt.Errorf("failed to load tracking wallet: %v", err)
 	}
 
-	log.Printf("✅ Loaded tracking wallet: %s", string(output))
+	log.Printf("✅ Successfully loaded tracking wallet: %s", string(output))
 	return nil
 }
 
