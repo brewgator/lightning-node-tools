@@ -237,10 +237,10 @@ func (ts *TransactionScanner) GetAddressStatistics(address string, from, to time
 			totalSent += -amountSats
 		}
 
-		if firstTx == nil || tx.Blocktime < firstTx.Time {
+		if firstTx == nil || tx.Blocktime < firstTx.Blocktime {
 			firstTx = &filteredTxs[i]
 		}
-		if lastTx == nil || tx.Blocktime > lastTx.Time {
+		if lastTx == nil || tx.Blocktime > lastTx.Blocktime {
 			lastTx = &filteredTxs[i]
 		}
 	}
@@ -264,10 +264,10 @@ func (ts *TransactionScanner) GetAddressStatistics(address string, from, to time
 	}
 
 	if firstTx != nil {
-		stats.FirstTransaction = time.Unix(firstTx.Time, 0)
+		stats.FirstTransaction = time.Unix(firstTx.Blocktime, 0)
 	}
 	if lastTx != nil {
-		stats.LastTransaction = time.Unix(lastTx.Time, 0)
+		stats.LastTransaction = time.Unix(lastTx.Blocktime, 0)
 	}
 
 	return stats, nil

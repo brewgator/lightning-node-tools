@@ -486,6 +486,19 @@ type AddOnchainAddressRequest struct {
 	Label string `json:"label"`
 }
 
+// EnhancedAddressInfo combines database info with real-time balance
+type EnhancedAddressInfo struct {
+	ID             int64     `json:"id"`
+	Address        string    `json:"address"`
+	Label          string    `json:"label"`
+	Active         bool      `json:"active"`
+	CurrentBalance int64     `json:"current_balance"`
+	TxCount        int64     `json:"tx_count"`
+	LastUpdated    time.Time `json:"last_updated"`
+	Source         string    `json:"source"` // "cache", "bitcoin-core", or "error"
+	Error          string    `json:"error,omitempty"`
+}
+
 // handleGetOnchainAddresses handles GET /api/onchain/addresses
 func (s *Server) handleGetOnchainAddresses(w http.ResponseWriter, r *http.Request) {
 	addresses, err := s.db.GetOnchainAddresses()
@@ -495,7 +508,62 @@ func (s *Server) handleGetOnchainAddresses(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	s.writeJSON(w, APIResponse{Success: true, Data: addresses})
+	// In mock mode, return simple mock data
+	if s.mockMode {
+		var mockAddresses []EnhancedAddressInfo
+		for _, addr := range addresses {
+			mockAddresses = append(mockAddresses, EnhancedAddressInfo{
+				ID:             addr.ID,
+				Address:        addr.Address,
+				Label:          addr.Label,
+				Active:         addr.Active,
+				CurrentBalance: 100000 + int64(addr.ID)*10000, // Mock balance
+				TxCount:        5,
+				LastUpdated:    time.Now(),
+				Source:         "mock",
+			})
+		}
+		s.writeJSON(w, APIResponse{Success: true, Data: mockAddresses})
+		return
+	}
+
+	// Enhance with real-time balance data
+	var enhancedAddresses []EnhancedAddressInfo
+	for _, addr := range addresses {
+		enhanced := EnhancedAddressInfo{
+			ID:      addr.ID,
+			Address: addr.Address,
+			Label:   addr.Label,
+			Active:  addr.Active,
+			Source:  "error",
+		}
+
+		// Get real-time balance if real-time service is available and address is active
+		if s.realtimeService != nil && addr.Active {
+			result, err := s.realtimeService.GetAddressBalance(addr.Address)
+			if err != nil {
+				log.Printf("⚠️  Failed to get balance for %s: %v", addr.Address, err)
+				enhanced.Error = err.Error()
+				enhanced.CurrentBalance = 0
+				enhanced.TxCount = 0
+				enhanced.LastUpdated = time.Now()
+			} else {
+				enhanced.CurrentBalance = result.Balance
+				enhanced.TxCount = result.TxCount
+				enhanced.LastUpdated = result.LastUpdated
+				enhanced.Source = result.Source
+			}
+		} else {
+			enhanced.CurrentBalance = 0
+			enhanced.TxCount = 0
+			enhanced.LastUpdated = time.Now()
+			enhanced.Source = "inactive"
+		}
+
+		enhancedAddresses = append(enhancedAddresses, enhanced)
+	}
+
+	s.writeJSON(w, APIResponse{Success: true, Data: enhancedAddresses})
 }
 
 // handleAddOnchainAddress handles POST /api/onchain/addresses
