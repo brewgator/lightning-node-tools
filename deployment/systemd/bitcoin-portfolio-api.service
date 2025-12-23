@@ -17,15 +17,9 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=bitcoin-portfolio-api
 
-# Security settings
+# Security settings (relaxed for Bitcoin Core access)
 NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/home/brewgator/lightning-node-tools/data
 PrivateTmp=true
-ProtectKernelTunables=true
-ProtectControlGroups=true
-RestrictRealtime=true
 
 # Resource limits
 LimitNOFILE=65536
