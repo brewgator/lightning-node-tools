@@ -122,6 +122,51 @@ func (c *Client) GetWalletBalance() (*ParsedWalletBalance, error) {
 	}, nil
 }
 
+// GetTransactions retrieves on-chain transactions from LND
+func (c *Client) GetTransactions() ([]OnchainTransaction, error) {
+	output, err := RunLNCLI("listontransactions")
+	if err != nil {
+		return nil, err
+	}
+
+	var response OnchainTransactionResponse
+	if err := json.Unmarshal(output, &response); err != nil {
+		return nil, err
+	}
+
+	return response.Transactions, nil
+}
+
+// GetInvoices retrieves Lightning invoices (received payments)
+func (c *Client) GetInvoices() ([]Invoice, error) {
+	output, err := RunLNCLI("listinvoices")
+	if err != nil {
+		return nil, err
+	}
+
+	var response InvoiceResponse
+	if err := json.Unmarshal(output, &response); err != nil {
+		return nil, err
+	}
+
+	return response.Invoices, nil
+}
+
+// GetPayments retrieves Lightning payments (sent payments)
+func (c *Client) GetPayments() ([]Payment, error) {
+	output, err := RunLNCLI("listpayments")
+	if err != nil {
+		return nil, err
+	}
+
+	var response PaymentResponse
+	if err := json.Unmarshal(output, &response); err != nil {
+		return nil, err
+	}
+
+	return response.Payments, nil
+}
+
 // GetFeeReport retrieves the fee report from LND
 func GetFeeReport() (*FeeReportResponse, error) {
 	output, err := RunLNCLI("feereport")

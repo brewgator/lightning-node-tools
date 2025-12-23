@@ -7,15 +7,13 @@ set -e # Exit on any error
 
 # Configuration
 SERVICES=(
-    "bitcoin-dashboard-api"
+    "bitcoin-portfolio-api"
     "bitcoin-forwarding-collector"
-    "bitcoin-dashboard-collector"
 )
 
 BINARIES=(
     "portfolio-api:services/portfolio/api"
     "forwarding-collector:services/lightning/forwarding-collector"
-    "portfolio-collector:services/portfolio/collector"
 )
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
