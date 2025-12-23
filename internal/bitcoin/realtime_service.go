@@ -7,14 +7,17 @@ import (
 	"time"
 
 	"github.com/brewgator/lightning-node-tools/internal/db"
+	"github.com/brewgator/lightning-node-tools/internal/lnd"
 )
 
-// RealtimeBalanceService provides real-time balance calculations from Bitcoin Core
+// RealtimeBalanceService provides real-time balance calculations from Bitcoin Core and LND
 type RealtimeBalanceService struct {
-	client    *Client
-	database  *db.Database
-	cache     *BalanceCache
-	txScanner *TransactionScanner
+	client           *Client
+	database         *db.Database
+	cache            *BalanceCache
+	txScanner        *TransactionScanner
+	lndClient        *lnd.Client
+	lightningScanner *lnd.LightningHistoryScanner
 }
 
 // BalanceCache stores recent balance queries with TTL
@@ -55,17 +58,24 @@ type PortfolioSnapshot struct {
 }
 
 // NewRealtimeBalanceService creates a new real-time balance service
-func NewRealtimeBalanceService(client *Client, database *db.Database) *RealtimeBalanceService {
+func NewRealtimeBalanceService(client *Client, database *db.Database, lndClient *lnd.Client) *RealtimeBalanceService {
 	cache := &BalanceCache{
 		entries: make(map[string]*CacheEntry),
 		ttl:     45 * time.Second, // 45 second cache TTL for good performance
 	}
 
+	var lightningScanner *lnd.LightningHistoryScanner
+	if lndClient != nil {
+		lightningScanner = lnd.NewLightningHistoryScanner(lndClient)
+	}
+
 	return &RealtimeBalanceService{
-		client:    client,
-		database:  database,
-		cache:     cache,
-		txScanner: NewTransactionScanner(client),
+		client:           client,
+		database:         database,
+		cache:            cache,
+		txScanner:        NewTransactionScanner(client),
+		lndClient:        lndClient,
+		lightningScanner: lightningScanner,
 	}
 }
 
@@ -226,7 +236,19 @@ func (s *RealtimeBalanceService) GetAddressHistory(address string, from, to time
 
 // GetPortfolioHistory generates real-time portfolio history based on actual transaction dates
 func (s *RealtimeBalanceService) GetPortfolioHistory(from, to time.Time) ([]PortfolioSnapshot, error) {
-	log.Printf("📈 Generating transaction-based portfolio history from %v to %v", from.Format("2006-01-02"), to.Format("2006-01-02"))
+	log.Printf("📈 Generating Lightning + Bitcoin transaction-based portfolio history from %v to %v", from.Format("2006-01-02"), to.Format("2006-01-02"))
+
+	// Get Lightning transaction history if available
+	var lightningHistory []lnd.LightningBalancePoint
+	if s.lightningScanner != nil {
+		history, err := s.lightningScanner.GetLightningHistory(from, to)
+		if err != nil {
+			log.Printf("⚠️  Warning: Failed to get Lightning history: %v", err)
+		} else {
+			lightningHistory = history
+			log.Printf("⚡ Found %d Lightning balance points", len(lightningHistory))
+		}
+	}
 
 	// Get all addresses to analyze
 	addresses, err := s.database.GetOnchainAddresses()
@@ -260,18 +282,23 @@ func (s *RealtimeBalanceService) GetPortfolioHistory(from, to time.Time) ([]Port
 	}
 
 	// Create snapshots for transaction dates + start and end dates
-	var snapshots []PortfolioSnapshot
 	dateSet := make(map[string]time.Time)
 
 	// Always include start and end dates
 	dateSet[from.Format("2006-01-02")] = from
 	dateSet[to.Format("2006-01-02")] = to
 
-	// Add all transaction dates
+	// Add Bitcoin transaction dates
 	for dateStr := range transactionDates {
 		if date, err := time.Parse("2006-01-02", dateStr); err == nil {
 			dateSet[dateStr] = date
 		}
+	}
+
+	// Add Lightning transaction dates
+	for _, lightningPoint := range lightningHistory {
+		dateStr := lightningPoint.Timestamp.Format("2006-01-02")
+		dateSet[dateStr] = lightningPoint.Timestamp
 	}
 
 	// Convert to sorted slice
@@ -289,19 +316,13 @@ func (s *RealtimeBalanceService) GetPortfolioHistory(from, to time.Time) ([]Port
 		}
 	}
 
-	log.Printf("📊 Creating %d snapshots for transaction dates", len(sortedDates))
+	log.Printf("📊 Creating %d snapshots for Lightning + Bitcoin transaction dates", len(sortedDates))
 
-	// Generate snapshots for each significant date
+	// Generate enhanced snapshots using Lightning data as primary source
+	var snapshots []PortfolioSnapshot
 	for _, date := range sortedDates {
-		snapshot, err := s.getPortfolioSnapshotForDate(date)
-		if err != nil {
-			log.Printf("⚠️  Failed to get snapshot for %v: %v", date.Format("2006-01-02"), err)
-			// Continue with empty snapshot for this date
-			snapshot = &PortfolioSnapshot{
-				Timestamp: date,
-			}
-		}
-		snapshots = append(snapshots, *snapshot)
+		snapshot := s.getPortfolioSnapshotWithLightningData(date, lightningHistory)
+		snapshots = append(snapshots, snapshot)
 	}
 
 	log.Printf("✅ Generated %d portfolio snapshots based on transaction history", len(snapshots))
@@ -386,6 +407,62 @@ func (s *RealtimeBalanceService) getHistoricalBalanceForDate(address string, tar
 	}
 
 	return balance, nil
+}
+
+// getPortfolioSnapshotWithLightningData creates a portfolio snapshot prioritizing Lightning wallet data
+func (s *RealtimeBalanceService) getPortfolioSnapshotWithLightningData(date time.Time, lightningHistory []lnd.LightningBalancePoint) PortfolioSnapshot {
+	// Find the Lightning balance point closest to this date
+	var lightningLocal, lightningRemote, onchainConfirmed int64
+	
+	// Find the most recent Lightning balance point at or before this date
+	var closestPoint *lnd.LightningBalancePoint
+	for i := range lightningHistory {
+		point := &lightningHistory[i]
+		if point.Timestamp.Before(date) || point.Timestamp.Equal(date) {
+			if closestPoint == nil || point.Timestamp.After(closestPoint.Timestamp) {
+				closestPoint = point
+			}
+		}
+	}
+	
+	if closestPoint != nil {
+		lightningLocal = closestPoint.LightningLocal
+		lightningRemote = closestPoint.LightningRemote
+		onchainConfirmed = closestPoint.OnchainBalance
+	}
+
+	// Get tracked addresses balance for this date (secondary)
+	trackedTotal := int64(0)
+	addresses, err := s.database.GetOnchainAddresses()
+	if err == nil {
+		for _, addr := range addresses {
+			if !addr.Active {
+				continue
+			}
+			if balance, err := s.getHistoricalBalanceForDate(addr.Address, date); err == nil {
+				trackedTotal += balance
+			}
+		}
+	}
+
+	// Get cold storage total (current values, as these are manual entries)
+	coldTotal, _ := s.getColdStorageTotal()
+
+	// Calculate totals with Lightning as primary focus
+	totalLiquid := lightningLocal + onchainConfirmed + trackedTotal
+	totalPortfolio := totalLiquid + lightningRemote + coldTotal
+
+	return PortfolioSnapshot{
+		Timestamp:          date,
+		LightningLocal:     lightningLocal,    // Lightning channel local balance
+		LightningRemote:    lightningRemote,   // Lightning channel remote balance  
+		OnchainConfirmed:   onchainConfirmed,  // Lightning wallet on-chain balance
+		OnchainUnconfirmed: 0,                 // Would need to track unconfirmed separately
+		TrackedAddresses:   trackedTotal,      // Additional tracked addresses
+		ColdStorage:        coldTotal,         // Cold storage (manual entries)
+		TotalPortfolio:     totalPortfolio,    // Everything combined
+		TotalLiquid:        totalLiquid,       // Spendable (local + on-chain + tracked)
+	}
 }
 
 // getColdStorageTotal gets total cold storage balance from database

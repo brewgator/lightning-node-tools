@@ -131,3 +131,61 @@ type Client struct {
 	// This is a simple wrapper around lncli commands
 	// In a production setup, you might use gRPC instead
 }
+
+// OnchainTransaction represents an on-chain transaction from LND
+type OnchainTransaction struct {
+	TxHash        string   `json:"tx_hash"`
+	Amount        string   `json:"amount"`
+	NumConfirms   int64    `json:"num_confirmations"`
+	BlockHash     string   `json:"block_hash"`
+	BlockHeight   int64    `json:"block_height"`
+	TimeStamp     string   `json:"time_stamp"`
+	TotalFees     string   `json:"total_fees"`
+	DestAddresses []string `json:"dest_addresses"`
+	Label         string   `json:"label"`
+}
+
+// OnchainTransactionResponse represents the response from listontransactions
+type OnchainTransactionResponse struct {
+	Transactions []OnchainTransaction `json:"transactions"`
+}
+
+// Invoice represents a Lightning invoice
+type Invoice struct {
+	RHash           string `json:"r_hash"`
+	PaymentRequest  string `json:"payment_request"`
+	AddIndex        string `json:"add_index"`
+	PaymentAddr     string `json:"payment_addr"`
+	Settled         bool   `json:"settled"`
+	SettleDate      string `json:"settle_date"`
+	CreationDate    string `json:"creation_date"`
+	Value           string `json:"value"`
+	ValueMsat       string `json:"value_msat"`
+	AmtPaidSat      string `json:"amt_paid_sat"`
+	AmtPaidMsat     string `json:"amt_paid_msat"`
+	State           string `json:"state"`
+	Memo            string `json:"memo"`
+}
+
+// InvoiceResponse represents the response from listinvoices
+type InvoiceResponse struct {
+	Invoices []Invoice `json:"invoices"`
+}
+
+// Payment represents a Lightning payment
+type Payment struct {
+	PaymentHash     string `json:"payment_hash"`
+	PaymentPreimage string `json:"payment_preimage"`
+	ValueSat        string `json:"value_sat"`
+	ValueMsat       string `json:"value_msat"`
+	CreationDate    string `json:"creation_date"`
+	FeeSat          string `json:"fee_sat"`
+	FeeMsat         string `json:"fee_msat"`
+	PaymentRequest  string `json:"payment_request"`
+	Status          string `json:"status"`
+}
+
+// PaymentResponse represents the response from listpayments
+type PaymentResponse struct {
+	Payments []Payment `json:"payments"`
+}

@@ -84,8 +84,8 @@ func main() {
 			log.Printf("💡 Real-time balance updates will be disabled. Ensure bitcoin-cli is available and Bitcoin Core is running.")
 		} else {
 			fmt.Println("₿ Connected to Bitcoin Core node for real-time queries")
-			realtimeService = bitcoin.NewRealtimeBalanceService(bitcoinClient, database)
-			// Note: Real-time service doesn't need to start - it responds to API calls on-demand
+			// Create real-time service with LND client (will be set below if available)
+			realtimeService = bitcoin.NewRealtimeBalanceService(bitcoinClient, database, nil)
 		}
 
 		// Initialize LND client for Lightning data
@@ -95,6 +95,11 @@ func main() {
 			log.Printf("💡 Lightning balance data will not be available")
 		} else {
 			fmt.Println("⚡ Connected to LND node")
+			// Update real-time service with LND client if both Bitcoin and LND are available
+			if realtimeService != nil {
+				realtimeService = bitcoin.NewRealtimeBalanceService(bitcoinClient, database, lndClient)
+				log.Println("📊 Real-time service enhanced with Lightning data")
+			}
 		}
 	}
 
