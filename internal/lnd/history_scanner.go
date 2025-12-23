@@ -31,7 +31,7 @@ func NewLightningHistoryScanner(client *Client) *LightningHistoryScanner {
 
 // GetLightningHistory generates historical Lightning + on-chain balance progression
 func (s *LightningHistoryScanner) GetLightningHistory(from, to time.Time) ([]LightningBalancePoint, error) {
-	log.Printf("⚡ Scanning Lightning transaction history from %v to %v", 
+	log.Printf("⚡ Scanning Lightning transaction history from %v to %v",
 		from.Format("2006-01-02"), to.Format("2006-01-02"))
 
 	// Get current balances as our endpoint
@@ -64,6 +64,7 @@ func (s *LightningHistoryScanner) GetLightningHistory(from, to time.Time) ([]Lig
 	if err != nil {
 		log.Printf("⚠️  Warning: Could not get on-chain transactions: %v", err)
 	} else {
+		log.Printf("📊 Found %d total on-chain transactions", len(onchainTxs))
 		for _, tx := range onchainTxs {
 			if timestamp, err := parseTimestamp(tx.TimeStamp); err == nil {
 				if timestamp >= fromUnix && timestamp <= toUnix {
@@ -74,7 +75,11 @@ func (s *LightningHistoryScanner) GetLightningHistory(from, to time.Time) ([]Lig
 						amount:    amount,
 						txHash:    tx.TxHash,
 					})
+					log.Printf("📈 On-chain tx: %s, amount: %d, date: %s",
+						tx.TxHash[:8], amount, time.Unix(timestamp, 0).Format("2006-01-02"))
 				}
+			} else {
+				log.Printf("⚠️  Could not parse timestamp for tx %s: %s", tx.TxHash, tx.TimeStamp)
 			}
 		}
 	}
@@ -84,8 +89,11 @@ func (s *LightningHistoryScanner) GetLightningHistory(from, to time.Time) ([]Lig
 	if err != nil {
 		log.Printf("⚠️  Warning: Could not get invoices: %v", err)
 	} else {
+		log.Printf("📊 Found %d total invoices", len(invoices))
+		settledCount := 0
 		for _, invoice := range invoices {
 			if invoice.Settled && invoice.State == "SETTLED" {
+				settledCount++
 				if timestamp, err := parseTimestamp(invoice.SettleDate); err == nil {
 					if timestamp >= fromUnix && timestamp <= toUnix {
 						amount, _ := strconv.ParseInt(invoice.AmtPaidSat, 10, 64)
@@ -95,10 +103,15 @@ func (s *LightningHistoryScanner) GetLightningHistory(from, to time.Time) ([]Lig
 							amount:    amount,
 							txHash:    invoice.RHash,
 						})
+						log.Printf("⚡ Lightning receive: %d sats, date: %s",
+							amount, time.Unix(timestamp, 0).Format("2006-01-02"))
 					}
+				} else {
+					log.Printf("⚠️  Could not parse settle date for invoice: %s", invoice.SettleDate)
 				}
 			}
 		}
+		log.Printf("📊 %d settled invoices out of %d total", settledCount, len(invoices))
 	}
 
 	// Get Lightning payments (sent)
@@ -106,8 +119,11 @@ func (s *LightningHistoryScanner) GetLightningHistory(from, to time.Time) ([]Lig
 	if err != nil {
 		log.Printf("⚠️  Warning: Could not get payments: %v", err)
 	} else {
+		log.Printf("📊 Found %d total payments", len(payments))
+		succeededCount := 0
 		for _, payment := range payments {
 			if payment.Status == "SUCCEEDED" {
+				succeededCount++
 				if timestamp, err := parseTimestamp(payment.CreationDate); err == nil {
 					if timestamp >= fromUnix && timestamp <= toUnix {
 						amount, _ := strconv.ParseInt(payment.ValueSat, 10, 64)
@@ -117,10 +133,15 @@ func (s *LightningHistoryScanner) GetLightningHistory(from, to time.Time) ([]Lig
 							amount:    -amount, // Negative for outgoing
 							txHash:    payment.PaymentHash,
 						})
+						log.Printf("⚡ Lightning send: -%d sats, date: %s",
+							amount, time.Unix(timestamp, 0).Format("2006-01-02"))
 					}
+				} else {
+					log.Printf("⚠️  Could not parse creation date for payment: %s", payment.CreationDate)
 				}
 			}
 		}
+		log.Printf("📊 %d succeeded payments out of %d total", succeededCount, len(payments))
 	}
 
 	// Sort events by timestamp (oldest first)
@@ -166,28 +187,59 @@ func (s *LightningHistoryScanner) GetLightningHistory(from, to time.Time) ([]Lig
 			lightningLocal -= event.amount // Reverse outgoing Lightning (amount is already negative)
 		}
 
-		balancePoints = append([]LightningBalancePoint{{
+		point := LightningBalancePoint{
 			Timestamp:         eventTime,
 			OnchainBalance:    onchainBalance,
 			LightningLocal:    lightningLocal,
 			LightningRemote:   lightningRemote,
 			TransactionType:   event.txType,
 			TransactionAmount: event.amount,
-		}}, balancePoints...)
+		}
+		balancePoints = append([]LightningBalancePoint{point}, balancePoints...)
+		log.Printf("📊 Added balance point: %s, on-chain: %d, local: %d, remote: %d",
+			eventTime.Format("2006-01-02"), onchainBalance, lightningLocal, lightningRemote)
 	}
 
-	// Add starting point if no transactions at start date
-	if len(allEvents) == 0 || allEvents[0].timestamp > fromUnix {
-		balancePoints = append([]LightningBalancePoint{{
-			Timestamp:       from,
-			OnchainBalance:  onchainBalance,
-			LightningLocal:  lightningLocal,
-			LightningRemote: lightningRemote,
-			TransactionType: "start",
-		}}, balancePoints...)
+	// If we have no transactions, create a simple progression using current balance
+	if len(allEvents) == 0 {
+		log.Println("📊 No Lightning transactions found, creating simple balance progression")
+
+		// Create balance points showing current balance maintained over time
+		balancePoints = []LightningBalancePoint{
+			{
+				Timestamp:       from,
+				OnchainBalance:  currentOnchain,
+				LightningLocal:  currentLocal,
+				LightningRemote: currentRemote,
+				TransactionType: "start",
+			},
+			{
+				Timestamp:       to,
+				OnchainBalance:  currentOnchain,
+				LightningLocal:  currentLocal,
+				LightningRemote: currentRemote,
+				TransactionType: "current",
+			},
+		}
+	} else {
+		// Add starting point if no transactions at start date
+		if allEvents[0].timestamp > fromUnix {
+			balancePoints = append([]LightningBalancePoint{{
+				Timestamp:       from,
+				OnchainBalance:  onchainBalance,
+				LightningLocal:  lightningLocal,
+				LightningRemote: lightningRemote,
+				TransactionType: "start",
+			}}, balancePoints...)
+		}
 	}
 
 	log.Printf("✅ Generated %d Lightning balance points", len(balancePoints))
+	for i, point := range balancePoints {
+		log.Printf("  Point %d: %s - on-chain: %d, local: %d, remote: %d",
+			i+1, point.Timestamp.Format("2006-01-02"),
+			point.OnchainBalance, point.LightningLocal, point.LightningRemote)
+	}
 	return balancePoints, nil
 }
 

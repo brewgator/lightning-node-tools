@@ -413,7 +413,7 @@ func (s *RealtimeBalanceService) getHistoricalBalanceForDate(address string, tar
 func (s *RealtimeBalanceService) getPortfolioSnapshotWithLightningData(date time.Time, lightningHistory []lnd.LightningBalancePoint) PortfolioSnapshot {
 	// Find the Lightning balance point closest to this date
 	var lightningLocal, lightningRemote, onchainConfirmed int64
-	
+
 	// Find the most recent Lightning balance point at or before this date
 	var closestPoint *lnd.LightningBalancePoint
 	for i := range lightningHistory {
@@ -424,7 +424,7 @@ func (s *RealtimeBalanceService) getPortfolioSnapshotWithLightningData(date time
 			}
 		}
 	}
-	
+
 	if closestPoint != nil {
 		lightningLocal = closestPoint.LightningLocal
 		lightningRemote = closestPoint.LightningRemote
@@ -454,14 +454,14 @@ func (s *RealtimeBalanceService) getPortfolioSnapshotWithLightningData(date time
 
 	return PortfolioSnapshot{
 		Timestamp:          date,
-		LightningLocal:     lightningLocal,    // Lightning channel local balance
-		LightningRemote:    lightningRemote,   // Lightning channel remote balance  
-		OnchainConfirmed:   onchainConfirmed,  // Lightning wallet on-chain balance
-		OnchainUnconfirmed: 0,                 // Would need to track unconfirmed separately
-		TrackedAddresses:   trackedTotal,      // Additional tracked addresses
-		ColdStorage:        coldTotal,         // Cold storage (manual entries)
-		TotalPortfolio:     totalPortfolio,    // Everything combined
-		TotalLiquid:        totalLiquid,       // Spendable (local + on-chain + tracked)
+		LightningLocal:     lightningLocal,   // Lightning channel local balance
+		LightningRemote:    lightningRemote,  // Lightning channel remote balance
+		OnchainConfirmed:   onchainConfirmed, // Lightning wallet on-chain balance
+		OnchainUnconfirmed: 0,                // Would need to track unconfirmed separately
+		TrackedAddresses:   trackedTotal,     // Additional tracked addresses
+		ColdStorage:        coldTotal,        // Cold storage (manual entries)
+		TotalPortfolio:     totalPortfolio,   // Everything combined
+		TotalLiquid:        totalLiquid,      // Spendable (local + on-chain + tracked)
 	}
 }
 

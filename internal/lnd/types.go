@@ -152,19 +152,19 @@ type OnchainTransactionResponse struct {
 
 // Invoice represents a Lightning invoice
 type Invoice struct {
-	RHash           string `json:"r_hash"`
-	PaymentRequest  string `json:"payment_request"`
-	AddIndex        string `json:"add_index"`
-	PaymentAddr     string `json:"payment_addr"`
-	Settled         bool   `json:"settled"`
-	SettleDate      string `json:"settle_date"`
-	CreationDate    string `json:"creation_date"`
-	Value           string `json:"value"`
-	ValueMsat       string `json:"value_msat"`
-	AmtPaidSat      string `json:"amt_paid_sat"`
-	AmtPaidMsat     string `json:"amt_paid_msat"`
-	State           string `json:"state"`
-	Memo            string `json:"memo"`
+	RHash          string `json:"r_hash"`
+	PaymentRequest string `json:"payment_request"`
+	AddIndex       string `json:"add_index"`
+	PaymentAddr    string `json:"payment_addr"`
+	Settled        bool   `json:"settled"`
+	SettleDate     string `json:"settle_date"`
+	CreationDate   string `json:"creation_date"`
+	Value          string `json:"value"`
+	ValueMsat      string `json:"value_msat"`
+	AmtPaidSat     string `json:"amt_paid_sat"`
+	AmtPaidMsat    string `json:"amt_paid_msat"`
+	State          string `json:"state"`
+	Memo           string `json:"memo"`
 }
 
 // InvoiceResponse represents the response from listinvoices
