@@ -224,59 +224,115 @@ func (s *RealtimeBalanceService) GetAddressHistory(address string, from, to time
 	return s.txScanner.GetBalanceHistory(address, from, to)
 }
 
-// GetPortfolioHistory generates real-time portfolio history
+// GetPortfolioHistory generates real-time portfolio history based on actual transaction dates
 func (s *RealtimeBalanceService) GetPortfolioHistory(from, to time.Time) ([]PortfolioSnapshot, error) {
-	// For now, we'll generate daily snapshots by scanning transaction history
-	// This is a simplified implementation - in practice, you might want to optimize this
-	log.Printf("📈 Generating portfolio history from %v to %v", from.Format("2006-01-02"), to.Format("2006-01-02"))
+	log.Printf("📈 Generating transaction-based portfolio history from %v to %v", from.Format("2006-01-02"), to.Format("2006-01-02"))
 
-	var snapshots []PortfolioSnapshot
+	// Get all addresses to analyze
+	addresses, err := s.database.GetOnchainAddresses()
+	if err != nil {
+		return nil, err
+	}
 
-	// Generate daily snapshots
-	current := from
-	for current.Before(to) || current.Equal(to) {
-		snapshot, err := s.getPortfolioSnapshotForDate(current)
+	// Collect all transaction dates across all addresses to create snapshots at meaningful points
+	transactionDates := make(map[string]bool)
+
+	for _, addr := range addresses {
+		if !addr.Active {
+			continue
+		}
+
+		transactions, err := s.txScanner.GetAddressTransactions(addr.Address)
 		if err != nil {
-			log.Printf("⚠️  Failed to get snapshot for %v: %v", current.Format("2006-01-02"), err)
+			log.Printf("⚠️  Failed to get transactions for %s: %v", addr.Address, err)
+			continue
+		}
+
+		// Add dates of transactions within our range
+		fromUnix := from.Unix()
+		toUnix := to.Unix()
+		for _, tx := range transactions {
+			if tx.Blocktime >= fromUnix && tx.Blocktime <= toUnix {
+				txDate := time.Unix(tx.Blocktime, 0).Format("2006-01-02")
+				transactionDates[txDate] = true
+			}
+		}
+	}
+
+	// Create snapshots for transaction dates + start and end dates
+	var snapshots []PortfolioSnapshot
+	dateSet := make(map[string]time.Time)
+
+	// Always include start and end dates
+	dateSet[from.Format("2006-01-02")] = from
+	dateSet[to.Format("2006-01-02")] = to
+
+	// Add all transaction dates
+	for dateStr := range transactionDates {
+		if date, err := time.Parse("2006-01-02", dateStr); err == nil {
+			dateSet[dateStr] = date
+		}
+	}
+
+	// Convert to sorted slice
+	var sortedDates []time.Time
+	for _, date := range dateSet {
+		sortedDates = append(sortedDates, date)
+	}
+
+	// Sort dates chronologically
+	for i := 0; i < len(sortedDates)-1; i++ {
+		for j := i + 1; j < len(sortedDates); j++ {
+			if sortedDates[i].After(sortedDates[j]) {
+				sortedDates[i], sortedDates[j] = sortedDates[j], sortedDates[i]
+			}
+		}
+	}
+
+	log.Printf("📊 Creating %d snapshots for transaction dates", len(sortedDates))
+
+	// Generate snapshots for each significant date
+	for _, date := range sortedDates {
+		snapshot, err := s.getPortfolioSnapshotForDate(date)
+		if err != nil {
+			log.Printf("⚠️  Failed to get snapshot for %v: %v", date.Format("2006-01-02"), err)
 			// Continue with empty snapshot for this date
 			snapshot = &PortfolioSnapshot{
-				Timestamp: current,
+				Timestamp: date,
 			}
 		}
 		snapshots = append(snapshots, *snapshot)
-		current = current.AddDate(0, 0, 1) // Next day
 	}
 
-	log.Printf("✅ Generated %d portfolio snapshots", len(snapshots))
+	log.Printf("✅ Generated %d portfolio snapshots based on transaction history", len(snapshots))
 	return snapshots, nil
 }
 
-// getPortfolioSnapshotForDate calculates portfolio value for a specific date
+// getPortfolioSnapshotForDate calculates portfolio value for a specific date using historical transactions
 func (s *RealtimeBalanceService) getPortfolioSnapshotForDate(date time.Time) (*PortfolioSnapshot, error) {
-	// This is a simplified approach - we'll use current balances as approximation
-	// For true historical accuracy, we'd need to scan transactions up to that date
-
 	addresses, err := s.database.GetOnchainAddresses()
 	if err != nil {
 		return nil, err
 	}
 
 	var trackedTotal int64
+
+	// Calculate historical balance for each address by scanning transactions up to this date
 	for _, addr := range addresses {
 		if !addr.Active {
 			continue
 		}
 
-		// For simplicity, use current balance
-		// TODO: Implement proper historical balance calculation by scanning transactions
-		result, err := s.GetAddressBalance(addr.Address)
+		balance, err := s.getHistoricalBalanceForDate(addr.Address, date)
 		if err != nil {
-			log.Printf("⚠️  Failed to get balance for %s: %v", addr.Address, err)
+			log.Printf("⚠️  Failed to get historical balance for %s on %v: %v", addr.Address, date.Format("2006-01-02"), err)
 			continue
 		}
-		trackedTotal += result.Balance
+		trackedTotal += balance
 	}
 
+	// For cold storage, we only have manual entries, so use current values
+	// TODO: Could implement historical cold storage tracking if needed
 	coldTotal, _ := s.getColdStorageTotal()
 
 	return &PortfolioSnapshot{
@@ -286,6 +342,50 @@ func (s *RealtimeBalanceService) getPortfolioSnapshotForDate(date time.Time) (*P
 		TotalPortfolio:   trackedTotal + coldTotal,
 		TotalLiquid:      trackedTotal,
 	}, nil
+}
+
+// getHistoricalBalanceForDate calculates an address balance as of a specific date
+func (s *RealtimeBalanceService) getHistoricalBalanceForDate(address string, targetDate time.Time) (int64, error) {
+	// Get all transactions for this address
+	transactions, err := s.txScanner.GetAddressTransactions(address)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get transactions: %w", err)
+	}
+
+	// If no transactions exist, balance is always zero
+	if len(transactions) == 0 {
+		return 0, nil
+	}
+
+	// Find the first transaction date for this address
+	var firstTxTime int64 = 0
+	for _, tx := range transactions {
+		if firstTxTime == 0 || tx.Blocktime < firstTxTime {
+			firstTxTime = tx.Blocktime
+		}
+	}
+
+	// If target date is before first transaction, balance was zero
+	targetUnix := targetDate.Unix()
+	if targetUnix < firstTxTime {
+		return 0, nil
+	}
+
+	// Calculate balance by replaying transactions up to the target date
+	var balance int64
+
+	for _, tx := range transactions {
+		// Skip transactions that happened after our target date
+		if tx.Blocktime > targetUnix {
+			continue
+		}
+
+		// Add the transaction amount to balance
+		amountSats := int64(tx.Amount * 100000000)
+		balance += amountSats
+	}
+
+	return balance, nil
 }
 
 // getColdStorageTotal gets total cold storage balance from database
