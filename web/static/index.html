@@ -544,17 +544,32 @@
             document.getElementById('dashboard').style.display = 'none';
         }
 
-        function updateCurrentBalances(data) {
+        async function updateCurrentBalances(data) {
             const container = document.getElementById('current-balances');
-            const total = data.total_portfolio;
 
-            // Calculate percentages for each source (based on actual portfolio calculation)
+            // Calculate base components
             const components = calculatePortfolioComponents(data);
             const lightningTotal = components.lightning;
             const onchainTotal = components.onchain;
 
+            // Fetch Strike balance
+            let strikeTotal = 0;
+            try {
+                const strikeResponse = await fetch('/api/strike/balance/current?currency=BTC');
+                const strikeResult = await strikeResponse.json();
+                if (strikeResult.success && strikeResult.data) {
+                    strikeTotal = strikeResult.data.available;
+                }
+            } catch (error) {
+                console.error('Failed to fetch Strike balance for portfolio:', error);
+            }
+
+            // Calculate total including Strike
+            const total = lightningTotal + onchainTotal + strikeTotal;
+
             const lightningPercent = total > 0 ? ((lightningTotal / total) * 100).toFixed(1) : 0;
             const onchainPercent = total > 0 ? ((onchainTotal / total) * 100).toFixed(1) : 0;
+            const strikePercent = total > 0 ? ((strikeTotal / total) * 100).toFixed(1) : 0;
 
             container.innerHTML = `
                 <div class="balance-item">
@@ -568,6 +583,10 @@
                 <div class="balance-item">
                     <span class="balance-label">🔗 On-chain (${onchainPercent}%):</span>
                     <span class="balance-value">${formatSats(onchainTotal)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="balance-label">⚡ Strike (${strikePercent}%):</span>
+                    <span class="balance-value">${formatSats(strikeTotal)}</span>
                 </div>
                 <div class="balance-item">
                     <span class="balance-label">Last Updated:</span>
@@ -704,25 +723,56 @@
                 showChartLoading('portfolioChart');
 
                 const daysParam = currentPortfolioRange === 'all' ? '?days=all' : `?days=${currentPortfolioRange}`;
-                const response = await fetch(`/api/portfolio/history${daysParam}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
-                }
-                const result = await response.json();
 
-                if (!result.success || !result.data || result.data.length === 0) {
+                // Fetch both portfolio and Strike history
+                const [portfolioResponse, strikeResponse] = await Promise.all([
+                    fetch(`/api/portfolio/history${daysParam}`),
+                    fetch(`/api/strike/balance/history?currency=BTC${daysParam.replace('?', '&')}`)
+                ]);
+
+                if (!portfolioResponse.ok) {
+                    throw new Error(`HTTP error ${portfolioResponse.status}: ${portfolioResponse.statusText}`);
+                }
+
+                const portfolioResult = await portfolioResponse.json();
+
+                if (!portfolioResult.success || !portfolioResult.data || portfolioResult.data.length === 0) {
                     hideChartLoading('portfolioChart');
-                    console.error('No portfolio history data available:', result.error || 'Empty dataset');
+                    console.error('No portfolio history data available:', portfolioResult.error || 'Empty dataset');
                     return;
+                }
+
+                // Get Strike data (may not be available)
+                let strikeData = [];
+                let strikeBalanceByDate = {};
+                if (strikeResponse.ok) {
+                    const strikeResult = await strikeResponse.json();
+                    if (strikeResult.success && strikeResult.data && strikeResult.data.labels) {
+                        // Create a map of date -> strike balance
+                        strikeResult.data.labels.forEach((label, idx) => {
+                            const strikeDate = label.split(' ')[0]; // Get just the date part
+                            strikeBalanceByDate[strikeDate] = strikeResult.data.datasets[0].data[idx] || 0;
+                        });
+                    }
                 }
 
                 const ctx = document.getElementById('portfolioChart').getContext('2d');
 
                 // Prepare data
-                const labels = result.data.map(item => new Date(item.timestamp).toLocaleDateString());
-                const portfolioData = result.data.map(item => item.total_portfolio);
-                const lightningData = result.data.map(item => calculatePortfolioComponents(item).lightning);
-                const onchainData = result.data.map(item => calculatePortfolioComponents(item).onchain);
+                const labels = portfolioResult.data.map(item => new Date(item.timestamp).toLocaleDateString());
+                const lightningData = portfolioResult.data.map(item => calculatePortfolioComponents(item).lightning);
+                const onchainData = portfolioResult.data.map(item => calculatePortfolioComponents(item).onchain);
+
+                // Match Strike data to portfolio dates
+                strikeData = labels.map(label => {
+                    return strikeBalanceByDate[label] || 0;
+                });
+
+                // Calculate total portfolio including Strike
+                const portfolioData = portfolioResult.data.map((item, idx) => {
+                    const baseTotal = calculatePortfolioComponents(item).lightning + calculatePortfolioComponents(item).onchain;
+                    return baseTotal + (strikeData[idx] || 0);
+                });
 
                 // Destroy existing chart
                 if (portfolioChart) {
@@ -754,6 +804,14 @@
                             data: onchainData,
                             borderColor: '#FF6B35',
                             backgroundColor: '#FF6B3520',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                        }, {
+                            label: '⚡ Strike',
+                            data: strikeData,
+                            borderColor: '#FF9F40',
+                            backgroundColor: '#FF9F4020',
                             borderWidth: 2,
                             fill: false,
                             tension: 0.3,
