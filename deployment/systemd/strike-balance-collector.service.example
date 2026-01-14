@@ -1,0 +1,35 @@
+[Unit]
+Description=Strike Balance Collector Service
+Documentation=https://github.com/brewgator/lightning-node-tools
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory={{WORKING_DIRECTORY}}
+ExecStart={{WORKING_DIRECTORY}}/bin/strike-balance-collector \
+    --db={{WORKING_DIRECTORY}}/data/portfolio.db \
+    --interval=15m
+
+# Environment variables
+# Option 1: Set directly in this file
+Environment="STRIKE_API_KEY=your_strike_api_key_here"
+# Option 2: Or configure in .env file at {{WORKING_DIRECTORY}}/.env
+
+# Restart configuration
+Restart=on-failure
+RestartSec=30s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=strike-balance-collector
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths={{WORKING_DIRECTORY}}/data
+
+[Install]
+WantedBy=multi-user.target

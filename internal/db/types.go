@@ -96,3 +96,14 @@ type ColdStorageBalanceHistory struct {
 	IsVerified      bool      `json:"is_verified" db:"is_verified"`
 	Notes           string    `json:"notes" db:"notes"`
 }
+
+// StrikeBalanceSnapshot represents Strike account balance at a point in time
+type StrikeBalanceSnapshot struct {
+	ID        int64     `json:"id" db:"id"`
+	Timestamp time.Time `json:"timestamp" db:"timestamp"`
+	Currency  string    `json:"currency" db:"currency"`   // "BTC", "USD", etc.
+	Available int64     `json:"available" db:"available"` // Sats for BTC, cents for fiat
+	Total     int64     `json:"total" db:"total"`
+	Pending   int64     `json:"pending" db:"pending"`
+	Reserved  int64     `json:"reserved" db:"reserved"`
+}

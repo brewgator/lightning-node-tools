@@ -162,6 +162,10 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/offline/accounts/{id:[0-9]+}", s.handleDeleteOfflineAccount).Methods("DELETE")
 	api.HandleFunc("/offline/history", s.handleOfflineHistory).Methods("GET")
 
+	// Strike balance endpoints
+	api.HandleFunc("/strike/balance/current", s.handleStrikeCurrentBalance).Methods("GET")
+	api.HandleFunc("/strike/balance/history", s.handleStrikeBalanceHistory).Methods("GET")
+
 	// Health check
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
 
@@ -1062,6 +1066,113 @@ func (s *Server) handleOfflineHistory(w http.ResponseWriter, r *http.Request) {
 	// Update the slices in the map
 	chartData["labels"] = labels
 	chartData["datasets"].([]map[string]interface{})[0]["data"] = data
+
+	s.writeJSON(w, APIResponse{Success: true, Data: chartData})
+}
+
+// handleStrikeCurrentBalance handles GET /api/strike/balance/current
+func (s *Server) handleStrikeCurrentBalance(w http.ResponseWriter, r *http.Request) {
+	// Get currency from query parameter (default to BTC)
+	currency := r.URL.Query().Get("currency")
+	if currency == "" {
+		currency = "BTC"
+	}
+
+	// Get latest Strike balance from database
+	balance, err := s.db.GetLatestStrikeBalance(currency)
+	if err != nil {
+		log.Printf("handleStrikeCurrentBalance: failed to get latest Strike balance: %v", err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get current Strike balance")
+		return
+	}
+
+	s.writeJSON(w, APIResponse{Success: true, Data: balance})
+}
+
+// handleStrikeBalanceHistory handles GET /api/strike/balance/history
+func (s *Server) handleStrikeBalanceHistory(w http.ResponseWriter, r *http.Request) {
+	// Get currency from query parameter (default to BTC)
+	currency := r.URL.Query().Get("currency")
+	if currency == "" {
+		currency = "BTC"
+	}
+
+	// Parse days parameter
+	daysStr := r.URL.Query().Get("days")
+	days := 30 // default
+	var from, to time.Time
+
+	if daysStr == "all" {
+		// For "all" data, get from the earliest possible date
+		to = time.Now()
+		genesisDate, _ := time.Parse("2006-01-02", BitcoinGenesisDate)
+		from = genesisDate
+	} else if daysStr != "" {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= MaxHistoryDays {
+			days = d
+		} else {
+			s.writeError(w, http.StatusBadRequest, "Invalid days parameter. Must be a number between 1 and "+strconv.Itoa(MaxHistoryDays)+", or 'all'")
+			return
+		}
+		// Calculate time range
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
+	} else {
+		// Default case
+		to = time.Now()
+		from = to.AddDate(0, 0, -days)
+	}
+
+	balances, err := s.db.GetStrikeBalanceHistory(currency, from, to)
+	if err != nil {
+		log.Printf("handleStrikeBalanceHistory: failed to get Strike balance history for %s: %v", currency, err)
+		s.writeError(w, http.StatusInternalServerError, "Failed to get Strike balance history")
+		return
+	}
+
+	// Format data for Chart.js consumption
+	chartData := map[string]interface{}{
+		"labels": make([]string, 0, len(balances)),
+		"datasets": []map[string]interface{}{
+			{
+				"label":           fmt.Sprintf("Available Balance (%s)", currency),
+				"data":            make([]int64, 0, len(balances)),
+				"backgroundColor": "rgba(255, 159, 64, 0.2)",
+				"borderColor":     "rgba(255, 159, 64, 1)",
+				"borderWidth":     2,
+				"fill":            false,
+			},
+			{
+				"label":           fmt.Sprintf("Total Balance (%s)", currency),
+				"data":            make([]int64, 0, len(balances)),
+				"backgroundColor": "rgba(54, 162, 235, 0.2)",
+				"borderColor":     "rgba(54, 162, 235, 1)",
+				"borderWidth":     2,
+				"fill":            false,
+			},
+		},
+		"metadata": map[string]interface{}{
+			"currency":       currency,
+			"days_requested": days,
+			"days_with_data": len(balances),
+		},
+	}
+
+	// Populate chart data
+	labels := chartData["labels"].([]string)
+	availableData := chartData["datasets"].([]map[string]interface{})[0]["data"].([]int64)
+	totalData := chartData["datasets"].([]map[string]interface{})[1]["data"].([]int64)
+
+	for _, balance := range balances {
+		labels = append(labels, balance.Timestamp.Format("2006-01-02 15:04"))
+		availableData = append(availableData, balance.Available)
+		totalData = append(totalData, balance.Total)
+	}
+
+	// Update the slices in the map
+	chartData["labels"] = labels
+	chartData["datasets"].([]map[string]interface{})[0]["data"] = availableData
+	chartData["datasets"].([]map[string]interface{})[1]["data"] = totalData
 
 	s.writeJSON(w, APIResponse{Success: true, Data: chartData})
 }
