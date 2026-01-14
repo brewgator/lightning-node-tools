@@ -866,6 +866,7 @@ func (db *Database) GetColdStorageEntriesWithWarnings() ([]map[string]interface{
 
 	return entries, rows.Err()
 }
+
 // InsertStrikeBalanceSnapshot stores a Strike balance snapshot
 func (db *Database) InsertStrikeBalanceSnapshot(snapshot *StrikeBalanceSnapshot) error {
 	tableName := db.getTableName("strike_balance_snapshots")

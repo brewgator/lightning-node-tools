@@ -243,18 +243,18 @@ func (c *BalanceCollector) collectMockBalances() error {
 		{
 			Timestamp: now,
 			Currency:  "BTC",
-			Available: 5000000,  // 0.05 BTC in sats
-			Total:     5100000,  // 0.051 BTC in sats
-			Pending:   50000,    // 0.0005 BTC in sats
-			Reserved:  50000,    // 0.0005 BTC in sats
+			Available: 5000000, // 0.05 BTC in sats
+			Total:     5100000, // 0.051 BTC in sats
+			Pending:   50000,   // 0.0005 BTC in sats
+			Reserved:  50000,   // 0.0005 BTC in sats
 		},
 		{
 			Timestamp: now,
 			Currency:  "USD",
-			Available: 100000,  // $1000.00 in cents
-			Total:     110000,  // $1100.00 in cents
-			Pending:   5000,    // $50.00 in cents
-			Reserved:  5000,    // $50.00 in cents
+			Available: 100000, // $1000.00 in cents
+			Total:     110000, // $1100.00 in cents
+			Pending:   5000,   // $50.00 in cents
+			Reserved:  5000,   // $50.00 in cents
 		},
 	}
 
