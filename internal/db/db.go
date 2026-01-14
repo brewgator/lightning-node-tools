@@ -243,6 +243,34 @@ func (db *Database) initTables() error {
 
 		`CREATE INDEX IF NOT EXISTS idx_cold_storage_history_mock_timestamp ON cold_storage_history_mock(timestamp);`,
 		`CREATE INDEX IF NOT EXISTS idx_cold_storage_history_mock_account_id ON cold_storage_history_mock(account_id);`,
+
+		// Strike balance tracking tables
+		`CREATE TABLE IF NOT EXISTS strike_balance_snapshots (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			timestamp DATETIME NOT NULL,
+			currency TEXT NOT NULL,
+			available INTEGER NOT NULL,
+			total INTEGER NOT NULL,
+			pending INTEGER NOT NULL,
+			reserved INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_strike_balance_timestamp ON strike_balance_snapshots(timestamp);`,
+		`CREATE INDEX IF NOT EXISTS idx_strike_balance_currency ON strike_balance_snapshots(currency);`,
+
+		// Mock table for Strike balances
+		`CREATE TABLE IF NOT EXISTS strike_balance_snapshots_mock (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			timestamp DATETIME NOT NULL,
+			currency TEXT NOT NULL,
+			available INTEGER NOT NULL,
+			total INTEGER NOT NULL,
+			pending INTEGER NOT NULL,
+			reserved INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_strike_balance_mock_timestamp ON strike_balance_snapshots_mock(timestamp);`,
+		`CREATE INDEX IF NOT EXISTS idx_strike_balance_mock_currency ON strike_balance_snapshots_mock(currency);`,
 	}
 
 	for _, query := range queries {
@@ -837,4 +865,92 @@ func (db *Database) GetColdStorageEntriesWithWarnings() ([]map[string]interface{
 	}
 
 	return entries, rows.Err()
+}
+// InsertStrikeBalanceSnapshot stores a Strike balance snapshot
+func (db *Database) InsertStrikeBalanceSnapshot(snapshot *StrikeBalanceSnapshot) error {
+	tableName := db.getTableName("strike_balance_snapshots")
+
+	query := fmt.Sprintf(`
+		INSERT INTO %s (timestamp, currency, available, total, pending, reserved)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, tableName)
+
+	_, err := db.conn.Exec(query,
+		snapshot.Timestamp,
+		snapshot.Currency,
+		snapshot.Available,
+		snapshot.Total,
+		snapshot.Pending,
+		snapshot.Reserved,
+	)
+
+	return err
+}
+
+// GetLatestStrikeBalance gets the most recent Strike balance for a currency
+func (db *Database) GetLatestStrikeBalance(currency string) (*StrikeBalanceSnapshot, error) {
+	tableName := db.getTableName("strike_balance_snapshots")
+
+	query := fmt.Sprintf(`
+		SELECT id, timestamp, currency, available, total, pending, reserved
+		FROM %s
+		WHERE currency = ?
+		ORDER BY timestamp DESC
+		LIMIT 1
+	`, tableName)
+
+	var snapshot StrikeBalanceSnapshot
+	err := db.conn.QueryRow(query, currency).Scan(
+		&snapshot.ID,
+		&snapshot.Timestamp,
+		&snapshot.Currency,
+		&snapshot.Available,
+		&snapshot.Total,
+		&snapshot.Pending,
+		&snapshot.Reserved,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &snapshot, nil
+}
+
+// GetStrikeBalanceHistory retrieves historical Strike balance snapshots
+func (db *Database) GetStrikeBalanceHistory(currency string, from, to time.Time) ([]*StrikeBalanceSnapshot, error) {
+	tableName := db.getTableName("strike_balance_snapshots")
+
+	query := fmt.Sprintf(`
+		SELECT id, timestamp, currency, available, total, pending, reserved
+		FROM %s
+		WHERE currency = ? AND timestamp >= ? AND timestamp <= ?
+		ORDER BY timestamp ASC
+	`, tableName)
+
+	rows, err := db.conn.Query(query, currency, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var snapshots []*StrikeBalanceSnapshot
+	for rows.Next() {
+		var snapshot StrikeBalanceSnapshot
+		err := rows.Scan(
+			&snapshot.ID,
+			&snapshot.Timestamp,
+			&snapshot.Currency,
+			&snapshot.Available,
+			&snapshot.Total,
+			&snapshot.Pending,
+			&snapshot.Reserved,
+		)
+		if err != nil {
+			return nil, err
+		}
+		snapshots = append(snapshots, &snapshot)
+	}
+
+	return snapshots, rows.Err()
 }

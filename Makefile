@@ -1,10 +1,10 @@
-.PHONY: build clean all channel-manager telegram-monitor dashboard-api forwarding-collector dashboard deploy install-services test test-verbose test-coverage test-unit test-integration test-api test-forwarding test-db test-utils test-race test-clean
+.PHONY: build clean all channel-manager telegram-monitor dashboard-api forwarding-collector strike-balance-collector dashboard deploy install-services test test-verbose test-coverage test-unit test-integration test-api test-forwarding test-db test-utils test-race test-clean
 
 # Default target - build all tools
 all: build
 
 # Build all tools
-build: channel-manager telegram-monitor portfolio-api forwarding-collector webhook-deployer
+build: channel-manager telegram-monitor portfolio-api forwarding-collector strike-balance-collector webhook-deployer
 
 # Build channel-manager
 channel-manager:
@@ -30,6 +30,12 @@ forwarding-collector:
 	@echo "Building forwarding-collector..."
 	@mkdir -p bin
 	go build -o bin/forwarding-collector ./services/lightning/forwarding-collector
+
+# Build strike-balance-collector
+strike-balance-collector:
+	@echo "Building strike-balance-collector..."
+	@mkdir -p bin
+	go build -o bin/strike-balance-collector ./services/strike/balance-collector
 
 # Build webhook-deployer
 webhook-deployer:
@@ -163,6 +169,7 @@ help:
 	@echo "  telegram-monitor    - Build only telegram-monitor"
 	@echo "  portfolio-api       - Build only portfolio-api"
 	@echo "  forwarding-collector - Build only forwarding-collector"
+	@echo "  strike-balance-collector - Build only strike-balance-collector"
 	@echo "  portfolio           - Build complete portfolio system"
 	@echo "  install-services    - Install/update systemd service files"
 	@echo "  install-services-auto - Install systemd services automatically (recommended)"
