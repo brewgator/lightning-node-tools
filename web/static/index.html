@@ -273,7 +273,7 @@
     <div class="container">
         <header>
             <h1>⚡ Bitcoin Portfolio Dashboard</h1>
-            <p class="subtitle">Real-time Lightning & On-chain Balance Tracking</p>
+            <p class="subtitle">Live Transaction-Based Balance Tracking (Powered by Bitcoin Core)</p>
 
             <div class="nav-tabs" role="tablist">
                 <button type="button"
@@ -324,7 +324,7 @@
             </div>
         </header>
 
-        <div id="status" class="status loading">Loading portfolio data...</div>
+        <div id="status" class="status loading">Scanning Bitcoin Core for real-time portfolio data...</div>
 
         <div id="dashboard" style="display: none;">
             <div class="grid">
@@ -368,7 +368,7 @@
                     <button class="date-range-btn portfolio-range" data-days="all">ALL</button>
                 </div>
                 <div class="chart-container">
-                    <div class="chart-loading" id="portfolioChartLoading">⏳ Loading chart data...</div>
+                    <div class="chart-loading" id="portfolioChartLoading">⏳ Scanning transaction history...</div>
                     <canvas id="portfolioChart"></canvas>
                 </div>
             </div>

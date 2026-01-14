@@ -37,8 +37,7 @@ fi
 
 # List of services to install
 services=(
-    "bitcoin-dashboard-api"
-    "bitcoin-dashboard-collector" 
+    "bitcoin-portfolio-api"
     "bitcoin-forwarding-collector"
     "webhook-deployer"
 )

@@ -3,6 +3,7 @@ package bitcoin
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -23,6 +24,7 @@ var allowedCommands = map[string]bool{
 	"validateaddress":   true,
 	"getaddressinfo":    true,
 	"rescanblockchain":  true,
+	"getwalletinfo":     true,
 }
 
 // addressRegex matches valid Bitcoin addresses (common formats)
@@ -69,7 +71,7 @@ func sanitizeString(s string) error {
 	return nil
 }
 
-// NewClient creates a new Bitcoin Core client
+// NewClient creates a new Bitcoin Core client and ensures tracking wallet exists
 func NewClient() (*Client, error) {
 	// Test Bitcoin Core connectivity (without wallet)
 	// Note: This command doesn't involve user input and is safe to call directly
@@ -79,6 +81,19 @@ func NewClient() (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Bitcoin Core: %w", err)
 	}
+
+	// Set up the tracking wallet for address monitoring
+	err = SetupTrackingWallet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to set up tracking wallet: %w", err)
+	}
+
+	// Ensure wallet is loaded
+	err = LoadTrackingWallet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tracking wallet: %w", err)
+	}
+
 	return &Client{}, nil
 }
 
@@ -324,4 +339,100 @@ func (c *Client) RescanBlockchain(startHeight int64) error {
 	startHeightStr := strconv.FormatInt(startHeight, 10)
 	_, err := RunBitcoinCLI("rescanblockchain", startHeightStr)
 	return err
+}
+
+// SetupTrackingWallet ensures the tracker_watchonly wallet exists and is loaded
+func SetupTrackingWallet() error {
+	log.Println("🔧 Setting up Bitcoin Core tracking wallet...")
+
+	// First try to load existing wallet if it exists
+	err := LoadTrackingWallet()
+	if err == nil {
+		log.Println("✅ Tracking wallet loaded successfully")
+		return nil
+	}
+
+	log.Printf("📝 Wallet not loaded, checking if it exists on disk...")
+
+	// Try to create the wallet - this will fail if it already exists, which is fine
+	cmd := exec.Command("bitcoin-cli", "createwallet", "tracker_watchonly", "false", "false", "", "false", "true", "false")
+	output, err := cmd.Output()
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			stderr := string(exitError.Stderr)
+			// If wallet already exists, try to load it
+			if containsStr(stderr, "Database already exists") || containsStr(stderr, "already exists") {
+				log.Println("📁 Wallet database already exists, attempting to load...")
+				return LoadTrackingWallet()
+			}
+			return fmt.Errorf("failed to create tracking wallet: %v, stderr: %s", err, stderr)
+		}
+		return fmt.Errorf("failed to create tracking wallet: %v", err)
+	}
+
+	log.Printf("✅ Created tracking wallet successfully: %s", string(output))
+
+	// Ensure it's loaded after creation
+	return LoadTrackingWallet()
+}
+
+// LoadTrackingWallet loads the tracking wallet if it exists but isn't loaded
+func LoadTrackingWallet() error {
+	log.Println("🔄 Attempting to load tracking wallet...")
+
+	// First check if it's already loaded by testing wallet info
+	cmd := exec.Command("bitcoin-cli", "-rpcwallet=tracker_watchonly", "getwalletinfo")
+	_, err := cmd.Output()
+	if err == nil {
+		log.Println("✅ Tracking wallet already loaded and accessible")
+		return nil
+	}
+
+	// Try to load the wallet
+	cmd = exec.Command("bitcoin-cli", "loadwallet", "tracker_watchonly")
+	output, err := cmd.Output()
+	if err != nil {
+		// Check if it's already loaded
+		if exitError, ok := err.(*exec.ExitError); ok {
+			stderr := string(exitError.Stderr)
+			if containsStr(stderr, "already loaded") || containsStr(stderr, "Duplicate wallet filename") {
+				log.Println("✅ Tracking wallet already loaded")
+				return nil
+			}
+			return fmt.Errorf("failed to load tracking wallet: %v, stderr: %s", err, stderr)
+		}
+		return fmt.Errorf("failed to load tracking wallet: %v", err)
+	}
+
+	log.Printf("✅ Successfully loaded tracking wallet: %s", string(output))
+	return nil
+}
+
+// walletExists checks if a wallet with the given name exists
+func walletExists(walletName string) (bool, error) {
+	// List all wallets
+	cmd := exec.Command("bitcoin-cli", "listwallets")
+	output, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to list wallets: %w", err)
+	}
+
+	var wallets []string
+	if err := json.Unmarshal(output, &wallets); err != nil {
+		return false, fmt.Errorf("failed to parse wallet list: %w", err)
+	}
+
+	// Check if our wallet is in the list
+	for _, wallet := range wallets {
+		if wallet == walletName {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// containsStr checks if a string contains a substring
+func containsStr(s, substr string) bool {
+	return strings.Contains(s, substr)
 }
