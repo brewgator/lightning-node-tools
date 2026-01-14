@@ -304,15 +304,6 @@
                     🔗 On-chain Management
                 </button>
                 <button type="button"
-                        id="tab-offline"
-                        class="nav-tab"
-                        role="tab"
-                        aria-selected="false"
-                        aria-controls="offline"
-                        onclick="showSection('offline', event)">
-                    🧊 Cold Storage
-                </button>
-                <button type="button"
                         id="tab-analytics"
                         class="nav-tab"
                         role="tab"
@@ -350,8 +341,8 @@
                 </div>
 
                 <div class="card">
-                    <h2>🧊 Cold Storage</h2>
-                    <div id="cold-storage-details">
+                    <h2>⚡ Strike Balance</h2>
+                    <div id="strike-details">
                         <!-- Populated by JavaScript -->
                     </div>
                 </div>
@@ -405,6 +396,22 @@
                         <canvas id="forwardsChart"></canvas>
                     </div>
                 </div>
+
+                <div class="card">
+                    <h2>⚡ Strike Balance History</h2>
+                    <div class="date-range-selector strike-range">
+                        <span class="date-range-label">Time Range:</span>
+                        <button class="date-range-btn strike-range" data-days="7">7D</button>
+                        <button class="date-range-btn strike-range active" data-days="30">30D</button>
+                        <button class="date-range-btn strike-range" data-days="90">90D</button>
+                        <button class="date-range-btn strike-range" data-days="365">1Y</button>
+                        <button class="date-range-btn strike-range" data-days="all">ALL</button>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-loading" id="strikeChartLoading">⏳ Loading chart data...</div>
+                        <canvas id="strikeChart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -416,17 +423,20 @@
         let portfolioChart = null;
         let feesChart = null;
         let forwardsChart = null;
+        let strikeChart = null;
 
         // Global variables for date ranges
         let currentPortfolioRange = 30;
         let currentFeesRange = 30;
         let currentForwardsRange = 30;
+        let currentStrikeRange = 30;
 
         // LocalStorage keys
         const STORAGE_KEYS = {
             PORTFOLIO_RANGE: 'portfolio_date_range',
             FEES_RANGE: 'fees_date_range',
-            FORWARDS_RANGE: 'forwards_date_range'
+            FORWARDS_RANGE: 'forwards_date_range',
+            STRIKE_RANGE: 'strike_date_range'
         };
 
         // Load date ranges from localStorage
@@ -434,10 +444,12 @@
             const portfolioVal = localStorage.getItem(STORAGE_KEYS.PORTFOLIO_RANGE);
             const feesVal = localStorage.getItem(STORAGE_KEYS.FEES_RANGE);
             const forwardsVal = localStorage.getItem(STORAGE_KEYS.FORWARDS_RANGE);
+            const strikeVal = localStorage.getItem(STORAGE_KEYS.STRIKE_RANGE);
 
             currentPortfolioRange = portfolioVal === 'all' ? 'all' : (parseInt(portfolioVal) || 30);
             currentFeesRange = feesVal === 'all' ? 'all' : (parseInt(feesVal) || 30);
             currentForwardsRange = forwardsVal === 'all' ? 'all' : (parseInt(forwardsVal) || 30);
+            currentStrikeRange = strikeVal === 'all' ? 'all' : (parseInt(strikeVal) || 30);
         }
 
         // Save date range to localStorage
@@ -454,6 +466,8 @@
                 selector = '.card .fees-range';
             } else if (chartType === 'forwards') {
                 selector = '.card .forwards-range';
+            } else if (chartType === 'strike') {
+                selector = '.card .strike-range';
             }
 
             // Remove active class from all buttons in the selector group
@@ -512,8 +526,7 @@
         function calculatePortfolioComponents(data) {
             return {
                 lightning: data.lightning_local, // Only local balance belongs to us
-                onchain: data.onchain_confirmed + data.onchain_unconfirmed + data.tracked_addresses,
-                cold: data.cold_storage
+                onchain: data.onchain_confirmed + data.onchain_unconfirmed + data.tracked_addresses
             };
         }
 
@@ -539,11 +552,9 @@
             const components = calculatePortfolioComponents(data);
             const lightningTotal = components.lightning;
             const onchainTotal = components.onchain;
-            const coldTotal = components.cold;
 
             const lightningPercent = total > 0 ? ((lightningTotal / total) * 100).toFixed(1) : 0;
             const onchainPercent = total > 0 ? ((onchainTotal / total) * 100).toFixed(1) : 0;
-            const coldPercent = total > 0 ? ((coldTotal / total) * 100).toFixed(1) : 0;
 
             container.innerHTML = `
                 <div class="balance-item">
@@ -557,14 +568,6 @@
                 <div class="balance-item">
                     <span class="balance-label">🔗 On-chain (${onchainPercent}%):</span>
                     <span class="balance-value">${formatSats(onchainTotal)}</span>
-                </div>
-                <div class="balance-item">
-                    <span class="balance-label">🧊 Cold Storage (${coldPercent}%):</span>
-                    <span class="balance-value">${formatSats(coldTotal)}</span>
-                </div>
-                <div class="balance-item">
-                    <span class="balance-label">💧 Liquid (No Cold):</span>
-                    <span class="balance-value">${formatSats(data.total_liquid)}</span>
                 </div>
                 <div class="balance-item">
                     <span class="balance-label">Last Updated:</span>
@@ -630,29 +633,54 @@
             `;
         }
 
-        function updateColdStorageDetails(data) {
-            const container = document.getElementById('cold-storage-details');
-            const coldTotal = data.cold_storage;
-            const portfolioPercent = data.total_portfolio > 0 ? ((coldTotal / data.total_portfolio) * 100).toFixed(1) : 0;
+        async function updateStrikeDetails() {
+            const container = document.getElementById('strike-details');
 
-            container.innerHTML = `
-                <div class="balance-item">
-                    <span class="balance-label">❄️ Total Cold Storage:</span>
-                    <span class="balance-value">${formatSats(coldTotal)}</span>
-                </div>
-                <div class="balance-item">
-                    <span class="balance-label">Portfolio %:</span>
-                    <span class="balance-value">${portfolioPercent}% of total</span>
-                </div>
-                <div class="balance-item">
-                    <span class="balance-label">Security Status:</span>
-                    <span class="balance-value" style="color: #238636;">🔒 Cold (Offline)</span>
-                </div>
-                <div class="balance-item">
-                    <span class="balance-label">Liquidity:</span>
-                    <span class="balance-value" style="color: #d29922;">⚠️ Manual verification required</span>
-                </div>
-            `;
+            try {
+                const response = await fetch('/api/strike/balance/current?currency=BTC');
+                const result = await response.json();
+
+                if (!result.success || !result.data) {
+                    container.innerHTML = `
+                        <div class="balance-item">
+                            <span class="balance-label">Status:</span>
+                            <span class="balance-value" style="color: #8b949e;">No Strike data available</span>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const strike = result.data;
+                const availableBTC = (strike.available / 100000000).toFixed(8);
+                const totalBTC = (strike.total / 100000000).toFixed(8);
+
+                container.innerHTML = `
+                    <div class="balance-item">
+                        <span class="balance-label">💰 Available:</span>
+                        <span class="balance-value">${formatSats(strike.available)}</span>
+                    </div>
+                    <div class="balance-item">
+                        <span class="balance-label">📊 Total:</span>
+                        <span class="balance-value">${formatSats(strike.total)}</span>
+                    </div>
+                    <div class="balance-item">
+                        <span class="balance-label">⏳ Pending:</span>
+                        <span class="balance-value">${formatSats(strike.pending)}</span>
+                    </div>
+                    <div class="balance-item">
+                        <span class="balance-label">Last Updated:</span>
+                        <span class="balance-value">${formatTimestamp(strike.timestamp)}</span>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Failed to load Strike balance:', error);
+                container.innerHTML = `
+                    <div class="balance-item">
+                        <span class="balance-label">Status:</span>
+                        <span class="balance-value" style="color: #f85149;">Error loading data</span>
+                    </div>
+                `;
+            }
         }
 
         // Show/hide loading indicator
@@ -693,10 +721,8 @@
                 // Prepare data
                 const labels = result.data.map(item => new Date(item.timestamp).toLocaleDateString());
                 const portfolioData = result.data.map(item => item.total_portfolio);
-                const liquidData = result.data.map(item => item.total_liquid);
                 const lightningData = result.data.map(item => calculatePortfolioComponents(item).lightning);
                 const onchainData = result.data.map(item => calculatePortfolioComponents(item).onchain);
-                const coldData = result.data.map(item => calculatePortfolioComponents(item).cold);
 
                 // Destroy existing chart
                 if (portfolioChart) {
@@ -729,23 +755,6 @@
                             borderColor: '#FF6B35',
                             backgroundColor: '#FF6B3520',
                             borderWidth: 2,
-                            fill: false,
-                            tension: 0.3,
-                        }, {
-                            label: '🧊 Cold Storage',
-                            data: coldData,
-                            borderColor: '#87CEEB',
-                            backgroundColor: '#87CEEB20',
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.3,
-                        }, {
-                            label: '💧 Liquid (No Cold)',
-                            data: liquidData,
-                            borderColor: darkTheme.successColor,
-                            backgroundColor: darkTheme.successColor + '20',
-                            borderWidth: 1,
-                            borderDash: [5, 5],
                             fill: false,
                             tension: 0.3,
                         }]
@@ -1057,6 +1066,118 @@
             }
         }
 
+        // Chart 4: Strike Balance History (Line Chart)
+        async function createStrikeChart() {
+            try {
+                showChartLoading('strikeChart');
+
+                const daysParam = currentStrikeRange === 'all' ? '?days=all' : `?days=${currentStrikeRange}`;
+                const response = await fetch(`/api/strike/balance/history?currency=BTC${daysParam.replace('?', '&')}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                }
+                const result = await response.json();
+
+                if (!result.success || !result.data) {
+                    hideChartLoading('strikeChart');
+                    console.error('No Strike balance data available:', result.error || 'Empty dataset');
+                    return;
+                }
+
+                const ctx = document.getElementById('strikeChart').getContext('2d');
+
+                // Prepare data from API response
+                const chartData = result.data;
+                const labels = chartData.labels || [];
+                const availableData = chartData.datasets?.[0]?.data || [];
+                const totalData = chartData.datasets?.[1]?.data || [];
+
+                // Destroy existing chart
+                if (strikeChart) {
+                    strikeChart.destroy();
+                }
+
+                strikeChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Available Balance (BTC)',
+                            data: availableData,
+                            borderColor: 'rgba(255, 159, 64, 1)',
+                            backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                        }, {
+                            label: 'Total Balance (BTC)',
+                            data: totalData,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderWidth: 2,
+                            fill: false,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index',
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                grid: {
+                                    color: darkTheme.gridColor,
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return formatSats(value);
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: darkTheme.gridColor,
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                backgroundColor: darkTheme.borderColor,
+                                titleColor: darkTheme.textColor,
+                                bodyColor: darkTheme.textColor,
+                                borderColor: darkTheme.gridColor,
+                                borderWidth: 1,
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${formatSats(context.parsed.y)}`;
+                                    }
+                                }
+                            },
+                            legend: {
+                                labels: {
+                                    color: darkTheme.textColor,
+                                }
+                            }
+                        },
+                        animation: {
+                            duration: 1000,
+                            easing: 'easeInOutQuart',
+                        }
+                    }
+                });
+
+                hideChartLoading('strikeChart');
+            } catch (error) {
+                console.error('Failed to load Strike chart:', error);
+                hideChartLoading('strikeChart');
+            }
+        }
+
         async function loadPortfolioData() {
             showLoading();
 
@@ -1071,6 +1192,7 @@
             updateActiveButton('portfolio', currentPortfolioRange);
             updateActiveButton('fees', currentFeesRange);
             updateActiveButton('forwards', currentForwardsRange);
+            updateActiveButton('strike', currentStrikeRange);
 
             try {
                 const response = await fetch('/api/portfolio/current');
@@ -1087,13 +1209,14 @@
                 updateCurrentBalances(data);
                 updateLightningDetails(data);
                 updateOnchainDetails(data);
-                updateColdStorageDetails(data);
+                updateStrikeDetails();
 
                 // Load charts
                 await Promise.all([
                     createPortfolioChart(),
                     createFeesChart(),
-                    createForwardsChart()
+                    createForwardsChart(),
+                    createStrikeChart()
                 ]);
 
                 // Hide status and show dashboard
@@ -1143,6 +1266,19 @@
                     saveDateRangeToStorage(STORAGE_KEYS.FORWARDS_RANGE, days);
                     updateActiveButton('forwards', days);
                     createForwardsChart();
+                });
+            });
+
+            // Strike chart buttons
+            document.querySelectorAll('.strike-range.date-range-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const days = this.getAttribute('data-days');
+                    const numDays = days === 'all' ? 'all' : parseInt(days);
+
+                    currentStrikeRange = numDays;
+                    saveDateRangeToStorage(STORAGE_KEYS.STRIKE_RANGE, days);
+                    updateActiveButton('strike', days);
+                    createStrikeChart();
                 });
             });
         }
@@ -1229,10 +1365,6 @@
                 case 'onchain':
                     // Redirect to existing on-chain addresses page
                     window.location.href = '/onchain-addresses.html';
-                    break;
-                case 'offline':
-                    // Redirect to existing cold storage page
-                    window.location.href = '/cold-storage.html';
                     break;
                 case 'analytics':
                     // TODO: Create dedicated analytics page
