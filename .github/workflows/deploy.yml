@@ -101,25 +101,29 @@ jobs:
     - name: Trigger deployment webhook
       run: |
         echo "🚀 Triggering deployment webhook..."
-        # Create a fake GitHub webhook payload
-        payload=$(cat <<EOF
-        {
-          "ref": "refs/heads/main",
-          "repository": {
-            "name": "lightning-node-tools",
-            "full_name": "brewgator/lightning-node-tools"
-          },
-          "head_commit": {
-            "id": "${{ github.sha }}",
-            "message": "${{ github.event.head_commit.message }}",
-            "author": {
-              "name": "${{ github.actor }}",
-              "email": "noreply@github.com"
+        # Create a properly escaped GitHub webhook payload using jq
+        payload=$(jq -n \
+          --arg ref "refs/heads/main" \
+          --arg repo_name "lightning-node-tools" \
+          --arg repo_full "brewgator/lightning-node-tools" \
+          --arg commit_id "${{ github.sha }}" \
+          --arg commit_msg "${{ github.event.head_commit.message }}" \
+          --arg author "${{ github.actor }}" \
+          '{
+            "ref": $ref,
+            "repository": {
+              "name": $repo_name,
+              "full_name": $repo_full
+            },
+            "head_commit": {
+              "id": $commit_id,
+              "message": $commit_msg,
+              "author": {
+                "name": $author,
+                "email": "noreply@github.com"
+              }
             }
-          }
-        }
-        EOF
-        )
+          }')
 
         # Calculate HMAC signature
         signature="sha256=$(echo -n "$payload" | openssl dgst -sha256 -hmac "${{ secrets.WEBHOOK_SECRET }}" | cut -d' ' -f2)"
