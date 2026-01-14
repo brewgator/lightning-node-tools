@@ -744,28 +744,51 @@
 
                 // Get Strike data (may not be available)
                 let strikeData = [];
-                let strikeBalanceByDate = {};
+                let strikeBalanceByTimestamp = {};
                 if (strikeResponse.ok) {
                     const strikeResult = await strikeResponse.json();
                     if (strikeResult.success && strikeResult.data && strikeResult.data.labels) {
-                        // Create a map of date -> strike balance
+                        // Create a map of timestamp string -> strike balance
                         strikeResult.data.labels.forEach((label, idx) => {
-                            const strikeDate = label.split(' ')[0]; // Get just the date part
-                            strikeBalanceByDate[strikeDate] = strikeResult.data.datasets[0].data[idx] || 0;
+                            // Parse the Strike timestamp and normalize to date string
+                            const strikeTimestamp = label; // Format: "2026-01-14 16:07"
+                            strikeBalanceByTimestamp[strikeTimestamp] = strikeResult.data.datasets[0].data[idx] || 0;
                         });
                     }
                 }
 
                 const ctx = document.getElementById('portfolioChart').getContext('2d');
 
-                // Prepare data
+                // Prepare data with raw timestamps for matching
+                const portfolioTimestamps = portfolioResult.data.map(item => item.timestamp);
                 const labels = portfolioResult.data.map(item => new Date(item.timestamp).toLocaleDateString());
                 const lightningData = portfolioResult.data.map(item => calculatePortfolioComponents(item).lightning);
                 const onchainData = portfolioResult.data.map(item => calculatePortfolioComponents(item).onchain);
 
-                // Match Strike data to portfolio dates
-                strikeData = labels.map(label => {
-                    return strikeBalanceByDate[label] || 0;
+                // Match Strike data to portfolio timestamps
+                // For each portfolio timestamp, find the closest Strike balance
+                strikeData = portfolioTimestamps.map(portfolioTs => {
+                    // Parse portfolio timestamp
+                    const portfolioDate = new Date(portfolioTs);
+                    const portfolioDateStr = portfolioDate.toISOString().split('T')[0]; // Get YYYY-MM-DD
+
+                    // Look for Strike data on this date
+                    for (const [strikeTs, balance] of Object.entries(strikeBalanceByTimestamp)) {
+                        const strikeDate = strikeTs.split(' ')[0]; // Get YYYY-MM-DD from "2026-01-14 16:07"
+                        if (strikeDate === portfolioDateStr) {
+                            return balance;
+                        }
+                    }
+
+                    // If no exact match, use most recent available Strike balance (forward fill)
+                    let latestBalance = 0;
+                    for (const [strikeTs, balance] of Object.entries(strikeBalanceByTimestamp)) {
+                        const strikeDate = new Date(strikeTs.replace(' ', 'T') + ':00Z');
+                        if (strikeDate <= portfolioDate) {
+                            latestBalance = balance;
+                        }
+                    }
+                    return latestBalance;
                 });
 
                 // Calculate total portfolio including Strike
