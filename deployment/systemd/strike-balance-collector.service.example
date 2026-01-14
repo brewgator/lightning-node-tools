@@ -5,17 +5,15 @@ After=network.target
 
 [Service]
 Type=simple
-User=bitcoin
-Group=bitcoin
-WorkingDirectory=/opt/lightning-node-tools
-ExecStart=/opt/lightning-node-tools/bin/strike-balance-collector \
-    --db=/opt/lightning-node-tools/data/portfolio.db \
+WorkingDirectory={{WORKING_DIRECTORY}}
+ExecStart={{WORKING_DIRECTORY}}/bin/strike-balance-collector \
+    --db={{WORKING_DIRECTORY}}/data/portfolio.db \
     --interval=15m
 
 # Environment variables
 # Option 1: Set directly in this file
 Environment="STRIKE_API_KEY=your_strike_api_key_here"
-# Option 2: Or configure in .env file at /opt/lightning-node-tools/.env
+# Option 2: Or configure in .env file at {{WORKING_DIRECTORY}}/.env
 
 # Restart configuration
 Restart=on-failure
@@ -30,8 +28,8 @@ SyslogIdentifier=strike-balance-collector
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/lightning-node-tools/data
+ProtectHome=read-only
+ReadWritePaths={{WORKING_DIRECTORY}}/data
 
 [Install]
 WantedBy=multi-user.target
